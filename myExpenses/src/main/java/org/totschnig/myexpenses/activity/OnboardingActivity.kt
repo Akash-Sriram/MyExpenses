@@ -10,7 +10,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import com.evernote.android.state.State
@@ -110,18 +113,20 @@ class OnboardingActivity : SyncBackendSetupActivity() {
     override val createAccountTaskShouldQueryLocalAccounts = false
 
     override fun onReceiveSyncAccountData(data: SyncAccountData) {
-        lifecycleScope.launchWhenResumed {
-            dataFragment?.setupMenu()
-            accountName = data.accountName
-            if (data.backups.isNotEmpty() || data.remoteAccounts.isNotEmpty()) {
-                if (checkForDuplicateUuids(data.remoteAccounts)) {
-                    showSnackBar("Found accounts with duplicate uuids")
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                dataFragment?.setupMenu()
+                accountName = data.accountName
+                if (data.backups.isNotEmpty() || data.remoteAccounts.isNotEmpty()) {
+                    if (checkForDuplicateUuids(data.remoteAccounts)) {
+                        showSnackBar("Found accounts with duplicate uuids")
+                    } else {
+                        RestoreFromCloudDialogFragment.newInstance(data.backups, data.remoteAccounts)
+                            .show(supportFragmentManager, FRAGMENT_TAG_RESTORE)
+                    }
                 } else {
-                    RestoreFromCloudDialogFragment.newInstance(data.backups, data.remoteAccounts)
-                        .show(supportFragmentManager, FRAGMENT_TAG_RESTORE)
+                    showSnackBar("Neither backups nor sync accounts found")
                 }
-            } else {
-                showSnackBar("Neither backups nor sync accounts found")
             }
         }
     }

@@ -46,7 +46,6 @@ android {
     }
 
     compileOptions {
-        coreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -160,8 +159,6 @@ dependencies {
     api(libs.androidx.datastore.preferences)
     implementation libs.androidx.compose.adaptive.navigation
     implementation libs.androidx.compose.material3.adaptive.navigation.suite
-    coreLibraryDesugaring libs.android.desugar
-    api libs.phrase
     implementation platform(libs.androidx.compose.bom)
     implementation(libs.androidx.navigation.compose)
     implementation libs.compose.ui
@@ -186,8 +183,6 @@ dependencies {
     implementation libs.itextpdf
     implementation libs.commons.csv
     api libs.commons.text
-    //noinspection GradleDependency
-    api libs.picasso
     implementation libs.mpandroidchart
     api libs.simpledialogfragments
     api libs.timber

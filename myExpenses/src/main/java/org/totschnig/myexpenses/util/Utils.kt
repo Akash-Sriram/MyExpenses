@@ -18,7 +18,6 @@ import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.style.IconMarginSpan
 import android.view.SubMenu
 import androidx.loader.app.LoaderManager
-import com.squareup.phrase.Phrase
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.CurrencyEnum
@@ -293,16 +292,16 @@ object Utils {
     @JvmStatic
     fun getTextWithAppName(ctx: Context?, resId: Int): CharSequence {
         val context = ctx ?: MyApplication.instance
-        return Phrase.from(context, resId).put(PLACEHOLDER_APP_NAME, context.getString(R.string.app_name)).format()
+        return context.getString(resId).replace("{$PLACEHOLDER_APP_NAME}", context.getString(R.string.app_name))
     }
 
     @JvmStatic
     fun getTellAFriendMessage(ctx: Context?): CharSequence {
         val context = ctx ?: MyApplication.instance
-        return Phrase.from(context, R.string.tell_a_friend_message)
-            .put(PLACEHOLDER_APP_NAME, context.getString(R.string.app_name))
-            .put("platform", DistributionHelper.platform)
-            .put("website", context.getString(R.string.website)).format()
+        return context.getString(R.string.tell_a_friend_message)
+            .replace("{$PLACEHOLDER_APP_NAME}", context.getString(R.string.app_name))
+            .replace("{platform}", DistributionHelper.platform)
+            .replace("{website}", context.getString(R.string.website))
     }
 
     @JvmStatic

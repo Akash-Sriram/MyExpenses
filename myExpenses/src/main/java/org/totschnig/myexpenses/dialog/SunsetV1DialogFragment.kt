@@ -31,7 +31,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.setFragmentResult
-import com.squareup.phrase.Phrase
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.BaseActivity
 import org.totschnig.myexpenses.activity.MyExpensesV2
@@ -81,11 +80,10 @@ class SunsetV1DialogFragment : ComposeBaseDialogFragment(), DialogInterface.OnCl
                         else -> "F-Droid"
                     }
 
-                    val bodyText3 = Phrase.from(context, R.string.sunset_v1_message_3_body)
-                        .put("app_name", stringResource(R.string.app_name))
-                        .put("store", storeName)
-                        .format()
-                        .toString()
+                    val appName = stringResource(R.string.app_name)
+                    val bodyText3 = stringResource(R.string.sunset_v1_message_3_body)
+                        .replace("{app_name}", appName)
+                        .replace("{store}", storeName)
 
                     val items = listOf(
                         stringResource(R.string.sunset_v1_message_1_intro) to stringResource(R.string.migration_v2_opt_out_warning),

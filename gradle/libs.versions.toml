@@ -66,8 +66,6 @@ mpandroidchart = "47240bb94c"
 okHttpVersion = "5.5.0"
 orchestrator = "1.6.1"
 pagingCompose = "3.5.1"
-phrase = "1.2.0"
-picassoVersion = "2.8"
 playServicesAuth = "22.0.0"
 playServicesMlkitTextRecognitionCommon = "19.1.0"
 recyclerview = "1.4.0"
@@ -200,8 +198,6 @@ mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoVers
 mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
 mpandroidchart = { module = "com.github.mtotschnig:MPAndroidChart", version.ref = "mpandroidchart" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okHttpVersion" }
-phrase = { module = "com.squareup.phrase:phrase", version.ref = "phrase" }
-picasso = { module = "com.squareup.picasso:picasso", version.ref = "picassoVersion" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 play-services-mlkit-text-recognition-common = { module = "com.google.android.gms:play-services-mlkit-text-recognition-common", version.ref = "playServicesMlkitTextRecognitionCommon" }
 relinker = { module = "com.getkeepsafe.relinker:relinker", version.ref = "relinker" }

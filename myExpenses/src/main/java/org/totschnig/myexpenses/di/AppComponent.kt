@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.di
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.google.gson.Gson
-import com.squareup.picasso.Picasso
 import dagger.BindsInstance
 import dagger.Component
 import kotlinx.coroutines.CoroutineDispatcher
@@ -135,8 +134,6 @@ interface AppComponent {
     fun currencyContext(): CurrencyContext
 
     fun currencyFormatter(): ICurrencyFormatter
-
-    fun picasso(): Picasso
 
     fun myApplication(): MyApplication
 

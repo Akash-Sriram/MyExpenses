@@ -5,19 +5,16 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.appcompat.app.AlertDialog
+import android.graphics.ImageDecoder
 import androidx.lifecycle.ViewModelProvider
 import com.google.android.material.snackbar.Snackbar
-import com.squareup.picasso.Picasso
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.dialog.DialogViewBinding
 import org.totschnig.myexpenses.feature.OcrHost
 import org.totschnig.ocr.databinding.ScanPreviewBinding
-import javax.inject.Inject
 
 class ScanPreviewFragment : DialogViewBinding<ScanPreviewBinding>() {
-    @Inject
-    lateinit var picasso: Picasso
     private lateinit var viewModel: ScanPreviewViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,15 +57,19 @@ class ScanPreviewFragment : DialogViewBinding<ScanPreviewBinding>() {
     }
 
     private fun loadImage() {
-        scanUri.let {
-            picasso.invalidate(it)
-            val requestCreator = picasso.load(it)
-            with(binding.imageView) {
-                if (width > 0 || height > 0) {
-                    requestCreator.resize(width, height).onlyScaleDown()
+        val uri = scanUri
+        try {
+            val source = ImageDecoder.createSource(requireContext().contentResolver, uri)
+            val bitmap = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                val targetW = binding.imageView.width
+                val targetH = binding.imageView.height
+                if (targetW > 0 && targetH > 0 && (info.size.width > targetW || info.size.height > targetH)) {
+                    decoder.setTargetSize(targetW, targetH)
                 }
-                requestCreator.into(this)
             }
+            binding.imageView.setImageBitmap(bitmap)
+        } catch (_: Exception) {
+            binding.imageView.setImageURI(uri)
         }
     }
 

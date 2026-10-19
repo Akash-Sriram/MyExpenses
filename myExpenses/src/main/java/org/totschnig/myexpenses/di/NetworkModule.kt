@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.di
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
-import com.squareup.picasso.Picasso
 import dagger.Module
 import dagger.Provides
 import okhttp3.OkHttpClient
@@ -15,12 +14,6 @@ import javax.inject.Singleton
 @Module
 open class NetworkModule {
     companion object {
-        @JvmStatic
-        @Singleton
-        @Provides
-        fun providePicasso(context: Context): Picasso = Picasso.Builder(context).build().also {
-            Picasso.setSingletonInstance(it)
-        }
 
         @JvmStatic
         @Provides
