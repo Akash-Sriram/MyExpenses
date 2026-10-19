@@ -93,9 +93,8 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
     @Inject
     lateinit var prefHandler: PrefHandler
 
-    @get:Deprecated("")
-    @Inject
-    lateinit var settings: SharedPreferences
+    val settings: SharedPreferences
+        get() = prefHandler.sharedPreferences
 
     @Inject
     lateinit var currencyContext: CurrencyContext
@@ -161,8 +160,7 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
         setupLogging()
         if (!syncService) {
             ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-            @Suppress("DEPRECATION")
-            settings.registerOnSharedPreferenceChangeListener(this)
+            prefHandler.sharedPreferences.registerOnSharedPreferenceChangeListener(this)
             register(this)
         }
         licenceHandler.init()

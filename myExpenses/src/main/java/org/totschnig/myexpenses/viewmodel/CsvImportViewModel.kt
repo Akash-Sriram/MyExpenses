@@ -139,7 +139,6 @@ class CsvImportViewModel(application: Application, val savedStateHandle: SavedSt
             )
         }
 
-    @Suppress("DEPRECATION")
     fun importData(
         data: List<CSVRecord>,
         columnToFieldMap: IntArray,

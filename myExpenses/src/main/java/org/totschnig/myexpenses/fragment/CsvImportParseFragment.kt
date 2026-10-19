@@ -46,6 +46,8 @@ import org.totschnig.myexpenses.viewmodel.data.Currency
 import org.totschnig.myexpenses.viewmodel.data.Currency.Companion.create
 import javax.inject.Inject
 import androidx.core.net.toUri
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import org.totschnig.myexpenses.adapter.GroupedSpinnerAdapter
 import org.totschnig.myexpenses.adapter.SpinnerItem
 import org.totschnig.myexpenses.dialog.addAllAccountTypes
@@ -55,7 +57,6 @@ import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.ui.SpinnerHelper
 
-@Suppress("DEPRECATION")
 class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnItemSelectedListener,
     FileNameHostFragment {
 
@@ -68,7 +69,7 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
     override var uri: Uri? = null
         set(value) {
             field = value
-            requireActivity().invalidateOptionsMenu()
+            requireActivity().invalidateMenu()
         }
     private val currencyViewModel: CurrencyViewModel by viewModels()
     private val viewModel: ImportConfigurationViewModel by viewModels()
@@ -176,6 +177,35 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        savedInstanceState?.getString(prefKey)?.toUri()?.let {
+            val displayName = requireActivity().contentResolver.getDisplayName(it)
+            uri = it
+            fileNameBinding.Filename.setText(displayName)
+        }
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.csv_parse, menu)
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                if (menuItem.itemId == R.id.PARSE_COMMAND) {
+                    val format = binding.DateFormatTable.DateFormat.selectedItem as QifDateFormat
+                    val encoding = binding.EncodingTable.Encoding.selectedItem as String
+                    val delimiter =
+                        resources.getStringArray(R.array.pref_csv_import_delimiter_values)[binding.Delimiter.selectedItemPosition]
+                    with(prefHandler) {
+                        putString(PREF_KEY_IMPORT_CSV_DELIMITER, delimiter)
+                        putString(PREF_KEY_IMPORT_CSV_ENCODING, encoding)
+                        putString(PREF_KEY_IMPORT_CSV_DATE_FORMAT, format.name)
+                    }
+                    ImportFileResultHandler.maybePersistUri(this@CsvImportParseFragment, prefHandler)
+                    (activity as? CsvImportActivity)?.parseFile(uri!!, delimiter[0], encoding)
+                    return true
+                }
+                return false
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
         ViewCompat.setOnApplyWindowInsetsListener(view, { v, insets ->
             val systemBarsAndCutouts = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
@@ -190,7 +220,6 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
 
             WindowInsetsCompat.CONSUMED
         })
-
     }
 
     override fun onDestroyView() {
@@ -201,7 +230,6 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
         with((requireActivity().application as MyApplication).appComponent) {
             inject(this@CsvImportParseFragment)
             inject(currencyViewModel)
@@ -237,16 +265,6 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
         outState.putString(KEY_CURRENCY, currency)
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        savedInstanceState?.getString(prefKey)?.toUri()?.let {
-            val displayName = requireActivity().contentResolver.getDisplayName(it)
-            uri = it
-            fileNameBinding.Filename.setText(displayName)
-        }
-    }
-
     override fun onClick(v: View) {
         DialogUtils.openBrowse(uri, this)
     }
@@ -260,27 +278,6 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
     }
 
     override val typeName = "CSV"
-
-    @Deprecated("Deprecated in Java")
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.csv_parse, menu)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onOptionsItemSelected(item: MenuItem) = if (item.itemId == R.id.PARSE_COMMAND) {
-        val format = binding.DateFormatTable.DateFormat.selectedItem as QifDateFormat
-        val encoding = binding.EncodingTable.Encoding.selectedItem as String
-        val delimiter =
-            resources.getStringArray(R.array.pref_csv_import_delimiter_values)[binding.Delimiter.selectedItemPosition]
-        with(prefHandler) {
-            putString(PREF_KEY_IMPORT_CSV_DELIMITER, delimiter)
-            putString(PREF_KEY_IMPORT_CSV_ENCODING, encoding)
-            putString(PREF_KEY_IMPORT_CSV_DATE_FORMAT, format.name)
-        }
-        ImportFileResultHandler.maybePersistUri(this, prefHandler)
-        (activity as? CsvImportActivity)?.parseFile(uri!!, delimiter[0], encoding)
-        true
-    } else super.onOptionsItemSelected(item)
 
     val isReady: Boolean
         get() {

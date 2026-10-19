@@ -300,7 +300,6 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                     //
                     //we open the backup file and read every entry
                     //getSharedPreferences does not allow to access file if it not in private data directory
-                    @Suppress("DEPRECATION")
                     val settings = application.settings
                     settings.unregisterOnSharedPreferenceChangeListener(application)
                     val edit = settings.edit()
@@ -373,7 +372,6 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                         R.string.restore_calendar_success,
                         restorePlanner()
                     )
-                    @Suppress("DEPRECATION")
                     application.settings
                         .registerOnSharedPreferenceChangeListener(application)
                     Timber.i("now emptying event cache")
@@ -482,7 +480,6 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
             TransactionProvider.ACCOUNTS_URI, projection,
             "$KEY_SYNC_ACCOUNT_NAME IS NOT null", null, null
         )?.use {
-            @Suppress("DEPRECATION")
             val sharedPreferences = application.settings
             val editor = sharedPreferences.edit()
             if (it.moveToFirst()) {

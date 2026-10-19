@@ -10,7 +10,7 @@ import androidx.core.content.edit
 
 open class PrefHandlerImpl(
     private val context: Application,
-    private val sharedPreferences: SharedPreferences,
+    override val sharedPreferences: SharedPreferences,
 ) : PrefHandler {
     override fun getKey(key: PrefKey) =
         if (key.resId == 0) key._key!! else context.getString(key.resId)

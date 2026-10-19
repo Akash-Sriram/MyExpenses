@@ -494,7 +494,6 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
    * and this can lead to bugs, if a later upgrade relies on column names as defined earlier,
    * and a user upgrading several versions at once would get a broken upgrade process
    */
-  @Suppress("DEPRECATION")
   override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {
     try {
       Timber.i("Upgrading database from version %d to %d", oldVersion, newVersion);

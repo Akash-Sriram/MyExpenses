@@ -3,6 +3,7 @@ package org.totschnig.myexpenses.preference
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.preference.PreferenceFragmentCompat
@@ -38,6 +39,8 @@ import java.util.Locale
 import kotlin.jvm.java
 
 interface PrefHandler {
+    val sharedPreferences: SharedPreferences
+
     fun getKey(key: PrefKey): String
 
 

@@ -47,20 +47,18 @@ abstract class AbstractListWidget(
 ) : BaseWidget(protectionKey) {
     abstract val emptyTextResourceId: Int
 
-    @Suppress("DEPRECATION")
     override fun onReceive(context: Context, intent: Intent) {
         context.injector.inject(this)
         val instance = AppWidgetManager.getInstance(context)
         val appWidgetIds = intent.extras?.getIntArray(AppWidgetManager.EXTRA_APPWIDGET_IDS)
         when (intent.action) {
             WIDGET_LIST_DATA_CHANGED ->
-                appWidgetIds?.forEach { instance.notifyAppWidgetViewDataChanged(it, R.id.list) }
+                appWidgetIds?.let { instance.notifyAppWidgetViewDataChanged(it, R.id.list) }
 
             else -> super.onReceive(context, intent)
         }
     }
 
-    @Suppress("DEPRECATION")
     override suspend fun updateWidgetDo(
         context: Context,
         appWidgetManager: AppWidgetManager,
@@ -78,7 +76,7 @@ abstract class AbstractListWidget(
                 setEmptyView(R.id.list, R.id.emptyView)
                 setOnClickPendingIntent(R.id.emptyView, clickPI)
 
-                setRemoteAdapter(appWidgetId, R.id.list, Intent(context, clazz).apply {
+                setRemoteAdapter(R.id.list, Intent(context, clazz).apply {
                     putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                     val availableWidth =
                         availableWidthForButtons(context, appWidgetManager, appWidgetId)

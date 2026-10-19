@@ -84,10 +84,9 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
                 backupState.postValue(
                     BackupState.Purged(
                         runCatching {
-                            @Suppress("DEPRECATION")
                             it.result.getOrThrow().third.fold(
                                 ifLeft = { list ->
-                                    list.sumBy {
+                                    list.sumOf {
                                         if (it.delete()) 1 else 0
                                     }
                                 },

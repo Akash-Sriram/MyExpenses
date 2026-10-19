@@ -19,6 +19,8 @@ import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatSpinner
 import androidx.appcompat.widget.AppCompatTextView
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -50,7 +52,6 @@ import org.totschnig.myexpenses.viewmodel.CsvImportViewModel.Companion.KEY_HEADE
 import timber.log.Timber
 import javax.inject.Inject
 
-@Suppress("DEPRECATION")
 class CsvImportDataFragment : Fragment() {
 
     private val viewModel: CsvImportViewModel by activityViewModels()
@@ -97,7 +98,6 @@ class CsvImportDataFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         (requireActivity().application as MyApplication).appComponent.inject(this)
-        setHasOptionsMenu(true)
         cellMinWidth = resources.getDimensionPixelSize(R.dimen.csv_import_header_text_size) * 8
         checkboxColumnWidth =
             resources.getDimensionPixelSize(R.dimen.csv_import_checkbox_column_width)
@@ -146,6 +146,19 @@ class CsvImportDataFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.csv_import, menu)
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                if (menuItem.itemId == R.id.IMPORT_COMMAND) {
+                    return handleImport()
+                }
+                return false
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
         ViewCompat.setOnApplyWindowInsetsListener(binding.scrollViewContainer, { v, insets ->
             val systemBarsAndCutouts = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
@@ -386,49 +399,41 @@ class CsvImportDataFragment : Fragment() {
             .toIntArray()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.csv_import, menu)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.IMPORT_COMMAND) {
-            val columnToFieldMap = IntArray(nrOfColumns)
-            val header = viewModel.headerLine.takeIf { it > -1 }?.let { dataSet[it] }
-            for (i in 0 until nrOfColumns) {
-                val position =
-                    (binding.headerLine.getChildAt(i + 1) as Spinner).selectedItemPosition
-                columnToFieldMap[i] = fields[position].first
-                if (position > 0) {
-                    header?.let {
-                        if (header.isSet(i)) {
-                            try {
-                                header2FieldMap.put(
-                                    Utils.normalize(header[i]),
-                                    fields[position].second
-                                )
-                            } catch (e: JSONException) {
-                                CrashHandler.report(e)
-                            }
+    private fun handleImport(): Boolean {
+        val columnToFieldMap = IntArray(nrOfColumns)
+        val header = viewModel.headerLine.takeIf { it > -1 }?.let { dataSet[it] }
+        for (i in 0 until nrOfColumns) {
+            val position =
+                (binding.headerLine.getChildAt(i + 1) as Spinner).selectedItemPosition
+            columnToFieldMap[i] = fields[position].first
+            if (position > 0) {
+                header?.let {
+                    if (header.isSet(i)) {
+                        try {
+                            header2FieldMap.put(
+                                Utils.normalize(header[i]),
+                                fields[position].second
+                            )
+                        } catch (e: JSONException) {
+                            CrashHandler.report(e)
                         }
                     }
                 }
             }
-            if (validateMapping(columnToFieldMap)) {
-                prefHandler.putString(
-                    PrefKey.CSV_IMPORT_HEADER_TO_FIELD_MAP,
-                    header2FieldMap.toString()
-                )
-                val selectedData = dataSet.filterIndexed { index, _ -> viewModel.isSelected(index) }
-                (activity as? CsvImportActivity)?.importData(
-                    selectedData,
-                    columnToFieldMap,
-                    dataSet.size - selectedData.size
-                )
-            }
         }
-        return super.onOptionsItemSelected(item)
+        if (validateMapping(columnToFieldMap)) {
+            prefHandler.putString(
+                PrefKey.CSV_IMPORT_HEADER_TO_FIELD_MAP,
+                header2FieldMap.toString()
+            )
+            val selectedData = dataSet.filterIndexed { index, _ -> viewModel.isSelected(index) }
+            (activity as? CsvImportActivity)?.importData(
+                selectedData,
+                columnToFieldMap,
+                dataSet.size - selectedData.size
+            )
+        }
+        return true
     }
 
     /**
