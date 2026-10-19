@@ -528,11 +528,11 @@ class AmountInput(context: Context, attrs: AttributeSet?) : ConstraintLayout(con
         val focusedId: Int
 
         constructor(source: Parcel) : super(source) {
-            val classLoader = javaClass.getClassLoader()
-            typeButtonState = source.readParcelable(classLoader)!!
-            amountEditTextState = source.readParcelable(classLoader)!!
-            currencySpinnerState = source.readParcelable(classLoader)!!
-            exchangeRateState = source.readSerializable() as BigDecimal?
+            val classLoader = javaClass.classLoader
+            typeButtonState = source.readParcelable(classLoader, Parcelable::class.java)!!
+            amountEditTextState = source.readParcelable(classLoader, Parcelable::class.java)!!
+            currencySpinnerState = source.readParcelable(classLoader, Parcelable::class.java)!!
+            exchangeRateState = source.readSerializable(classLoader, BigDecimal::class.java)
             focusedId = source.readInt()
         }
 

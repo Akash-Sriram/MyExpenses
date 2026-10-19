@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.activity
 
 import android.app.Activity
-import android.app.ProgressDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -148,7 +147,7 @@ class RemapHandler(val activity: BaseMyExpenses<*>) : FragmentResultListener {
             val shouldUpdateValueDate = extras.getBoolean(KEY_UPDATE_VALUE_DATE, false)
             if (shouldClone) {
                 val progressDialog = ProgressDialogFragment.newInstance(
-                    getString(R.string.saving), null, ProgressDialog.STYLE_HORIZONTAL, false
+                    getString(R.string.saving), null, ProgressDialogFragment.STYLE_HORIZONTAL, false
                 )
                 progressDialog.max = checkedItemIds.size
                 supportFragmentManager

@@ -15,9 +15,7 @@
 
 package org.totschnig.myexpenses.dialog
 
-import android.app.AlertDialog
 import android.app.Dialog
-import android.app.ProgressDialog
 import android.content.DialogInterface
 import android.os.Bundle
 import android.text.TextUtils
@@ -26,10 +24,12 @@ import androidx.annotation.NonNull
 import org.totschnig.myexpenses.ui.ScrollableProgressDialog
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 
-@Suppress("DEPRECATION")
 class ProgressDialogFragment : BaseDialogFragment() {
 
     companion object {
+        const val STYLE_SPINNER = 0
+        const val STYLE_HORIZONTAL = 1
+
         private const val KEY_PROGRESS_STYLE = "progressStyle"
         private const val KEY_MESSAGE = "message"
         private const val KEY_WITH_BUTTON = "withButton"
@@ -40,15 +40,14 @@ class ProgressDialogFragment : BaseDialogFragment() {
 
         @JvmStatic
         fun newInstance(message: String, withButton: Boolean): ProgressDialogFragment {
-            return newInstance(null, message, ProgressDialog.STYLE_SPINNER, withButton)
+            return newInstance(null, message, STYLE_SPINNER, withButton)
         }
 
         /**
          * @param message       the dialog's message
-         * @param progressStyle [ProgressDialog.STYLE_SPINNER] or [ProgressDialog.STYLE_HORIZONTAL]
+         * @param progressStyle [STYLE_SPINNER] or [STYLE_HORIZONTAL]
          * @param withButton    if true dialog is rendered with an OK button that is initially disabled
          */
-        @Deprecated("Use modern progress UI instead")
         @JvmStatic
         fun newInstance(
             title: String?,
@@ -68,14 +67,14 @@ class ProgressDialogFragment : BaseDialogFragment() {
         }
     }
 
-    private lateinit var mDialog: AlertDialog
+    private lateinit var mDialog: ScrollableProgressDialog
     private var mTaskCompleted = false
     private var progress = 0
     var max = 0
         set(value) {
             field = value
-            if (::mDialog.isInitialized && mDialog is ProgressDialog) {
-                (mDialog as ProgressDialog).max = value
+            if (::mDialog.isInitialized) {
+                mDialog.max = value
             }
         }
     private var title: String? = null
@@ -91,7 +90,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
             progress = it.getInt(KEY_PROGRESS)
             max = it.getInt(KEY_MAX)
         }
-        retainInstance = true
     }
 
     override fun onResume() {
@@ -110,12 +108,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
         }
     }
 
-    // http://stackoverflow.com/a/12434038/1199911
-    override fun onDestroyView() {
-        if (dialog != null && retainInstance) dialog?.setDismissMessage(null)
-        super.onDestroyView()
-    }
-
     @NonNull
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val arguments = requireArguments()
@@ -123,11 +115,10 @@ class ProgressDialogFragment : BaseDialogFragment() {
         val messageFromArguments = arguments.getString(KEY_MESSAGE)
         val titleFromArguments = arguments.getString(KEY_TITLE)
 
-        mDialog = if (progressStyle == ProgressDialog.STYLE_SPINNER) {
-            ScrollableProgressDialog(requireActivity())
-        } else {
-            ProgressDialog(requireActivity()).also { it.setProgressStyle(progressStyle) }
-        }
+        mDialog = ScrollableProgressDialog(
+            requireActivity(),
+            isHorizontal = (progressStyle == STYLE_HORIZONTAL)
+        )
 
         val withButton = arguments.getBoolean(KEY_WITH_BUTTON)
         if (messageFromArguments != null) {
@@ -154,20 +145,24 @@ class ProgressDialogFragment : BaseDialogFragment() {
 
     fun setProgress(progress: Int) {
         this.progress = progress
-        if (mDialog is ProgressDialog) {
-            (mDialog as ProgressDialog).progress = progress
+        if (::mDialog.isInitialized) {
+            mDialog.progress = progress
         }
     }
 
     fun setTitle(title: String) {
         this.title = title
-        mDialog.setTitle(title)
+        if (::mDialog.isInitialized) {
+            mDialog.setTitle(title)
+        }
     }
 
     fun appendToMessage(@NonNull newMessage: CharSequence) {
         this.message = if (TextUtils.isEmpty(this.message)) newMessage
         else TextUtils.concat(this.message, "\n", newMessage)
-        mDialog.setMessage(this.message)
+        if (::mDialog.isInitialized) {
+            mDialog.setMessage(this.message)
+        }
     }
 
     fun onTaskCompleted() {
@@ -182,10 +177,8 @@ class ProgressDialogFragment : BaseDialogFragment() {
     }
 
     private fun unsetIndeterminateDrawable() {
-        if (mDialog is ProgressDialog) {
-            (mDialog as ProgressDialog).setIndeterminateDrawable(null)
-        } else {
-            (mDialog as ScrollableProgressDialog).unsetIndeterminateDrawable()
+        if (::mDialog.isInitialized) {
+            mDialog.unsetIndeterminateDrawable()
         }
     }
 

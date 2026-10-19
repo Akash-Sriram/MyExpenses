@@ -1210,8 +1210,8 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
         //cache fraction digits
         val c = db.query("SELECT distinct currency from accounts");
         if (c.moveToFirst()) {
+          val currencyContext = (context.applicationContext as MyApplication).appComponent.currencyContext();
           while (!c.isAfterLast()) {
-            val currencyContext = MyApplication.instance.appComponent.currencyContext();
             val code = c.getString(0);
             with(BaseTransactionProvider.Companion) {
               db.storeFractionDigits(code, currencyContext.get(code).fractionDigits);
@@ -1485,7 +1485,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
         val c = db.query("SELECT distinct currency from accounts");
         if (c.moveToFirst()) {
           val GROUPING_PREF_PREFIX = "AGGREGATE_GROUPING_";
-          val settings = MyApplication.instance.settings
+          val settings = prefHandler.sharedPreferences
           val editor = settings.edit()
           var updated = false;
           while (!c.isAfterLast()) {
@@ -1538,7 +1538,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       //}
 
       if (oldVersion < 83) {
-        val auto_backup_cloud = MyApplication.instance.settings.getString("auto_backup_cloud", null);
+        val auto_backup_cloud = prefHandler.sharedPreferences.getString("auto_backup_cloud", null);
         if (auto_backup_cloud != null) {
           val values = ContentValues(2)
           values.put("key", "auto_backup_cloud");
@@ -1611,7 +1611,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
             )
         )
         if (c.moveToFirst()) {
-          val settings = MyApplication.instance.settings
+          val settings = prefHandler.sharedPreferences
           val editor = settings.edit()
           while (c.getPosition() < c.getCount()) {
             val accountId = c.getLong(1)
