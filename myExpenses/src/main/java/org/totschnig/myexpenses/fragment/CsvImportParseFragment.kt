@@ -55,6 +55,7 @@ import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.ui.SpinnerHelper
 
+@Suppress("DEPRECATION")
 class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnItemSelectedListener,
     FileNameHostFragment {
 
@@ -301,7 +302,7 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
 
             R.id.AccountType -> {
                 if (viewModel.accountId == 0L) {
-                    type = (parent.selectedItem as? SpinnerItem.Item<AccountType>)?.data
+                    type = (parent.selectedItem as? SpinnerItem.Item<*>)?.data as? AccountType
                 }
                 return
             }

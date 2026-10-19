@@ -197,7 +197,7 @@ public class Utils {
     try {
       return Currency.getInstance(Locale.getDefault());
     } catch (NullPointerException | IllegalArgumentException ex) {
-      return Currency.getInstance(new Locale("en", "US"));
+      return Currency.getInstance(Locale.US);
     }
   }
 
@@ -315,7 +315,7 @@ public class Utils {
   }
 
   public static Locale localeFromContext(Context context) {
-    return context.getResources().getConfiguration().locale;
+    return context.getResources().getConfiguration().getLocales().get(0);
   }
 
   /**

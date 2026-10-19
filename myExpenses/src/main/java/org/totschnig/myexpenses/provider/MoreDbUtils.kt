@@ -504,6 +504,7 @@ fun cacheSyncState(context: Context) {
         null,
         null
     )?.use {
+        @Suppress("DEPRECATION")
         val editor = context.myApplication.settings.edit()
         if (it.moveToFirst()) {
             do {
@@ -674,7 +675,7 @@ fun backup(
                 lenientMode
             )
         } finally {
-            release()
+            close()
         }
     }
 }

@@ -12,6 +12,7 @@ import javax.inject.Inject;
 
 import androidx.annotation.NonNull;
 
+@SuppressWarnings("deprecation")
 public abstract class SortableListFragment extends ContextualActionBarFragment {
 
   @Inject

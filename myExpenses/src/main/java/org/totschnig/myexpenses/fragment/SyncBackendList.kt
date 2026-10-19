@@ -18,8 +18,11 @@ import android.widget.ExpandableListView.PACKED_POSITION_TYPE_CHILD
 import android.widget.ExpandableListView.getPackedPositionGroup
 import android.widget.ExpandableListView.getPackedPositionType
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import com.evernote.android.state.State
 import com.evernote.android.state.StateSaver
 import com.google.android.material.snackbar.Snackbar
@@ -47,6 +50,7 @@ import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.viewmodel.AbstractSyncBackendViewModel
 import javax.inject.Inject
 
+@Suppress("DEPRECATION")
 class SyncBackendList : Fragment(), OnGroupExpandListener,
     OnChildClickListener {
     private var _binding: SyncBackendsListBinding? = null
@@ -103,9 +107,11 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
         binding.list.emptyView = binding.empty
         binding.list.setOnGroupExpandListener(this)
         binding.list.setOnChildClickListener(this)
-        lifecycleScope.launchWhenStarted {
-            viewModel.localAccountInfo.collect {
-                syncBackendAdapter.setLocalAccountInfo(it)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.localAccountInfo.collect {
+                    syncBackendAdapter.setLocalAccountInfo(it)
+                }
             }
         }
         registerForContextMenu(binding.list)

@@ -1,6 +1,7 @@
 package org.totschnig.myexpenses.provider
 
 import android.content.ContentProvider
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentUris.appendId
 import android.content.ContentValues
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.totschnig.myexpenses.MyApplication
+import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.compose.transactions.FutureCriterion
 import org.totschnig.myexpenses.db2.FLAG_EXPENSE
@@ -199,10 +201,10 @@ abstract class BaseTransactionProvider : ContentProvider() {
     }
 
     private fun notifyChangeDo(uri: Uri, syncToNetwork: Boolean) {
-        context!!.contentResolver.notifyChange(
-            uri, null,
-            syncToNetwork && prefHandler.getBoolean(PrefKey.SYNC_CHANGES_IMMEDIATELY, true)
-        )
+        val flags = if (syncToNetwork && prefHandler.getBoolean(PrefKey.SYNC_CHANGES_IMMEDIATELY, true))
+            ContentResolver.NOTIFY_SYNC_TO_NETWORK
+        else 0
+        context!!.contentResolver.notifyChange(uri, null, flags)
     }
 
     fun notifyBulk() {
@@ -1386,7 +1388,7 @@ abstract class BaseTransactionProvider : ContentProvider() {
     }
 
     override fun onCreate(): Boolean {
-        MyApplication.instance.appComponent.inject(this)
+        context!!.injector.inject(this)
         shouldLog = prefHandler.shouldDebug
         return true
     }
@@ -1586,7 +1588,7 @@ abstract class BaseTransactionProvider : ContentProvider() {
     ) {
         db.execSQL(
             "INSERT or REPLACE INTO $table SELECT DISTINCT ?, _id, ? FROM $TABLE_ATTRIBUTES WHERE $KEY_ATTRIBUTE_NAME = ? AND $KEY_CONTEXT = ?;",
-            arrayOf(
+            arrayOf<Any?>(
                 values.getAsLong(linkColumn),
                 values.getAsString(KEY_VALUE),
                 values.getAsString(KEY_ATTRIBUTE_NAME),

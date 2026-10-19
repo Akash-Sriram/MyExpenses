@@ -84,6 +84,7 @@ import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
 
+@Suppress("DEPRECATION")
 class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
     private var _binding: HistoryChartBinding? = null
     private val binding

@@ -50,6 +50,7 @@ import org.totschnig.myexpenses.viewmodel.CsvImportViewModel.Companion.KEY_HEADE
 import timber.log.Timber
 import javax.inject.Inject
 
+@Suppress("DEPRECATION")
 class CsvImportDataFragment : Fragment() {
 
     private val viewModel: CsvImportViewModel by activityViewModels()

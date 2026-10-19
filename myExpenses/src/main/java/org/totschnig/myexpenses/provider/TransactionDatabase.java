@@ -545,6 +545,7 @@ public class TransactionDatabase extends BaseTransactionDatabase {
    * and a user upgrading several versions at once would get a broken upgrade process
    */
   @Override
+  @SuppressWarnings("deprecation")
   public void onUpgrade(@NonNull SupportSQLiteDatabase db, int oldVersion, int newVersion) {
     try {
       Timber.i("Upgrading database from version %d to %d", oldVersion, newVersion);
@@ -1078,12 +1079,12 @@ public class TransactionDatabase extends BaseTransactionDatabase {
       }
 
       if (oldVersion < 51) {
-        File pictureDir = PictureDirHelper.getPictureDir(MyApplication.Companion.getInstance(), false);
+        File pictureDir = PictureDirHelper.getPictureDir(getContext(), false);
         //fallback if not mounted
         if (pictureDir == null) {
           pictureDir = new File(
               Environment.getExternalStorageDirectory().getPath() +
-                  "/Android/data/" + MyApplication.Companion.getInstance().getPackageName() + "/files",
+                  "/Android/data/" + getContext().getPackageName() + "/files",
               Environment.DIRECTORY_PICTURES);
         }
         if (!pictureDir.exists()) {
@@ -1208,7 +1209,7 @@ public class TransactionDatabase extends BaseTransactionDatabase {
       if (oldVersion < 57) {
         //fix custom app uris
         try {
-          if (CALENDAR.hasPermission(MyApplication.Companion.getInstance())) {
+          if (CALENDAR.hasPermission(getContext())) {
             Cursor c = MoreDbUtilsKt.query(db,"templates", new String[]{"_id", "plan_id"}, "plan_id IS NOT null", null, null, null, null, null);
             if (c.moveToFirst()) {
               while (!c.isAfterLast()) {
@@ -1913,7 +1914,7 @@ public class TransactionDatabase extends BaseTransactionDatabase {
       if (oldVersion < 135) {
         db.execSQL("ALTER TABLE categories add column uuid text");
         db.execSQL("CREATE UNIQUE INDEX categories_uuid ON categories(uuid)");
-        MoreDbUtilsKt.insertUuidsForDefaultCategories(db, MyApplication.Companion.getInstance().getResources());
+        MoreDbUtilsKt.insertUuidsForDefaultCategories(db, getContext().getResources());
       }
       if (oldVersion < 136) {
         upgradeTo136(db);

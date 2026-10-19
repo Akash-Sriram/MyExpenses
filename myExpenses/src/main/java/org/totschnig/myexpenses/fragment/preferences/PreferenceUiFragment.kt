@@ -90,7 +90,7 @@ class PreferenceUiFragment : BasePreferenceFragment() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 preferenceDataStore.handleList(requirePreference(PrefKey.CRITERION_FUTURE)) {
-                    requireContext().contentResolver.notifyChange(ACCOUNTS_URI, null, false)
+                    requireContext().contentResolver.notifyChange(ACCOUNTS_URI, null, 0)
                 }
             }
         }

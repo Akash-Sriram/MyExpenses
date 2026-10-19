@@ -161,7 +161,7 @@ open class DatabaseCurrencyContext(
     override val localCurrency: Currency by lazy {
         Utils.getCountryFromTelephonyManager(application)?.let {
             try {
-                Currency.getInstance(Locale("", it))
+                Currency.getInstance(Locale.Builder().setRegion(it).build())
             } catch (_: Exception) {
                 null
             }

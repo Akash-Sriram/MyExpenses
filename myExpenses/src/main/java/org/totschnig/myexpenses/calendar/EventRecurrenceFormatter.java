@@ -27,6 +27,7 @@ import org.totschnig.myexpenses.R;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 
+@SuppressWarnings("deprecation")
 public class EventRecurrenceFormatter
 {
 

@@ -62,7 +62,7 @@ public class DialogUtils {
     dialog.show();
     if (callback == null) {
       callback = () -> {
-        MyApplication.Companion.getInstance().unlock();
+        ((MyApplication) ctx.getApplicationContext()).unlock();
         ctx.showWindow();
       };
     }
@@ -171,6 +171,7 @@ public class DialogUtils {
             .indexOf(prefHandler.getString(prefName, ",")));
   }
 
+  @SuppressWarnings("deprecation")
   public static void openBrowse(Uri uri, Fragment fragment) {
     Intent intent = new Intent(Intent.ACTION_GET_CONTENT);//TODO implement preference that allows to use ACTION_OPEN_DOCUMENT
     intent.addCategory(Intent.CATEGORY_OPENABLE);

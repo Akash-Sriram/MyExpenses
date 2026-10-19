@@ -160,6 +160,7 @@ abstract class ImportSourceDialogFragment : BaseDialogFragment(),
     }
 
     @Deprecated("Deprecated in Java")
+    @Suppress("DEPRECATION")
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
         savedInstanceState?.getString(prefKey)?.toUri()?.let {

@@ -141,6 +141,7 @@ const val DIALOG_TAG_CONFIRM_CANCEL = "confirm_cancel"
 const val DIALOG_TAG_CONFIRM_RESET = "confirm_reset"
 const val DIALOG_TAG_CONFIRM_DELETE = "confirm_delete"
 
+@Suppress("DEPRECATION")
 class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Cursor?>,
     SimpleDialog.OnDialogResultListener {
     private var popup: PopupMenu? = null
@@ -627,7 +628,7 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     private fun repairPlan(missingUuids: List<String>) {
         repairTriggered = true
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            val calendarId = PrefKey.PLANNER_CALENDAR_ID.getString("-1")
+            val calendarId = prefHandler.getString(PrefKey.PLANNER_CALENDAR_ID, "-1")
             if (calendarId == "-1") return@launch
             val cr = context?.contentResolver ?: return@launch
             val values = ContentValues()
@@ -882,8 +883,8 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
                     longArrayOf(extras.getLong(KEY_TRANSACTIONID))
                 )
 
-                DIALOG_TAG_CONFIRM_RESET -> viewModel.reset(extras.getParcelable(KEY_INSTANCE)!!)
-                DIALOG_TAG_CONFIRM_CANCEL -> viewModel.cancel(extras.getParcelable(KEY_INSTANCE)!!)
+                DIALOG_TAG_CONFIRM_RESET -> viewModel.reset(extras.getParcelable(KEY_INSTANCE, PlanInstanceInfo::class.java)!!)
+                DIALOG_TAG_CONFIRM_CANCEL -> viewModel.cancel(extras.getParcelable(KEY_INSTANCE, PlanInstanceInfo::class.java)!!)
             }
         }
         return true

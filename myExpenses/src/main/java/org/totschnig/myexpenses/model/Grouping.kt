@@ -63,7 +63,7 @@ enum class Grouping(@param:StringRes val label: Int) {
         weekRangeOnly: Boolean = false,
         relativeDay: Boolean = true
     ): String {
-        val locale = ctx.resources.configuration.locale
+        val locale = ctx.resources.configuration.locales[0]
         return try {
             when (this) {
                 NONE -> ctx.getString(R.string.menu_aggregates)

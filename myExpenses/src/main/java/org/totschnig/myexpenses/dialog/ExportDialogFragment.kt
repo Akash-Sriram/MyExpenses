@@ -81,7 +81,7 @@ class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-        val accountInfo = requireArguments().getSerializable(KEY_DATA) as AccountInfo
+        val accountInfo = requireArguments().getSerializable(KEY_DATA, AccountInfo::class.java)!!
         var allP = false
         var warningText: String
         val fileName: String
@@ -368,7 +368,7 @@ class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
         if (activity == null) {
             return
         }
-        val accountInfo = requireArguments().getSerializable(KEY_DATA) as AccountInfo
+        val accountInfo = requireArguments().getSerializable(KEY_DATA, AccountInfo::class.java)!!
         val format = ExportFormat.entries.find { it.resId == binding.format.checkedButtonId }
             ?: ExportFormat.CSV
         val dateFormat = binding.dateFormat.text.toString()
