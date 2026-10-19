@@ -7,7 +7,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.CalendarContract
 import org.totschnig.myexpenses.BuildConfig
-import org.totschnig.myexpenses.calendar.EventRecurrence
 import java.time.Instant
 import java.time.ZoneId
 

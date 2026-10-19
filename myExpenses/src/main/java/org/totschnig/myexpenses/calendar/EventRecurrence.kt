@@ -17,10 +17,9 @@
 package org.totschnig.myexpenses.calendar
 
 import android.text.TextUtils
-import android.text.format.Time
 import android.util.Log
-import android.util.TimeFormatException
 import java.time.DayOfWeek
+import java.time.ZonedDateTime
 import java.util.Calendar
 import java.util.HashMap
 import java.util.Locale
@@ -28,7 +27,6 @@ import java.util.Locale
 /**
  * Event recurrence utility functions.
  */
-@Suppress("deprecation")
 class EventRecurrence {
 
     companion object {
@@ -119,33 +117,6 @@ class EventRecurrence {
             }
         }
 
-        @JvmStatic
-        fun timeDay2Day(day: Int): Int {
-            return when (day) {
-                Time.SUNDAY -> SU
-                Time.MONDAY -> MO
-                Time.TUESDAY -> TU
-                Time.WEDNESDAY -> WE
-                Time.THURSDAY -> TH
-                Time.FRIDAY -> FR
-                Time.SATURDAY -> SA
-                else -> throw RuntimeException("bad day of week: $day")
-            }
-        }
-
-        @JvmStatic
-        fun day2TimeDay(day: Int): Int {
-            return when (day) {
-                SU -> Time.SUNDAY
-                MO -> Time.MONDAY
-                TU -> Time.TUESDAY
-                WE -> Time.WEDNESDAY
-                TH -> Time.THURSDAY
-                FR -> Time.FRIDAY
-                SA -> Time.SATURDAY
-                else -> throw RuntimeException("bad day of week: $day")
-            }
-        }
 
         @JvmStatic
         fun day2CalendarDay(day: Int): Int {
@@ -198,7 +169,7 @@ class EventRecurrence {
         }
     }
 
-    @JvmField var startDate: Time? = null
+    @JvmField var startDate: ZonedDateTime? = null
     @JvmField var freq: Int = 0
     @JvmField var until: String? = null
     @JvmField var count: Int = 0
@@ -227,7 +198,7 @@ class EventRecurrence {
 
     class InvalidFormatException(s: String) : RuntimeException(s)
 
-    fun setStartDate(date: Time?) {
+    fun setStartDate(date: ZonedDateTime?) {
         startDate = date
     }
 
@@ -319,7 +290,7 @@ class EventRecurrence {
         if (this === other) return true
         if (other !is EventRecurrence) return false
 
-        return (if (startDate == null) other.startDate == null else Time.compare(startDate, other.startDate) == 0) &&
+        return (if (startDate == null) other.startDate == null else startDate == other.startDate) &&
                 freq == other.freq &&
                 (if (until == null) other.until == null else until == other.until) &&
                 count == other.count &&
@@ -462,9 +433,8 @@ class EventRecurrence {
         override fun parsePart(value: String, er: EventRecurrence): Int {
             if (VALIDATE_UNTIL) {
                 try {
-                    val until = Time()
-                    until.parse(value)
-                } catch (tfe: TimeFormatException) {
+                    EventRecurrenceFormatter.parseUntilToMillis(value)
+                } catch (e: Exception) {
                     throw InvalidFormatException("Invalid UNTIL value: $value")
                 }
             }

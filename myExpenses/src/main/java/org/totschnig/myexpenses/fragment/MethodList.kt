@@ -28,9 +28,11 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
 import android.widget.SimpleCursorAdapter
 import androidx.annotation.NonNull
-import androidx.loader.app.LoaderManager
-import androidx.loader.content.CursorLoader
-import androidx.loader.content.Loader
+import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.ManageMethods
 import org.totschnig.myexpenses.activity.MethodEdit
@@ -39,9 +41,10 @@ import org.totschnig.myexpenses.provider.KEY_MAPPED_TEMPLATES
 import org.totschnig.myexpenses.provider.KEY_MAPPED_TRANSACTIONS
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.TransactionProvider
+import org.totschnig.myexpenses.viewmodel.MethodViewModel
 
-@Suppress("deprecation")
-class MethodList : ContextualActionBarFragment(), LoaderManager.LoaderCallbacks<Cursor> {
+class MethodList : ContextualActionBarFragment() {
+    private val viewModel: MethodViewModel by activityViewModels()
     private lateinit var mAdapter: SimpleCursorAdapter
     private var mMethodsCursor: Cursor? = null
 
@@ -63,7 +66,14 @@ class MethodList : ContextualActionBarFragment(), LoaderManager.LoaderCallbacks<
             to,
             0
         )
-        LoaderManager.getInstance(this).initLoader(0, null, this)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.methodsCursor.collect { c ->
+                    mMethodsCursor = c
+                    mAdapter.swapCursor(c)
+                }
+            }
+        }
         lv.adapter = mAdapter
         lv.emptyView = v.findViewById(R.id.empty)
         registerForContextualActionBar(lv)
@@ -71,17 +81,8 @@ class MethodList : ContextualActionBarFragment(), LoaderManager.LoaderCallbacks<
         return v
     }
 
-    @NonNull
-    override fun onCreateLoader(arg0: Int, arg1: Bundle?): Loader<Cursor> {
-        return CursorLoader(requireActivity(), TransactionProvider.METHODS_URI, null, null, null, null)
-    }
-
-    override fun onLoadFinished(@NonNull arg0: Loader<Cursor>, c: Cursor) {
-        mMethodsCursor = c
-        mAdapter.swapCursor(c)
-    }
-
-    override fun onLoaderReset(@NonNull arg0: Loader<Cursor>) {
+    override fun onDestroyView() {
+        super.onDestroyView()
         mMethodsCursor = null
         mAdapter.swapCursor(null)
     }

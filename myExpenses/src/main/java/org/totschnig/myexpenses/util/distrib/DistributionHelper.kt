@@ -48,11 +48,7 @@ object DistributionHelper {
         val installer = try {
             ctx.packageManager.getInstallSourceInfo(ctx.packageName).installingPackageName
         } catch (_: Exception) {
-            try {
-                ctx.packageManager.getInstallerPackageName(ctx.packageName)
-            } catch (_: Exception) {
-                null
-            }
+            null
         }
         return "${BuildConfig.VERSION_NAME} ($versionNumber) $buildDateFormatted $distributionAsString $installer"
     }

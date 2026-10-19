@@ -9,10 +9,14 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.text.SpannableStringBuilder
 import android.text.TextUtils
+import android.database.Cursor
 import androidx.core.text.color
 import androidx.lifecycle.viewModelScope
+import app.cash.copper.flow.observeQuery
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.provider.TransactionProvider
@@ -24,6 +28,9 @@ import java.io.IOException
 
 class StaleImagesViewModel(application: Application) :
     ContentResolvingAndroidViewModel(application) {
+
+    val imagesCursor: Flow<Cursor?>
+        get() = contentResolver.observeQuery(TransactionProvider.STALE_IMAGES_URI).map { it.run() }
 
     private val _result: MutableStateFlow<CharSequence?> = MutableStateFlow(null)
     val result: StateFlow<CharSequence?> = _result

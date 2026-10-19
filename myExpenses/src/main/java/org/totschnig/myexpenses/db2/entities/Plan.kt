@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.db2.entities
 
 import android.content.Context
-import android.text.format.Time
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.calendar.EventRecurrence
 import org.totschnig.myexpenses.calendar.EventRecurrenceFormatter
@@ -11,8 +10,10 @@ import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.util.toEpochMillis
 import java.text.DateFormat
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.temporal.ChronoField
 import java.util.Date
 import java.util.Locale
@@ -95,8 +96,7 @@ fun prettyTimeInfo(ctx: Context, rRule: String?, start: Long): String {
             CrashHandler.report(e, "rRule", rRule)
             return e.safeMessage
         }
-        val date = Time()
-        date.set(start)
+        val date = Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault())
         eventRecurrence.setStartDate(date)
         EventRecurrenceFormatter.getRepeatString(ctx, ctx.resources, eventRecurrence, true)
     } ?:  DateFormat

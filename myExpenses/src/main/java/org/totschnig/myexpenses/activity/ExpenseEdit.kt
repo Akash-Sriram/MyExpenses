@@ -52,7 +52,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.loader.app.LoaderManager
 import com.evernote.android.state.State
 import com.google.android.material.snackbar.Snackbar
 import com.theartofdev.edmodo.cropper.CropImage
@@ -209,8 +208,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
      */
     @State
     var operationType = 0
-
-    private lateinit var mManager: LoaderManager
 
     @State
     var createNew = false
@@ -396,7 +393,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         setContentView(rootBinding.root)
         floatingActionButton = rootBinding.fab.CREATECOMMAND
         setupToolbarWithClose()
-        mManager = LoaderManager.getInstance(this)
         val viewModelProvider = ViewModelProvider(this)
         viewModel = viewModelProvider[TransactionEditViewModel::class.java]
         currencyViewModel = viewModelProvider[CurrencyViewModel::class.java]

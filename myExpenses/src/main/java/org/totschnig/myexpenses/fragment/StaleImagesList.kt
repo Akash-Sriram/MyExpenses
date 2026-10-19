@@ -32,11 +32,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.loader.app.LoaderManager
-import androidx.loader.content.CursorLoader
-import androidx.loader.content.Loader
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,7 +50,7 @@ import org.totschnig.myexpenses.viewmodel.StaleImagesViewModel
 import org.totschnig.myexpenses.viewmodel.data.AttachmentInfo
 import javax.inject.Inject
 
-class StaleImagesList : ContextualActionBarFragment(), LoaderManager.LoaderCallbacks<Cursor> {
+class StaleImagesList : ContextualActionBarFragment() {
     private lateinit var adapter: SimpleCursorAdapter
     private var imagesCursor: Cursor? = null
     private val viewModel: StaleImagesViewModel by viewModels()
@@ -68,7 +63,6 @@ class StaleImagesList : ContextualActionBarFragment(), LoaderManager.LoaderCallb
 
     private var attachmentInfoMap: Map<Uri, AttachmentInfo>? = null
 
-    @State
     var selectedItemIds: LongArray? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,17 +78,19 @@ class StaleImagesList : ContextualActionBarFragment(), LoaderManager.LoaderCallb
                 }
             }
         }
-        StateSaver.restoreInstanceState(this, savedInstanceState)
+        selectedItemIds = savedInstanceState?.getLongArray("selectedItemIds")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
-     }
+        outState.putLongArray("selectedItemIds", selectedItemIds)
+    }
 
     override fun onDestroyView() {
         super.onDestroyView()
         attachmentInfoMap = null
+        imagesCursor = null
+        adapter.swapCursor(null)
         _binding = null
     }
 
@@ -195,27 +191,17 @@ class StaleImagesList : ContextualActionBarFragment(), LoaderManager.LoaderCallb
                     }
                 )
             }
-        LoaderManager.getInstance(this).initLoader(0, null, this)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.imagesCursor.collect { c ->
+                    imagesCursor = c
+                    adapter.swapCursor(c)
+                }
+            }
+        }
         binding.grid.adapter = adapter
         registerForContextualActionBar(binding.grid)
         return binding.root
-    }
-
-    override fun onCreateLoader(arg0: Int, arg1: Bundle?): Loader<Cursor> {
-        return CursorLoader(
-            requireActivity(),
-            TransactionProvider.STALE_IMAGES_URI, null, null, null, null
-        )
-    }
-
-    override fun onLoadFinished(arg0: Loader<Cursor>, c: Cursor) {
-        imagesCursor = c
-        adapter.swapCursor(c)
-    }
-
-    override fun onLoaderReset(arg0: Loader<Cursor>) {
-        imagesCursor = null
-        adapter.swapCursor(null)
     }
 
     override fun inflateContextualActionBar(menu: Menu, listId: Int) {

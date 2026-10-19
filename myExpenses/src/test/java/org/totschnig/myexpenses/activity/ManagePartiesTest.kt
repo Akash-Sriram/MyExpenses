@@ -71,13 +71,33 @@ class ManagePartiesTest {
 
     private fun testSearch(action: Action, expectedInitialCount: Int) {
         fixture(action)
+        for (i in 0 until 50) {
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+            ShadowLooper.idleMainLooper()
+            var count = -1
+            activityScenario.onActivity { activity ->
+                val rv = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.list)
+                count = rv?.childCount ?: -1
+            }
+            if (count == expectedInitialCount) break
+            Thread.sleep(50)
+        }
         onView(withId(R.id.list))
             .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount)))
         clickMenu(R.id.SEARCH_COMMAND)
         onView(withId(androidx.appcompat.R.id.search_src_text)).perform(typeText("John"))
-        ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
-        ShadowLooper.idleMainLooper()
+        for (i in 0 until 50) {
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+            ShadowLooper.idleMainLooper()
+            var count = -1
+            activityScenario.onActivity { activity ->
+                val rv = activity.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.list)
+                count = rv?.childCount ?: -1
+            }
+            if (count == expectedInitialCount - 1) break
+            Thread.sleep(50)
+        }
         onView(withId(R.id.list))
-            .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount -1)))
+            .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount - 1)))
     }
 }

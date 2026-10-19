@@ -1730,9 +1730,7 @@ open class TransactionProvider : BaseTransactionProvider() {
 
     const val QUERY_PARAMETER_BREAKDOWN_BY_ACCOUNT = "breakdownByAccount"
 
-    @Deprecated("Legacy bulk start")
     const val METHOD_BULK_START = "bulkStart"
-    @Deprecated("Legacy bulk end")
     const val METHOD_BULK_END = "bulkEnd"
     const val METHOD_SORT_ACCOUNTS = "sort_accounts"
     const val METHOD_SETUP_CATEGORIES = "setup_categories"

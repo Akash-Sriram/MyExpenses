@@ -19,17 +19,50 @@ package org.totschnig.myexpenses.calendar
 import android.content.Context
 import android.content.res.Resources
 import android.text.format.DateUtils
-import android.text.format.Time
-import android.util.TimeFormatException
 import org.totschnig.myexpenses.R
-import java.text.SimpleDateFormat
-import java.util.Calendar
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
-@Suppress("deprecation")
 object EventRecurrenceFormatter {
 
     private var mMonthRepeatByDayOfWeekIds: IntArray? = null
     private var mMonthRepeatByDayOfWeekStrs: Array<Array<String>?>? = null
+
+    @JvmStatic
+    fun parseUntilToMillis(until: String): Long {
+        val trimmed = until.trim()
+        return try {
+            if (trimmed.contains("-")) {
+                if (trimmed.contains("T")) {
+                    Instant.parse(trimmed).toEpochMilli()
+                } else {
+                    LocalDate.parse(trimmed).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                }
+            } else if (trimmed.contains("T")) {
+                if (trimmed.endsWith("Z")) {
+                    val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
+                    Instant.from(formatter.parse(trimmed)).toEpochMilli()
+                } else {
+                    val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
+                    LocalDateTime.parse(trimmed, formatter).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                }
+            } else {
+                LocalDate.parse(trimmed, DateTimeFormatter.BASIC_ISO_DATE)
+                    .atStartOfDay(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            }
+        } catch (_: Exception) {
+            0L
+        }
+    }
 
     @JvmStatic
     fun getRepeatString(
@@ -42,16 +75,14 @@ object EventRecurrenceFormatter {
         if (includeEndString) {
             val sb = StringBuilder()
             if (recurrence.until != null) {
-                try {
-                    val t = Time()
-                    t.parse(recurrence.until)
+                val millis = parseUntilToMillis(recurrence.until!!)
+                if (millis > 0L) {
                     val dateStr = DateUtils.formatDateTime(
                         context,
-                        t.toMillis(false),
+                        millis,
                         DateUtils.FORMAT_NUMERIC_DATE
                     )
                     sb.append(r.getString(R.string.endByDate, dateStr))
-                } catch (ignored: TimeFormatException) {
                 }
             }
 
@@ -98,7 +129,7 @@ object EventRecurrenceFormatter {
                         if (recurrence.startDate == null) {
                             return null
                         }
-                        val day = EventRecurrence.timeDay2Day(recurrence.startDate!!.weekDay)
+                        val day = EventRecurrence.dayOfWeek2Day(recurrence.startDate!!.dayOfWeek)
                         string = dayToString(day, DateUtils.LENGTH_LONG)
                     }
                     return r.getQuantityString(R.plurals.weekly, interval, interval, string) + endString
@@ -109,9 +140,17 @@ object EventRecurrenceFormatter {
                 val sb = StringBuilder()
                 sb.append(r.getQuantityString(R.plurals.monthly, interval, interval))
                 if (recurrence.bydayCount == 1) {
-                    val weekday = recurrence.startDate!!.weekDay
+                    val weekday = when (recurrence.startDate!!.dayOfWeek) {
+                        DayOfWeek.SUNDAY -> 0
+                        DayOfWeek.MONDAY -> 1
+                        DayOfWeek.TUESDAY -> 2
+                        DayOfWeek.WEDNESDAY -> 3
+                        DayOfWeek.THURSDAY -> 4
+                        DayOfWeek.FRIDAY -> 5
+                        DayOfWeek.SATURDAY -> 6
+                    }
                     cacheMonthRepeatStrings(r, weekday)
-                    val dayNumber = (recurrence.startDate!!.monthDay - 1) / 7
+                    val dayNumber = (recurrence.startDate!!.dayOfMonth - 1) / 7
                     sb.append(" (")
                     sb.append(mMonthRepeatByDayOfWeekStrs!![weekday]!![dayNumber])
                     sb.append(")")
@@ -121,7 +160,7 @@ object EventRecurrenceFormatter {
                     sb.append(r.getString(R.string.recurrence_last_day_of_month))
                     sb.append(")")
                 } else {
-                    sb.append(r.getString(R.string.monthly_on_day, recurrence.startDate!!.monthDay.toString()))
+                    sb.append(r.getString(R.string.monthly_on_day, recurrence.startDate!!.dayOfMonth.toString()))
                 }
                 sb.append(endString)
                 return sb.toString()
@@ -133,7 +172,7 @@ object EventRecurrenceFormatter {
                 interval
             ) + r.getString(
                 R.string.yearly_on_day,
-                DateUtils.formatDateTime(context, recurrence.startDate!!.toMillis(false), 0)
+                DateUtils.formatDateTime(context, recurrence.startDate!!.toInstant().toEpochMilli(), 0)
             ) + endString
         }
 
@@ -162,22 +201,17 @@ object EventRecurrenceFormatter {
     }
 
     private fun dayToString(day: Int, dayOfWeekLength: Int): String {
-        val format = if (dayOfWeekLength == DateUtils.LENGTH_MEDIUM) "EEE" else "EEEE"
-        val c = Calendar.getInstance()
-        c[Calendar.DAY_OF_WEEK] = dayToUtilDay(day)
-        return SimpleDateFormat(format).format(c.time)
-    }
-
-    private fun dayToUtilDay(day: Int): Int {
-        return when (day) {
-            EventRecurrence.SU -> Calendar.SUNDAY
-            EventRecurrence.MO -> Calendar.MONDAY
-            EventRecurrence.TU -> Calendar.TUESDAY
-            EventRecurrence.WE -> Calendar.WEDNESDAY
-            EventRecurrence.TH -> Calendar.THURSDAY
-            EventRecurrence.FR -> Calendar.FRIDAY
-            EventRecurrence.SA -> Calendar.SATURDAY
+        val dayOfWeek = when (day) {
+            EventRecurrence.SU -> DayOfWeek.SUNDAY
+            EventRecurrence.MO -> DayOfWeek.MONDAY
+            EventRecurrence.TU -> DayOfWeek.TUESDAY
+            EventRecurrence.WE -> DayOfWeek.WEDNESDAY
+            EventRecurrence.TH -> DayOfWeek.THURSDAY
+            EventRecurrence.FR -> DayOfWeek.FRIDAY
+            EventRecurrence.SA -> DayOfWeek.SATURDAY
             else -> throw IllegalArgumentException("bad day argument: $day")
         }
+        val textStyle = if (dayOfWeekLength == DateUtils.LENGTH_MEDIUM) TextStyle.SHORT else TextStyle.FULL
+        return dayOfWeek.getDisplayName(textStyle, Locale.getDefault())
     }
 }
