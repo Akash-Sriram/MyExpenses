@@ -513,20 +513,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     operationType = TYPE_TRANSACTION
                 }
                 val isNewTemplate = intent.getBooleanExtra(KEY_NEW_TEMPLATE, false)
-                if (isSplitParent) {
-                    val (contribFeature, allowed) = if (isNewTemplate) {
-                        ContribFeature.SPLIT_TEMPLATE to
-                                prefHandler.getBoolean(PrefKey.NEW_SPLIT_TEMPLATE_ENABLED, true)
-                    } else {
-                        ContribFeature.SPLIT_TRANSACTION to
-                                licenceHandler.hasTrialAccessTo(ContribFeature.SPLIT_TRANSACTION)
-                    }
-                    if (!allowed) {
-                        contribFeatureRequested(contribFeature)
-                        finish()
-                        return
-                    }
-                }
                 parentId = intent.getLongExtra(KEY_PARENTID, 0)
                 val currencyUnit = intent.getStringExtra(KEY_CURRENCY)
                     ?.let { currencyContext[it] }

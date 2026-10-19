@@ -64,11 +64,6 @@ class ManageSyncBackends : SyncBackendSetupActivity(), ContribIFace {
         }
         setupToolbar()
         setTitle(R.string.pref_manage_sync_backends_title)
-        if (savedInstanceState == null) {
-            if (!licenceHandler.hasTrialAccessTo(ContribFeature.SYNCHRONIZATION)) {
-                contribFeatureRequested(ContribFeature.SYNCHRONIZATION)
-            }
-        }
         onBackPressedCallback = object : OnBackPressedCallback(incomingAccountDeleted) {
             override fun handleOnBackPressed() {
                 finishWithIncomingAccountDeleted()

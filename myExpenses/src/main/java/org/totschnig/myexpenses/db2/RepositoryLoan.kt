@@ -75,9 +75,10 @@ class RepositoryLoan @Inject constructor(
     suspend fun createLoanWithSchedule(
         loan: Loan,
         customEmi: Long? = null,
+        emisAlreadyPaid: Int = 0,
         zoneId: ZoneId = ZoneId.systemDefault()
     ): Long = withContext(coroutineDispatcher) {
-        val calculatedEmi = customEmi ?: loan.monthlyEmiAmount.takeIf { it > 0L }
+        val calculatedEmi = customEmi ?: loan.actualEmiAmount ?: loan.monthlyEmiAmount.takeIf { it > 0L }
             ?: EmiCalculator.calculateEmi(loan.loanType, loan.principalAmount, loan.interestRatePercent, loan.tenureMonths)
 
         val loanToSave = loan.copy(monthlyEmiAmount = calculatedEmi)
@@ -105,6 +106,10 @@ class RepositoryLoan @Inject constructor(
             val installments = EmiCalculator.generateInstallmentsForLoan(loanId, loanToSave, zoneId)
 
             for (inst in installments) {
+                val isAlreadyPaid = inst.installmentNumber <= emisAlreadyPaid
+                val effectiveStatus = if (isAlreadyPaid) InstallmentStatus.PAID else inst.status
+                val effectivePaidDate = if (isAlreadyPaid) inst.dueDate else inst.paidDate
+
                 val instValues = ContentValues().apply {
                     put(KEY_LOAN_ID, loanId)
                     put(KEY_INSTALLMENT_NUMBER, inst.installmentNumber)
@@ -112,9 +117,9 @@ class RepositoryLoan @Inject constructor(
                     put(KEY_PRINCIPAL_PART, inst.principalPart)
                     put(KEY_INTEREST_PART, inst.interestPart)
                     put(KEY_TOTAL_AMOUNT, inst.totalAmount)
-                    put(KEY_PAID_DATE, inst.paidDate)
+                    put(KEY_PAID_DATE, effectivePaidDate)
                     put("transaction_id", inst.transactionId)
-                    put(KEY_STATUS, inst.status.name)
+                    put(KEY_STATUS, effectiveStatus.name)
                 }
                 db.insert(TABLE_EMI_INSTALLMENTS, SQLiteDatabase.CONFLICT_NONE, instValues)
             }

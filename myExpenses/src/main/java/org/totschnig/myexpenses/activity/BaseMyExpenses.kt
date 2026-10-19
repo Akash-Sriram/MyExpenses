@@ -598,11 +598,15 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             R.id.BUDGET_COMMAND -> contribFeatureRequested(ContribFeature.BUDGET, null)
 
             R.id.MANAGE_TEMPLATES_COMMAND -> startActivity(
-                Intent(this, ManageTemplates::class.java)
+                Intent(this, LoansActivity::class.java).apply {
+                    putExtra(LoansActivity.EXTRA_INITIAL_TAB, LoansActivity.TAB_TEMPLATES)
+                }
             )
 
             R.id.LOANS_COMMAND -> startActivity(
-                Intent(this, LoansActivity::class.java)
+                Intent(this, LoansActivity::class.java).apply {
+                    putExtra(LoansActivity.EXTRA_INITIAL_TAB, LoansActivity.TAB_LOANS)
+                }
             )
 
             R.id.MANAGE_PARTIES_COMMAND -> startActivity(
@@ -1389,26 +1393,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             upgradeHandlerViewModel.upgrade(this, prevVersion, currentVersion)
 
             showVersionDialog(prevVersion)
-        } else {
-            lifecycleScope.launch(Dispatchers.IO) {
-                if ((!licenceHandler.hasTrialAccessTo(ContribFeature.SYNCHRONIZATION)
-                            && viewModel.repository.countAccounts(
-                        "$KEY_SYNC_ACCOUNT_NAME IS NOT NULL",
-                        null
-                    ) > 0
-                            && !prefHandler.getBoolean(
-                        PrefKey.SYNC_UPSELL_NOTIFICATION_SHOWN,
-                        false
-                    )
-                            )
-                ) {
-                    prefHandler.putBoolean(PrefKey.SYNC_UPSELL_NOTIFICATION_SHOWN, true)
-                    ContribUtils.showContribNotification(
-                        this@BaseMyExpenses,
-                        ContribFeature.SYNCHRONIZATION
-                    )
-                }
-            }
         }
         checkCalendarPermission()
     }

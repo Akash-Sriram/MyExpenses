@@ -243,7 +243,6 @@ class GenericAccountService : Service() {
             licenceHandler: LicenceHandler,
             prefHandler: PrefHandler
         ) {
-            val isSyncable = licenceHandler.hasTrialAccessTo(ContribFeature.SYNCHRONIZATION)
             val accountManager = AccountManager.get(context)
             getAccounts(context)
                 .filter { account ->
@@ -253,11 +252,7 @@ class GenericAccountService : Service() {
                     ) == null
                 }
                 .forEach { account ->
-                    if (isSyncable) {
-                        activateSync(account, prefHandler)
-                    } else {
-                        deactivateSync(account)
-                    }
+                    activateSync(account, prefHandler)
                 }
         }
 

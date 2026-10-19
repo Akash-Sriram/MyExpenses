@@ -116,11 +116,6 @@ class BudgetActivity : DistributionBaseActivity<BudgetViewModel2>(), OnDialogRes
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!licenceHandler.hasTrialAccessTo(ContribFeature.BUDGET)) {
-            contribFeatureRequested(ContribFeature.BUDGET)
-            finish()
-            return
-        }
         val binding = setupView()
         injector.inject(viewModel)
         val groupingYear = intent.getIntExtra(KEY_YEAR, 0)

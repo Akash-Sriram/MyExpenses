@@ -1219,4 +1219,15 @@
     <string name="no_credit_cards_message">No credit cards found. Create a Credit Card account to track billing cycles, limits, and statement dues offline.</string>
     <string name="payment_recorded_success">Credit card payment recorded successfully</string>
     <string name="statement_updated_success">Statement details updated successfully</string>
+    <string name="tab_plans">Recurring Plans</string>
+    <string name="tab_templates">Templates</string>
+    <string name="commitments_title">Commitments &amp; Loans</string>
+    <string name="no_plans_message">No recurring plans tracked yet. Create plans for monthly SIPs, rent, or recurring bills.</string>
+    <string name="no_templates_message">No templates created yet. Save quick templates for frequent expenses like tea, fuel, or cab.</string>
+    <string name="add_plan">Add Recurring Plan</string>
+    <string name="add_template">Add Template</string>
+    <string name="apply_template">Apply Now</string>
+    <string name="template_applied_success">Transaction created successfully</string>
+    <string name="delete_template_confirm">Delete template \"%1$s\"?</string>
+    <string name="delete_plan_confirm">Delete recurring plan \"%1$s\"?</string>
 </resources>

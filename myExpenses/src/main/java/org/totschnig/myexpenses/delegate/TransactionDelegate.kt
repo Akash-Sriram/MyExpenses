@@ -214,7 +214,7 @@ abstract class TransactionDelegate(
     var methodLabel: String? = null
 
     @State
-    var crStatus: CrStatus = CrStatus.UNRECONCILED
+    var crStatus: CrStatus = CrStatus.CLEARED
 
     @State
     var parentId: Long? = null
@@ -1080,7 +1080,7 @@ abstract class TransactionDelegate(
     open fun prepareForNew() = if (resetAmounts()) {
         rowId = 0L
         uuid = generateUuid()
-        crStatus = CrStatus.UNRECONCILED
+        crStatus = CrStatus.CLEARED
         resetRecurrence()
         populateStatusSpinner()
         true

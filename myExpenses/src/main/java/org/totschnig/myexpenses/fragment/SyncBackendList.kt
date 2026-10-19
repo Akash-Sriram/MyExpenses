@@ -116,37 +116,32 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
         val packedPosition = (menuInfo as ExpandableListContextMenuInfo).packedPosition
         val commandId: Int
         val titleId: Int
-        val isSyncAvailable = licenceHandler.hasTrialAccessTo(ContribFeature.SYNCHRONIZATION)
         if (getPackedPositionType(packedPosition) == PACKED_POSITION_TYPE_CHILD) {
-            if (isSyncAvailable) {
-                when (syncBackendAdapter.getSyncState(packedPosition)) {
-                    SyncBackendAdapter.SyncState.SYNCED_TO_THIS -> {
-                        commandId = R.id.SYNC_UNLINK_COMMAND
-                        titleId = R.string.menu_sync_unlink
-                    }
-                    SyncBackendAdapter.SyncState.UNSYNCED -> {
-                        commandId = R.id.SYNC_LINK_COMMAND
-                        titleId = R.string.menu_sync_link
-                    }
-                    SyncBackendAdapter.SyncState.SYNCED_TO_OTHER -> {
-                        commandId = R.id.SYNCED_TO_OTHER_COMMAND
-                        titleId = R.string.menu_sync_link
-                    }
-                    SyncBackendAdapter.SyncState.UNKNOWN -> {
-                        commandId = R.id.SYNC_DOWNLOAD_COMMAND
-                        titleId = R.string.menu_sync_download
-                    }
-                    else -> {
-                        commandId = 0
-                        titleId = 0
-                    }
+            when (syncBackendAdapter.getSyncState(packedPosition)) {
+                SyncBackendAdapter.SyncState.SYNCED_TO_THIS -> {
+                    commandId = R.id.SYNC_UNLINK_COMMAND
+                    titleId = R.string.menu_sync_unlink
                 }
-                if (commandId != 0) menu.add(Menu.NONE, commandId, 0, titleId)
+                SyncBackendAdapter.SyncState.UNSYNCED -> {
+                    commandId = R.id.SYNC_LINK_COMMAND
+                    titleId = R.string.menu_sync_link
+                }
+                SyncBackendAdapter.SyncState.SYNCED_TO_OTHER -> {
+                    commandId = R.id.SYNCED_TO_OTHER_COMMAND
+                    titleId = R.string.menu_sync_link
+                }
+                SyncBackendAdapter.SyncState.UNKNOWN -> {
+                    commandId = R.id.SYNC_DOWNLOAD_COMMAND
+                    titleId = R.string.menu_sync_download
+                }
+                else -> {
+                    commandId = 0
+                    titleId = 0
+                }
             }
+            if (commandId != 0) menu.add(Menu.NONE, commandId, 0, titleId)
         } else {
-            if (isSyncAvailable) {
-                menu.add(Menu.NONE, R.id.SYNC_COMMAND, 0, R.string.menu_sync_now)
-            }
+            menu.add(Menu.NONE, R.id.SYNC_COMMAND, 0, R.string.menu_sync_now)
             menu.add(Menu.NONE, R.id.SYNC_REMOVE_BACKEND_COMMAND, 0, R.string.remove)
             if (syncBackendAdapter.isEncrypted(packedPosition)) {
                 menu.add(Menu.NONE, R.id.SHOW_PASSWORD_COMMAND, 0, R.string.input_label_passphrase)

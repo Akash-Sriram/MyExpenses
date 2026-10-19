@@ -204,15 +204,7 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
                     if (initialLaunchWasForSystemPreferences) {
                         log("Suppressing WebUI start")
                     } else {
-                        if (licenceHandler.hasTrialAccessTo(ContribFeature.WEB_UI)) {
-                            controlWebUi(START_ACTION)
-                        } else {
-                            disableWebUi()
-                            ContribUtils.showContribNotification(
-                                this@MyApplication,
-                                ContribFeature.WEB_UI
-                            )
-                        }
+                        controlWebUi(START_ACTION)
                     }
                 }
             }

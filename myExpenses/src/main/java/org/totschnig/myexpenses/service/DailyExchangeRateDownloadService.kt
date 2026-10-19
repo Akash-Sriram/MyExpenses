@@ -110,13 +110,6 @@ class DailyExchangeRateDownloadService(context: Context, workerParameters: Worke
     override val notificationTitleResId = R.string.pref_category_exchange_rates
 
     override suspend fun doWork(): Result {
-
-        if (!licenceHandler.hasTrialAccessTo(ContribFeature.AUTOMATIC_FX_DOWNLOAD)) {
-            prefHandler.putBoolean(PrefKey.AUTOMATIC_EXCHANGE_RATE_DOWNLOAD, false)
-            ContribUtils.showContribNotification(applicationContext, ContribFeature.AUTOMATIC_FX_DOWNLOAD)
-            return Result.failure()
-        }
-
         val result: List<kotlin.Result<Unit>>? = applicationContext.contentResolver.query(
             TransactionProvider.ACCOUNTS_MINIMAL_URI,
             arrayOf("distinct $KEY_CURRENCY"),

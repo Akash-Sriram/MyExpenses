@@ -1,5 +1,13 @@
 package org.totschnig.myexpenses.compose.loans
 
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import org.totschnig.myexpenses.activity.ExpenseEdit
+import org.totschnig.myexpenses.contract.TransactionsContract.Transactions
+import org.totschnig.myexpenses.db2.entities.Template
+import org.totschnig.myexpenses.provider.KEY_ROWID
+import org.totschnig.myexpenses.provider.KEY_TEMPLATEID
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,9 +29,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -90,13 +102,16 @@ import org.totschnig.myexpenses.viewmodel.data.AccountMinimal
 @Composable
 fun LoansScreen(
     viewModel: LoanViewModel,
+    initialTab: Int = 0,
     onClose: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
     val allLoans by viewModel.allLoans.collectAsState()
     val activeLoans by viewModel.activeLoans.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
     val creditCardDetails by viewModel.creditCardDetails.collectAsState()
+    val templates by viewModel.templates.collectAsState()
+    val recurringPlans by viewModel.recurringPlans.collectAsState()
 
     var showAddLoanSheet by remember { mutableStateOf(false) }
     var loanFilterActiveOnly by remember { mutableStateOf(true) }
@@ -118,7 +133,7 @@ fun LoansScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.loans_title)) },
+                title = { Text(stringResource(R.string.commitments_title)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -127,11 +142,38 @@ fun LoansScreen(
             )
         },
         floatingActionButton = {
-            if (selectedTab == 0) {
-                FloatingActionButton(
-                    onClick = { showAddLoanSheet = true }
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_loan))
+            val context = LocalContext.current
+            when (selectedTab) {
+                0 -> {
+                    FloatingActionButton(
+                        onClick = { showAddLoanSheet = true }
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_loan))
+                    }
+                }
+                2 -> {
+                    FloatingActionButton(
+                        onClick = {
+                            context.startActivity(Intent(context, ExpenseEdit::class.java).apply {
+                                putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                                putExtra(ExpenseEdit.KEY_NEW_TEMPLATE, true)
+                            })
+                        }
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_plan))
+                    }
+                }
+                3 -> {
+                    FloatingActionButton(
+                        onClick = {
+                            context.startActivity(Intent(context, ExpenseEdit::class.java).apply {
+                                putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                                putExtra(ExpenseEdit.KEY_NEW_TEMPLATE, true)
+                            })
+                        }
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_template))
+                    }
                 }
             }
         }
@@ -151,6 +193,16 @@ fun LoansScreen(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = { Text(stringResource(R.string.tab_credit_cards)) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("${stringResource(R.string.tab_plans)} (${recurringPlans.size})") }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text("${stringResource(R.string.tab_templates)} (${templates.size})") }
                 )
             }
 
@@ -233,6 +285,154 @@ fun LoansScreen(
                                 Spacer(modifier = Modifier.height(72.dp))
                             }
                         }
+                    }
+                }
+
+                2 -> {
+                    val context = LocalContext.current
+                    var planToDelete by remember { mutableStateOf<Template?>(null) }
+
+                    if (recurringPlans.isEmpty()) {
+                        PlansEmptyState(onAddPlan = {
+                            context.startActivity(Intent(context, ExpenseEdit::class.java).apply {
+                                putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                                putExtra(ExpenseEdit.KEY_NEW_TEMPLATE, true)
+                            })
+                        })
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(recurringPlans, key = { it.id }) { plan ->
+                                val linkedAccount = accounts.find { it.id == plan.accountId }
+                                RecurringPlanItem(
+                                    plan = plan,
+                                    account = linkedAccount,
+                                    viewModel = viewModel,
+                                    onRunPlan = {
+                                        viewModel.instantiateTemplate(plan.id) { success ->
+                                            val msg = if (success) context.getString(R.string.template_applied_success)
+                                            else "Failed to execute plan"
+                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onEditPlan = {
+                                        context.startActivity(Intent(context, ExpenseEdit::class.java).apply {
+                                            putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                                            putExtra(KEY_ROWID, plan.id)
+                                            putExtra(KEY_TEMPLATEID, plan.id)
+                                        })
+                                    },
+                                    onDeletePlan = {
+                                        planToDelete = plan
+                                    }
+                                )
+                            }
+                            item {
+                                Spacer(modifier = Modifier.height(72.dp))
+                            }
+                        }
+                    }
+
+                    if (planToDelete != null) {
+                        AlertDialog(
+                            onDismissRequest = { planToDelete = null },
+                            title = { Text(stringResource(R.string.menu_delete)) },
+                            text = { Text(stringResource(R.string.delete_plan_confirm, planToDelete!!.title)) },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        val id = planToDelete!!.id
+                                        planToDelete = null
+                                        viewModel.deleteTemplate(id)
+                                    }
+                                ) {
+                                    Text(stringResource(R.string.menu_delete))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { planToDelete = null }) {
+                                    Text(stringResource(android.R.string.cancel))
+                                }
+                            }
+                        )
+                    }
+                }
+
+                3 -> {
+                    val context = LocalContext.current
+                    var templateToDelete by remember { mutableStateOf<Template?>(null) }
+
+                    if (templates.isEmpty()) {
+                        TemplatesEmptyState(onAddTemplate = {
+                            context.startActivity(Intent(context, ExpenseEdit::class.java).apply {
+                                putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                                putExtra(ExpenseEdit.KEY_NEW_TEMPLATE, true)
+                            })
+                        })
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(templates, key = { it.id }) { template ->
+                                val linkedAccount = accounts.find { it.id == template.accountId }
+                                QuickTemplateItem(
+                                    template = template,
+                                    account = linkedAccount,
+                                    viewModel = viewModel,
+                                    onApply = {
+                                        viewModel.instantiateTemplate(template.id) { success ->
+                                            val msg = if (success) context.getString(R.string.template_applied_success)
+                                            else "Failed to instantiate template"
+                                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onEdit = {
+                                        context.startActivity(Intent(context, ExpenseEdit::class.java).apply {
+                                            putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                                            putExtra(KEY_ROWID, template.id)
+                                            putExtra(KEY_TEMPLATEID, template.id)
+                                        })
+                                    },
+                                    onDelete = {
+                                        templateToDelete = template
+                                    }
+                                )
+                            }
+                            item {
+                                Spacer(modifier = Modifier.height(72.dp))
+                            }
+                        }
+                    }
+
+                    if (templateToDelete != null) {
+                        AlertDialog(
+                            onDismissRequest = { templateToDelete = null },
+                            title = { Text(stringResource(R.string.menu_delete)) },
+                            text = { Text(stringResource(R.string.delete_template_confirm, templateToDelete!!.title)) },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        val id = templateToDelete!!.id
+                                        templateToDelete = null
+                                        viewModel.deleteTemplate(id)
+                                    }
+                                ) {
+                                    Text(stringResource(R.string.menu_delete))
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { templateToDelete = null }) {
+                                    Text(stringResource(android.R.string.cancel))
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -782,6 +982,8 @@ private fun AddLoanBottomSheet(
     var interestRateText by remember { mutableStateOf("10.5") }
     var tenureMonthsText by remember { mutableStateOf("12") }
     var dueDayOfMonthText by remember { mutableStateOf("5") }
+    var actualEmiText by remember { mutableStateOf("") }
+    var emisAlreadyPaidText by remember { mutableStateOf("0") }
     var selectedAccountId by remember { mutableStateOf<Long?>(null) }
     var expandedAccountDropdown by remember { mutableStateOf(false) }
 
@@ -789,9 +991,10 @@ private fun AddLoanBottomSheet(
     val interestRate = interestRateText.toDoubleOrNull() ?: 0.0
     val tenureMonths = tenureMonthsText.toIntOrNull() ?: 0
     val dueDay = dueDayOfMonthText.toIntOrNull() ?: 5
+    val overrideEmi = actualEmiText.toLongOrNull()?.times(100L)
 
-    val previewEmi = remember(loanType, principal, interestRate, tenureMonths) {
-        if (principal > 0 && tenureMonths > 0) {
+    val previewEmi = remember(loanType, principal, interestRate, tenureMonths, overrideEmi) {
+        overrideEmi ?: if (principal > 0 && tenureMonths > 0) {
             EmiCalculator.calculateEmi(loanType, principal, interestRate, tenureMonths)
         } else 0L
     }
@@ -896,6 +1099,28 @@ private fun AddLoanBottomSheet(
                 singleLine = true
             )
 
+            // Optional Actual EMI Override
+            OutlinedTextField(
+                value = actualEmiText,
+                onValueChange = { actualEmiText = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Actual Monthly EMI (₹) (Optional Override)") },
+                placeholder = { Text("e.g. from bank statement") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            // Mid-Tenure Onboarding: EMIs Already Paid
+            OutlinedTextField(
+                value = emisAlreadyPaidText,
+                onValueChange = { emisAlreadyPaidText = it.filter { ch -> ch.isDigit() } },
+                label = { Text("Number of EMIs already paid (0 for new loan)") },
+                placeholder = { Text("e.g. 28 if migrating existing loan") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
             // Linked Bank Account
             ExposedDropdownMenuBox(
                 expanded = expandedAccountDropdown,
@@ -975,6 +1200,15 @@ private fun AddLoanBottomSheet(
                                 Text("₹${(totalPayable - principal) / 100.0}")
                             }
                         }
+                        val alreadyPaid = emisAlreadyPaidText.toIntOrNull() ?: 0
+                        if (alreadyPaid > 0) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Onboarding: $alreadyPaid of $tenureMonths EMIs marked paid",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -983,6 +1217,8 @@ private fun AddLoanBottomSheet(
             val canSave = label.isNotBlank() && principal > 0 && tenureMonths > 0
             Button(
                 onClick = {
+                    val actualEmiPaise = actualEmiText.toLongOrNull()?.times(100L)
+                    val alreadyPaidCount = emisAlreadyPaidText.toIntOrNull() ?: 0
                     viewModel.createLoan(
                         label = label,
                         lenderName = lenderName,
@@ -992,7 +1228,9 @@ private fun AddLoanBottomSheet(
                         tenureMonths = tenureMonths,
                         startDate = System.currentTimeMillis(),
                         dueDayOfMonth = dueDay,
-                        linkedAccountId = selectedAccountId
+                        linkedAccountId = selectedAccountId,
+                        actualEmiAmount = actualEmiPaise,
+                        emisAlreadyPaid = alreadyPaidCount
                     ) {
                         onDismiss()
                     }
@@ -1315,4 +1553,234 @@ private fun SettleCreditCardDialog(
             }
         }
     )
+}
+
+@Composable
+fun RecurringPlanItem(
+    plan: Template,
+    account: AccountMinimal?,
+    viewModel: LoanViewModel,
+    onRunPlan: () -> Unit,
+    onEditPlan: () -> Unit,
+    onDeletePlan: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = plan.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            if (plan.planExecutionAutomatic) "Auto-Debit" else "Manual Run",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            account?.let {
+                Text(
+                    text = "Account: ${it.label}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (!plan.categoryPath.isNullOrBlank()) {
+                Text(
+                    text = "Category: ${plan.categoryPath}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val currencyUnit = viewModel.getCurrencyUnit(account?.currency ?: viewModel.defaultCurrency.code)
+                AmountText(
+                    amount = plan.amount,
+                    currency = currencyUnit,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = onRunPlan) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Run", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Record")
+                    }
+                    IconButton(onClick = onEditPlan) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                    }
+                    IconButton(onClick = onDeletePlan) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickTemplateItem(
+    template: Template,
+    account: AccountMinimal?,
+    viewModel: LoanViewModel,
+    onApply: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = template.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                account?.let {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text(it.label, style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
+            }
+
+            if (!template.categoryPath.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = template.categoryPath,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val currencyUnit = viewModel.getCurrencyUnit(account?.currency ?: viewModel.defaultCurrency.code)
+                if (template.amount != 0L) {
+                    AmountText(
+                        amount = template.amount,
+                        currency = currencyUnit,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                } else {
+                    Text(
+                        text = "Variable Amount",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = onApply) {
+                        Icon(Icons.Default.Bolt, contentDescription = "Apply", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.apply_template))
+                    }
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PlansEmptyState(onAddPlan: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.DateRange,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.no_plans_message),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedButton(onClick = onAddPlan) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.add_plan))
+        }
+    }
+}
+
+@Composable
+fun TemplatesEmptyState(onAddTemplate: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Bolt,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.no_templates_message),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        OutlinedButton(onClick = onAddTemplate) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.add_template))
+        }
+    }
 }
