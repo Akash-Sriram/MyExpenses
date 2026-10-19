@@ -34,7 +34,7 @@ class BatchPriceDownloadDialogFragment : ComposeBaseDialogFragment2() {
     override fun BuildContent() {
         DateRangePickerScaffold(
             confirmButtonText = stringResource(R.string.batch_download),
-            warning = if (source == ExchangeRateApi.Frankfurter) null else
+            warning = if (source.host.isEmpty()) null else
                 getString(R.string.warning_batch_download_quota, source.host),
         ) { (start, end) ->
             try {

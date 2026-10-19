@@ -23,7 +23,6 @@ import org.totschnig.myexpenses.preference.PrefHandlerImpl
 import org.totschnig.myexpenses.provider.DATABASE_VERSION
 import org.totschnig.myexpenses.provider.DatabaseVersionPeekHelper
 import org.totschnig.myexpenses.provider.TransactionDatabase
-import org.totschnig.myexpenses.retrofit.ExchangeRateService
 import org.totschnig.myexpenses.util.ExchangeRateHandler
 import timber.log.Timber
 import java.io.File
@@ -144,12 +143,10 @@ open class DataModule() {
     @Singleton
     @Provides
     fun provideExchangeRateHandler(
-        exchangeRateService: ExchangeRateService,
         repository: Repository,
         prefHandler: PrefHandler,
         currencyContext: CurrencyContext
     ): ExchangeRateHandler = ExchangeRateHandler(
-        exchangeRateService,
         repository,
         prefHandler,
         currencyContext

@@ -98,7 +98,6 @@ import org.totschnig.myexpenses.exception.ExternalStorageNotAvailableException
 import org.totschnig.myexpenses.exception.UnknownPictureSaveException
 import org.totschnig.myexpenses.feature.OcrResultFlat
 import org.totschnig.myexpenses.fragment.PartiesList.Companion.DIALOG_EDIT_PARTY
-import org.totschnig.myexpenses.fragment.PlanMonthFragment
 import org.totschnig.myexpenses.fragment.TemplatesList
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.ContribFeature
@@ -1735,15 +1734,9 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         get() = if (createNew && delegate.createNewOverride) R.string.menu_save_and_new_content_description else super.fabDescription
 
     fun showPlanMonthFragment(originTemplate: TemplateEditData, color: Int) {
-        PlanMonthFragment.newInstance(
-            originTemplate.title,
-            originTemplate.templateId,
-            originTemplate.plan?.id ?: 0L,
-            color, true, prefHandler
-        ).show(
-            supportFragmentManager,
-            TemplatesList.CALDROID_DIALOG_FRAGMENT_TAG
-        )
+        originTemplate.plan?.id?.let { planId ->
+            launchPlanView(false, planId)
+        }
     }
 
     fun observePlan(planId: Long) {

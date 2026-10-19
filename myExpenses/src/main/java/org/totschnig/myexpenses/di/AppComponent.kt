@@ -52,8 +52,6 @@ import org.totschnig.myexpenses.preference.CalendarListPreferenceDialogFragmentC
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.provider.BaseTransactionProvider
 import org.totschnig.myexpenses.provider.PlannerUtils
-import org.totschnig.myexpenses.retrofit.ExchangeRateService
-import org.totschnig.myexpenses.service.DailyExchangeRateDownloadService
 import org.totschnig.myexpenses.service.PlanExecutor
 import org.totschnig.myexpenses.service.PlanNotificationClickHandler
 import org.totschnig.myexpenses.sync.SyncAdapter
@@ -139,8 +137,6 @@ interface AppComponent {
     fun currencyContext(): CurrencyContext
 
     fun currencyFormatter(): ICurrencyFormatter
-
-    fun exchangeRateService(): ExchangeRateService
 
     fun picasso(): Picasso
 
@@ -290,8 +286,6 @@ interface AppComponent {
     fun inject(archiveDialogFragment: ArchiveDialogFragment)
 
     fun inject(budgetListViewModel: BudgetListViewModel)
-
-    fun inject(dailyExchangeRateService: DailyExchangeRateDownloadService)
 
     fun inject(printLayoutConfigurationViewModel: PrintLayoutConfigurationViewModel)
 

@@ -4,7 +4,6 @@ import android.content.Context
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.feature.Feature
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
-import org.totschnig.myexpenses.util.distrib.DistributionHelper
 
 enum class BackendService(
     private val className: String,
@@ -13,45 +12,14 @@ enum class BackendService(
     val feature: Feature?,
     val supportsReconfiguration: Boolean = false
 ) {
-    DRIVE(
-        "org.totschnig.drive.sync.GoogleDriveBackendProviderFactory",
-        R.id.SYNC_BACKEND_DRIVE,
-        "Drive",
-        Feature.DRIVE
-    ),
     SAF(
         "org.totschnig.myexpenses.sync.StorageAccessFrameworkBackendProviderFactory",
         R.id.SYNC_BACKEND_LOCAL,
         "SAF",
         null
-    ),
-    DROPBOX(
-        "org.totschnig.dropbox.sync.DropboxProviderFactory",
-        R.id.SYNC_BACKEND_DROPBOX,
-        "Dropbox",
-        Feature.DROPBOX
-    ),
-    ONEDRIVE(
-        "org.totschnig.onedrive.sync.OneDriveProviderFactory",
-        R.id.SYNC_BACKEND_ONEDRIVE,
-        "OneDrive",
-        Feature.ONEDRIVE
-    ),
-    WEBDAV(
-        "org.totschnig.webdav.sync.WebDavBackendProviderFactory",
-        R.id.SYNC_BACKEND_WEBDAV,
-        "WebDAV",
-        Feature.WEBDAV,
-        true
     );
 
-
-    open fun isAvailable(context: Context) = if (DistributionHelper.isGithub) try {
-        Class.forName(className, false, this::class.java.classLoader)
-        true
-    } catch (_: Exception) {
-        false
-    } else true
+    open fun isAvailable(context: Context) = true
 
     fun instantiate(): Result<SyncBackendProviderFactory> = kotlin.runCatching {
         Class.forName(className).getDeclaredConstructor()
@@ -71,6 +39,5 @@ enum class BackendService(
         }
 
         fun allAvailable(context: Context) = entries.filter { it.isAvailable(context) }
-
     }
 }

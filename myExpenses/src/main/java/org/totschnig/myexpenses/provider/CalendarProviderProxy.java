@@ -16,8 +16,6 @@ import org.totschnig.myexpenses.BuildConfig;
 import java.time.ZoneId;
 import java.util.TimeZone;
 
-import hirondelle.date4j.DateTime;
-
 /**
  * Proxy for {@link  CalendarContract.Instances} which allows to swap in
  * alternate implementation in context where the Instances table does not work, e.g. Blackberry
@@ -80,31 +78,11 @@ public class CalendarProviderProxy extends ContentProvider {
     }
   }
 
-  private boolean isInstanceOfPlan(DateTime dayToCheck, long dtstart, EventRecurrence recurrence) {
-    DateTime startDate = DateTime.forInstant(dtstart, TimeZone.getDefault());
-    if (recurrence == null) {
-      return dayToCheck.isSameDayAs(startDate);
-    }
-    switch (recurrence.freq) {
-      case EventRecurrence.DAILY:
-        return true;
-      case EventRecurrence.WEEKLY:
-        return dayToCheck.getWeekDay().equals(startDate.getWeekDay());
-      case EventRecurrence.MONTHLY:
-        return dayToCheck.getDay().equals(startDate.getDay());
-      case EventRecurrence.YEARLY:
-        return dayToCheck.getDay().equals(startDate.getDay()) &&
-            dayToCheck.getMonth().equals(startDate.getMonth());
-    }
-    throw new IllegalStateException("Unhandled event recurrence" + recurrence);
-  }
-
   public static long calculateId(long date) {
-    return calculateId(DateTime.forInstant(date, TimeZone.getTimeZone(ZoneId.systemDefault())));
-  }
-
-  public static long calculateId(DateTime dateTime) {
-    return dateTime.getYear() * 1000 + dateTime.getDayOfYear();
+    java.time.LocalDate localDate = java.time.Instant.ofEpochMilli(date)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate();
+    return localDate.getYear() * 1000L + localDate.getDayOfYear();
   }
 
   @Override

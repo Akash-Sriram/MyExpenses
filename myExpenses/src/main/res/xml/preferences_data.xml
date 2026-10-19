@@ -70,27 +70,7 @@
         <ListPreference
             android:enabled="false"
             android:key="@string/pref_home_currency_key"
-            android:title="@string/pref_home_currency_title"
-            my:useSimpleSummaryProvider="true" />
-        <MultiSelectListPreference
-            android:defaultValue="@array/pref_exchange_rate_provider_default"
-            android:key="@string/pref_exchange_rate_provider_key"
-            android:summary="@string/pref_exchange_rate_provider_summary"
-            android:title="@string/pref_exchange_rate_provider_title" />
-        <EditTextPreference
-            android:key="@string/pref_openexchangerates_app_id_key"
-            android:title="OpenExchangeRates App ID"
-            my:isPreferenceVisible="false" />
-        <EditTextPreference
-            android:key="@string/pref_coin_api_api_key_key"
-            android:title="CoinApi API Key"
-            my:isPreferenceVisible="false" />
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="@string/pref_automatic_exchange_rate_download_key"
-            android:title="@string/enable_automatic_daily_exchange_rate_download"
-            my:allowDividerAbove="true"
-            my:singleLineTitle="false" />
+            android:title="@string/pref_home_currency_title" />
     </PreferenceCategory>
     <PreferenceCategory
         android:key="@string/pref_category_prices_key"

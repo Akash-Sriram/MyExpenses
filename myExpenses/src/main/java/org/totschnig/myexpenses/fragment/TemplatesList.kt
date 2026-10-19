@@ -16,8 +16,10 @@ package org.totschnig.myexpenses.fragment
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.provider.CalendarContract
 import android.database.Cursor
 import android.graphics.Typeface
 import android.os.Bundle
@@ -239,18 +241,12 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
                     }
                 }
             } else {
-                if (isCalendarPermissionGranted) {
-                    val planMonthFragment = PlanMonthFragment.newInstance(
-                        templatesCursor.getString(KEY_TITLE),
-                        id,
-                        templatesCursor.getLong(KEY_PLANID),
-                        templatesCursor.getInt(KEY_COLOR), isSealed, prefHandler
-                    )
-                    if (!childFragmentManager.isStateSaved) {
-                        planMonthFragment.show(childFragmentManager, CALDROID_DIALOG_FRAGMENT_TAG)
+                val planId = templatesCursor.getLong(KEY_PLANID)
+                if (planId != 0L) {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, planId)
                     }
-                } else {
-                    ctx.requestCalendarPermission()
+                    ctx.startActivity(intent)
                 }
             }
         }
@@ -461,32 +457,22 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
             if (isCalendarPermissionGranted && _templatesCursor != null && templatesCursor.moveToFirst()) {
                 val needToExpand =
                     if (expandedHandled) ManageTemplates.NOT_CALLED else ctx.calledFromCalendarWithId
-                var planMonthFragment: PlanMonthFragment? = null
                 while (!templatesCursor.isAfterLast) {
                     val planId = templatesCursor.getLong(KEY_PLANID)
                     if (planId != 0L) {
                         hasPlans = true
                     }
                     val templateId = templatesCursor.getLong(KEY_ROWID)
-                    if (needToExpand == templateId) {
-                        planMonthFragment = PlanMonthFragment.newInstance(
-                            templatesCursor.getString(KEY_TITLE),
-                            templateId,
-                            planId,
-                            templatesCursor.getInt(KEY_COLOR),
-                            templatesCursor.getInt(KEY_SEALED) != 0,
-                            prefHandler
-                        )
+                    if (needToExpand == templateId && planId != 0L) {
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, planId)
+                        }
+                        ctx.startActivity(intent)
                     }
                     templatesCursor.moveToNext()
                 }
                 if (needToExpand != ManageTemplates.NOT_CALLED) {
                     expandedHandled = true
-                    if (planMonthFragment != null) {
-                        planMonthFragment.show(childFragmentManager, CALDROID_DIALOG_FRAGMENT_TAG)
-                    } else {
-                        ctx.showSnackBar(R.string.save_transaction_template_deleted)
-                    }
                 }
                 //look for plans that we could possible relink
                 if (!repairTriggered && templatesCursor.moveToFirst()) {
@@ -519,7 +505,7 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     }
 
     fun showSnackbar(msg: String) {
-        (planMonthFragment ?: plannerFragment)?.also {
+        plannerFragment?.also {
             showSnackbar(it, msg)
         } ?: run { (activity as ProtectedFragmentActivity).showSnackBar(msg) }
     }
@@ -671,8 +657,6 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     }
 
     //after orientation change, we need to restore the reference
-    private val planMonthFragment: PlanMonthFragment?
-        get() = childFragmentManager.findFragmentByTag(CALDROID_DIALOG_FRAGMENT_TAG) as PlanMonthFragment?
     private val plannerFragment: PlannerFragment?
         get() = childFragmentManager.findFragmentByTag(PLANNER_FRAGMENT_TAG) as PlannerFragment?
 
@@ -870,8 +854,6 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     override fun inflateContextualActionBar(menu: Menu, listId: Int) {
         if (listId == R.id.list) {
             super.inflateContextualActionBar(menu, listId)
-        } else if (listId == com.caldroid.R.id.calendar_gridview) {
-            requireActivity().menuInflater.inflate(R.menu.planlist_context, menu)
         }
     }
 
@@ -881,7 +863,6 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
 
     companion object {
         private const val SORTABLE_CURSOR = -1
-        const val CALDROID_DIALOG_FRAGMENT_TAG = "CALDROID_DIALOG_FRAGMENT"
         const val PLANNER_FRAGMENT_TAG = "PLANNER_FRAGMENT"
     }
 

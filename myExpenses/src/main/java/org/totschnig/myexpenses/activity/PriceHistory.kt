@@ -525,7 +525,7 @@ fun HistoricPricesPreview() {
                     date,
                     Price(
                         date,
-                        ExchangeRateApi.Frankfurter,
+                        ExchangeRateSource.User,
                         BigDecimal.valueOf(random.nextDouble())
                     )
                 )

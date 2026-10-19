@@ -68,16 +68,6 @@ class OnboardingActivity : SyncBackendSetupActivity() {
         pagerAdapter = MyPagerAdapter(this)
         binding.viewPager.adapter = pagerAdapter
         binding.viewPager.offscreenPageLimit = 2
-        ViewCompat.setOnApplyWindowInsetsListener(binding.pageIndicatorView) { v, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars()
-                        or WindowInsetsCompat.Type.displayCutout()
-            )
-            v.updateLayoutParams<MarginLayoutParams> {
-                topMargin = bars.top
-            }
-            insets
-        }
         onBackPressedCallback = object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 val currentItem = binding.viewPager.currentItem

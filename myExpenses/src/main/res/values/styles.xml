@@ -131,21 +131,7 @@
         <item name="backgroundInsetBottom">@dimen/mtrl_alert_dialog_background_inset_vertical</item>
     </style>
 
-    <style name="CaldroidCustomBase" parent="@style/CaldroidDefault" />
 
-    <style name="CaldroidCustom" parent="CaldroidCustomBase">
-        <item name="styleCaldroidGridView">@style/CaldroidCustomGridView</item>
-    </style>
-
-    <style name="CaldroidCustomGridView">
-        <item name="android:drawSelectorOnTop">true</item>
-        <item name="android:adjustViewBounds">true</item>
-        <item name="android:gravity">center_horizontal</item>
-        <item name="android:background">@color/caldroid_custom_gridview_background</item>
-        <item name="android:horizontalSpacing">1dp</item>
-        <item name="android:padding">1dp</item>
-        <item name="android:verticalSpacing">1dp</item>
-    </style>
 
     <style name="MySpinnerItemStyle" parent="@style/Widget.AppCompat.TextView.SpinnerItem">
         <item name="android:minHeight">@dimen/accessibility_clickable_minimum</item>

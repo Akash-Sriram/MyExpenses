@@ -11,7 +11,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.res.ResourcesCompat
-import com.kazy.fontdrawable.FontDrawable
+import org.totschnig.myexpenses.ui.FontDrawable
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.util.ui.UiUtils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler

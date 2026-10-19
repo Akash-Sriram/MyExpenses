@@ -84,7 +84,7 @@ sealed class Feature(vararg val requiredModules: Module) {
         ) =
             GenericAccountService.getAccountNames(context).none { account ->
                 account.startsWith(
-                    BackendService.entries.first { it.feature == this }.label
+                    BackendService.entries.firstOrNull { it.feature == this }?.label ?: ""
                 )
             }
     }
