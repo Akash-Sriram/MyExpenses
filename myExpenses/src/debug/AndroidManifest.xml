@@ -23,8 +23,7 @@
     <application
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
-        tools:ignore="AllowBackup,GoogleAppIndexingWarning"
-        tools:targetApi="q">
+        tools:ignore="AllowBackup,GoogleAppIndexingWarning">
         <receiver
             android:exported="true"
             android:name=".ExecutionTrigger"

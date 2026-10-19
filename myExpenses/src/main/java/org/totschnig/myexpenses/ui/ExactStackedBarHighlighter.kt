@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.ui
 
 import android.graphics.RectF
-import androidx.annotation.NonNull
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.BarLineScatterCandleBubbleData

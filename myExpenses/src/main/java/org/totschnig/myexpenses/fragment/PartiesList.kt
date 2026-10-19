@@ -14,7 +14,6 @@
  */
 package org.totschnig.myexpenses.fragment
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -28,6 +27,8 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.view.menu.MenuBuilder
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
@@ -375,7 +376,6 @@ class PartiesList : Fragment(), OnDialogResultListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
         with((requireActivity().application as MyApplication).appComponent) {
             inject(this@PartiesList)
             inject(viewModel)
@@ -403,9 +403,77 @@ class PartiesList : Fragment(), OnDialogResultListener {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         if (mergeMode) {
             updateUiMergeMode()
         }
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                if (activity == null) return
+                menuInflater.inflate(R.menu.search, menu)
+                if (action == Action.MANAGE) {
+                    menu.add(Menu.NONE, R.id.MERGE_COMMAND, 0, R.string.menu_merge).apply {
+                        setIcon(R.drawable.ic_menu_split_transaction)
+                        isCheckable = true
+                    }
+                    menu.add(Menu.NONE, R.id.DEBT_COMMAND, 0, R.string.title_activity_debt_overview)
+                        .setIcon(R.drawable.balance_scale)
+                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+                    menu.add(Menu.NONE, R.id.CLEANUP_COMMAND, 0, R.string.menu_cleanup)
+                        .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                }
+                configureSearch(requireActivity(), menu, callback = ::onQueryTextChange)
+            }
+
+            override fun onPrepareMenu(menu: Menu) {
+                menu.findItem(R.id.MERGE_COMMAND)?.let { menuItem ->
+                    menuItem.setEnabledAndVisible(adapter.currentList.count { !it.isDuplicate } > 1)
+                    menuItem.isChecked = mergeMode
+                }
+                menu.prepareSearch(viewModel.filter)
+                menu.findItem(R.id.DEBT_COMMAND)?.let { menuItem ->
+                    menuItem.isVisible = viewModel.hasDebts
+                }
+                menu.findItem(R.id.CLEANUP_COMMAND)?.let { menuItem ->
+                    menuItem.isVisible = viewModel.unusedCount.value > 0
+                }
+            }
+
+            override fun onMenuItemSelected(item: MenuItem): Boolean =
+                when (item.itemId) {
+                    R.id.MERGE_COMMAND -> {
+                        mergeMode = !mergeMode
+                        viewModel.expandedItem = null
+                        updateUiMergeMode()
+                        resetAdapter()
+                        true
+                    }
+
+                    R.id.DEBT_COMMAND -> {
+                        startActivity(Intent(context, DebtOverview::class.java))
+                        true
+                    }
+
+                    R.id.CLEANUP_COMMAND -> {
+                        val unusedCount = viewModel.unusedCount.value
+                        (requireActivity() as BaseActivity).showConfirmationDialog(
+                            tag = "CLEANUP_PARTIES",
+                            message =
+                                resources.getQuantityString(
+                                    R.plurals.warning_cleanup_parties,
+                                    unusedCount,
+                                    unusedCount
+                                ) +
+                                        " " + getString(R.string.continue_confirmation),
+                            commandPositive = R.id.CLEANUP_COMMAND_DO,
+                        )
+                        true
+                    }
+
+                    else -> false
+                }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -413,59 +481,6 @@ class PartiesList : Fragment(), OnDialogResultListener {
         StateSaver.saveInstanceState(this, outState)
         adapter.onSaveInstanceState(outState)
     }
-
-    @Deprecated("Deprecated in Java")
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        if (activity == null) return
-        inflater.inflate(R.menu.search, menu)
-        if (action == Action.MANAGE) {
-            menu.add(Menu.NONE, R.id.MERGE_COMMAND, 0, R.string.menu_merge).apply {
-                setIcon(R.drawable.ic_menu_split_transaction)
-                isCheckable = true
-            }
-            menu.add(Menu.NONE, R.id.DEBT_COMMAND, 0, R.string.title_activity_debt_overview)
-                .setIcon(R.drawable.balance_scale)
-                .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
-            menu.add(Menu.NONE, R.id.CLEANUP_COMMAND, 0, R.string.menu_cleanup)
-                .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
-        }
-        configureSearch(requireActivity(), menu, callback = ::onQueryTextChange)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onOptionsItemSelected(item: MenuItem) =
-        when (item.itemId) {
-            R.id.MERGE_COMMAND -> {
-                mergeMode = !mergeMode
-                viewModel.expandedItem = null
-                updateUiMergeMode()
-                resetAdapter()
-                true
-            }
-
-            R.id.DEBT_COMMAND -> {
-                startActivity(Intent(context, DebtOverview::class.java))
-                true
-            }
-
-            R.id.CLEANUP_COMMAND -> {
-                val unusedCount = viewModel.unusedCount.value
-                (requireActivity() as BaseActivity).showConfirmationDialog(
-                    tag = "CLEANUP_PARTIES",
-                    message =
-                        resources.getQuantityString(
-                            R.plurals.warning_cleanup_parties,
-                            unusedCount,
-                            unusedCount
-                        ) +
-                                " " + getString(R.string.continue_confirmation),
-                    commandPositive = R.id.CLEANUP_COMMAND_DO,
-                )
-                true
-            }
-
-            else -> super.onOptionsItemSelected(item)
-        }
 
     private fun updateUiMergeMode() {
         with(manageParties) {
@@ -479,22 +494,6 @@ class PartiesList : Fragment(), OnDialogResultListener {
     private fun resetAdapter() {
         //noinspection NotifyDataSetChanged
         adapter.notifyDataSetChanged()
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onPrepareOptionsMenu(menu: Menu) {
-        super.onPrepareOptionsMenu(menu)
-        menu.findItem(R.id.MERGE_COMMAND)?.let { menuItem ->
-            menuItem.setEnabledAndVisible(adapter.currentList.count { !it.isDuplicate } > 1)
-            menuItem.isChecked = mergeMode
-        }
-        menu.prepareSearch(viewModel.filter)
-        menu.findItem(R.id.DEBT_COMMAND)?.let { menuItem ->
-            menuItem.isVisible = viewModel.hasDebts
-        }
-        menu.findItem(R.id.CLEANUP_COMMAND)?.let { menuItem ->
-            menuItem.isVisible = viewModel.unusedCount.value > 0
-        }
     }
 
     private fun onQueryTextChange(newText: String): Boolean {
@@ -515,7 +514,6 @@ class PartiesList : Fragment(), OnDialogResultListener {
         }
     }
 
-    @SuppressLint("InlinedApi")
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,

@@ -14,7 +14,6 @@
  */
 package org.totschnig.myexpenses.activity
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -97,7 +96,6 @@ class AccountEdit : AmountActivity<AccountEditViewModel>(), ExchangeRateEdit.Hos
     val rowId: Long
         get() = intent.getLongExtra(KEY_ROWID, 0)
 
-    @SuppressLint("InlinedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = OneAccountBinding.inflate(layoutInflater)

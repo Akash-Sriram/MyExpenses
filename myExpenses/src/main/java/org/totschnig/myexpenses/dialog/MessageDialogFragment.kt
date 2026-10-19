@@ -24,7 +24,6 @@ import android.content.DialogInterface.BUTTON_POSITIVE
 import android.content.DialogInterface.OnClickListener
 import android.os.Bundle
 import androidx.core.os.BundleCompat
-import androidx.annotation.Nullable
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.totschnig.myexpenses.R
@@ -147,7 +146,7 @@ class MessageDialogFragment : BaseDialogFragment(), OnClickListener {
     }
 
     interface MessageDialogListener {
-        fun dispatchCommand(command: Int, @Nullable tag: Any?): Boolean
+        fun dispatchCommand(command: Int, tag: Any?): Boolean
         fun onMessageDialogDismissOrCancel()
     }
 }

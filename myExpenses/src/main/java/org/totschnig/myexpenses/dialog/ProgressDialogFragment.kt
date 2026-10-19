@@ -20,7 +20,6 @@ import android.content.DialogInterface
 import android.os.Bundle
 import android.text.TextUtils
 import android.widget.Button
-import androidx.annotation.NonNull
 import org.totschnig.myexpenses.ui.ScrollableProgressDialog
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 
@@ -108,7 +107,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
         }
     }
 
-    @NonNull
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val arguments = requireArguments()
         val progressStyle = arguments.getInt(KEY_PROGRESS_STYLE)
@@ -157,7 +155,7 @@ class ProgressDialogFragment : BaseDialogFragment() {
         }
     }
 
-    fun appendToMessage(@NonNull newMessage: CharSequence) {
+    fun appendToMessage(newMessage: CharSequence) {
         this.message = if (TextUtils.isEmpty(this.message)) newMessage
         else TextUtils.concat(this.message, "\n", newMessage)
         if (::mDialog.isInitialized) {
@@ -182,7 +180,7 @@ class ProgressDialogFragment : BaseDialogFragment() {
         }
     }
 
-    override fun onSaveInstanceState(@NonNull outState: Bundle) {
+    override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_TASK_COMPLETED, mTaskCompleted)
         outState.putString(KEY_TITLE, title)

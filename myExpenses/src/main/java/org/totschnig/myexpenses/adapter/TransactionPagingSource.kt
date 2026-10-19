@@ -1,6 +1,5 @@
 package org.totschnig.myexpenses.adapter
 
-import android.annotation.SuppressLint
 import android.content.ContentResolver
 import android.content.Context
 import android.database.ContentObserver
@@ -106,7 +105,6 @@ open class TransactionPagingSource(
             Timber.i("Calculating refreshKey for anchorPosition %d: %d", state.anchorPosition, it)
         }
 
-    @SuppressLint("InlinedApi")
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, Transaction2> = try {
         val position = params.key ?: 0
         //if the previous page was loaded from an offset between 0 and loadSize,

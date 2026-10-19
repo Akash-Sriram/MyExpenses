@@ -183,6 +183,10 @@ const val HELP_VARIANT_SPLIT_PART_TRANSFER = "splitPartTransfer"
  */
 open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFace,
     ConfirmationDialogListener, ExchangeRateEdit.Host, OnCriterionDialogDismissedListener {
+    private val planLauncher =
+        registerForActivityResult(StartActivityForResult()) {
+            finish()
+        }
     private lateinit var rootBinding: OneExpenseBinding
     private lateinit var dateEditBinding: DateEditBinding
     private lateinit var methodRowBinding: MethodRowBinding
@@ -1411,14 +1415,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         setDirty()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            PLAN_REQUEST -> finish()
-        }
-    }
-
     override val onBackPressedCallbackEnabled: Boolean
         get() = super.onBackPressedCallbackEnabled || isSplitParent || backwardCanceledTagsIntent() != null
 
@@ -1615,11 +1611,17 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         //intent.putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, mPlan!!.dtstart)
         //intent.putExtra(CalendarContract.EXTRA_EVENT_END_TIME, mPlan!!.dtstart)
         intent.data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, planId)
-        startActivity(
-            intent,
-            R.string.no_calendar_app_installed,
-            if (forResult) PLAN_REQUEST else null
-        )
+        if (forResult) {
+            try {
+                planLauncher.launch(intent)
+            } catch (_: ActivityNotFoundException) {
+                showSnackBar(R.string.no_calendar_app_installed)
+            } catch (e: SecurityException) {
+                showSnackBar(e.safeMessage)
+            }
+        } else {
+            startActivity(intent, R.string.no_calendar_app_installed)
+        }
     }
 
     override fun contribFeatureCalled(feature: ContribFeature, tag: Serializable?) {

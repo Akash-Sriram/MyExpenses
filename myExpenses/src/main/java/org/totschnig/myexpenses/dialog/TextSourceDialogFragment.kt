@@ -4,7 +4,6 @@ import android.view.View
 import android.widget.CheckBox
 import android.widget.CompoundButton
 import android.widget.CompoundButton.OnCheckedChangeListener
-import androidx.annotation.NonNull
 import org.totschnig.myexpenses.R
 
 abstract class TextSourceDialogFragment : ImportSourceDialogFragment(), OnCheckedChangeListener {
@@ -12,7 +11,7 @@ abstract class TextSourceDialogFragment : ImportSourceDialogFragment(), OnChecke
     protected var mImportParties: CheckBox? = null
     protected var mImportTransactions: CheckBox? = null
 
-    override fun setupDialogView(@NonNull view: View) {
+    override fun setupDialogView(view: View) {
         super.setupDialogView(view)
         mImportCategories = view.findViewById(R.id.import_select_categories)
         mImportCategories?.let { categories ->
@@ -31,7 +30,7 @@ abstract class TextSourceDialogFragment : ImportSourceDialogFragment(), OnChecke
             (mImportTransactions?.visibility == View.VISIBLE && mImportTransactions?.isChecked == true)
         )
 
-    override fun onCheckedChanged(@NonNull buttonView: CompoundButton, isChecked: Boolean) {
+    override fun onCheckedChanged(buttonView: CompoundButton, isChecked: Boolean) {
         setButtonState()
     }
 }

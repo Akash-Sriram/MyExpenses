@@ -93,7 +93,6 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
                             Intent(applicationContext, BackupPurgeReceiver::class.java).setAction(
                                 ACTION_BACKUP_PURGE
                             ),
-                            //noinspection InlinedApi
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
                     )
@@ -106,7 +105,6 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
                             Intent(applicationContext, BackupPurgeReceiver::class.java).setAction(
                                 ACTION_BACKUP_PURGE_CANCEL
                             ),
-                            //noinspection InlinedApi
                             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                         )
                     )
@@ -134,7 +132,6 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
                         applicationContext,
                         0,
                         preferenceIntent,
-                        //noinspection InlinedApi
                         PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
                     )
                 )

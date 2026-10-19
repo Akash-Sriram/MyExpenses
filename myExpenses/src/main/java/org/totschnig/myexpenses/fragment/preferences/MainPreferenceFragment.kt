@@ -1,5 +1,6 @@
 package org.totschnig.myexpenses.fragment.preferences
 
+import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.DialogInterface
 import android.content.Intent
@@ -19,6 +20,7 @@ import org.totschnig.myexpenses.util.AppDirHelper
 import org.totschnig.myexpenses.viewmodel.SettingsViewModel
 import java.util.Locale
 
+@SuppressLint("RestrictedApi")
 class MainPreferenceFragment : BasePreferenceFragment(),
     MultiSelectListPreferenceDialogFragment2.OnClickListener {
 

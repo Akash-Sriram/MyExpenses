@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.service
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.ContentResolver
@@ -142,7 +141,6 @@ class PlanExecutor(context: Context, workerParameters: WorkerParameters) :
     }
 
     @RequiresPermission(allOf = [Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR])
-    @SuppressLint("InlinedApi")
     override suspend fun doWork(): Result {
         val nowZDT = ZonedDateTime.now()
         val beginningOfDay = nowZDT.toLocalDate().atTime(LocalTime.MIN).toEpochMillis()

@@ -26,19 +26,12 @@ import android.provider.Settings
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
-import android.view.View
-import androidx.annotation.NonNull
-import androidx.annotation.Nullable
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.activity.CALCULATOR_REQUEST
 import org.totschnig.myexpenses.dialog.ProgressDialogFragment
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.preference.PrefKey.UI_FONT_SIZE
-import org.totschnig.myexpenses.provider.KEY_AMOUNT
-import org.totschnig.myexpenses.ui.AmountInput
-import java.math.BigDecimal
 import javax.inject.Inject
 
 abstract class ProtectedFragmentActivity : BaseActivity(),
@@ -97,7 +90,7 @@ abstract class ProtectedFragmentActivity : BaseActivity(),
 
     override fun onProgressDialogDismiss() {}
 
-    override fun onCreateOptionsMenu(@NonNull menu: Menu): Boolean {
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         super.onCreateOptionsMenu(menu)
         inflateHelpMenu(menu)
         return true
@@ -120,20 +113,7 @@ abstract class ProtectedFragmentActivity : BaseActivity(),
         return super.onOptionsItemSelected(item)
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == RESULT_OK && requestCode == CALCULATOR_REQUEST && data != null) {
-            val target = findViewById<View>(data.getIntExtra(CalculatorInput.EXTRA_KEY_INPUT_ID, 0))
-            if (target is AmountInput) {
-                target.setAmount(BigDecimal(data.getStringExtra(KEY_AMOUNT)), false, false)
-            } else {
-                showSnackBar("CALCULATOR_REQUEST launched with incorrect EXTRA_KEY_INPUT_ID")
-            }
-        }
-    }
-
-    override fun onCurrencySelectionChanged(@NonNull currencyUnit: CurrencyUnit) {}
+    override fun onCurrencySelectionChanged(currencyUnit: CurrencyUnit) {}
 
     enum class ThemeType {
         dark, light

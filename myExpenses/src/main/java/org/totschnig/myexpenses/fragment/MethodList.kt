@@ -15,7 +15,6 @@
 
 package org.totschnig.myexpenses.fragment
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.database.Cursor
 import android.os.Bundle
@@ -27,7 +26,6 @@ import android.view.ViewGroup
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
 import android.widget.SimpleCursorAdapter
-import androidx.annotation.NonNull
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -48,7 +46,6 @@ class MethodList : ContextualActionBarFragment() {
     private lateinit var mAdapter: SimpleCursorAdapter
     private var mMethodsCursor: Cursor? = null
 
-    @SuppressLint("InlinedApi")
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -102,8 +99,8 @@ class MethodList : ContextualActionBarFragment() {
 
     override fun dispatchCommandMultiple(
         command: Int,
-        @NonNull positions: SparseBooleanArray,
-        @NonNull itemIds: LongArray
+        positions: SparseBooleanArray,
+        itemIds: LongArray
     ): Boolean {
         if (super.dispatchCommandMultiple(command, positions, itemIds)) return true
         if (command == R.id.DELETE_COMMAND) {

@@ -744,7 +744,6 @@ class SyncAdapter @JvmOverloads constructor(
         )
         if (intent != null) {
             builder.setContentIntent(
-                //noinspection InlinedApi
                 PendingIntent.getActivity(
                     context,
                     0,

@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.ui
 import android.content.Context
 import android.content.ContextWrapper
 import android.database.Cursor
-import android.os.Build
 import android.os.Parcelable
 import android.text.TextWatcher
 import android.util.AttributeSet
@@ -17,7 +16,6 @@ import android.widget.LinearLayout
 import android.widget.ListPopupWindow
 import android.widget.SimpleCursorAdapter
 import android.widget.ViewSwitcher
-import androidx.annotation.RequiresApi
 import com.evernote.android.state.State
 import com.evernote.android.state.StateSaver
 import com.google.android.material.chip.Chip
@@ -151,7 +149,6 @@ class PartyInput @JvmOverloads constructor(
         autoCompleteTextView.addTextChangedListener(watcher)
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     private fun setInputMethodModeNeeded() {
         autoCompleteTextView.inputMethodMode = ListPopupWindow.INPUT_METHOD_NEEDED
     }

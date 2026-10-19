@@ -1,13 +1,13 @@
 package org.totschnig.myexpenses.activity
 
 import android.annotation.SuppressLint
-import android.app.Dialog
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.Menu
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -72,6 +72,14 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
     private val progressViewModel: ModalProgressViewModel by viewModels()
 
     private val priceCalculationViewModel: PriceCalculationViewModel by viewModels()
+
+    private val confirmCredentialsProtectionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                twoPanePreference.startPerformProtection()
+                requireApplication().unlock()
+            }
+        }
 
     private var initialPrefToShow: String? = null
 
@@ -161,7 +169,7 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
                         prefHandler.putString(PrefKey.HOME_CURRENCY, currencyCode)
                     }
                     requireApplication().invalidateHomeCurrency()
-                    contentResolver.notifyChange(DYNAMIC_CURRENCIES_URI, null, false)
+                    contentResolver.notifyChange(DYNAMIC_CURRENCIES_URI, null)
 
                     progressViewModel.appendToMessage(getString(R.string.done_label))
                     progressViewModel.onTaskCompleted(emptyList())
@@ -280,8 +288,8 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
             getKey(PrefKey.PLANNER_EXECUTION_TIME) -> enqueuePlanner(false)
 
             getKey(PrefKey.UNMAPPED_TRANSACTION_AS_TRANSFER) -> {
-                contentResolver.notifyChange(TRANSACTIONS_URI, null, false)
-                contentResolver.notifyChange(ACCOUNTS_URI, null, false)
+                contentResolver.notifyChange(TRANSACTIONS_URI, null)
+                contentResolver.notifyChange(ACCOUNTS_URI, null)
             }
 
             getKey(PrefKey.PRINT_FONT_SIZE) -> LazyFontSelector.FontType.clearCache()
@@ -355,34 +363,16 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == CONFIRM_DEVICE_CREDENTIALS_MANAGE_PROTECTION_SETTINGS_REQUEST) {
-            if (resultCode == RESULT_OK) {
-                twoPanePreference.startPerformProtection()
-                requireApplication().unlock()
-            }
-        }
-    }
-
     fun protectionCheck(pref: Preference) =
         if (pref.key == prefHandler.getKey(PrefKey.CATEGORY_SECURITY) && prefHandler.isProtected) {
             confirmCredentials(
-                CONFIRM_DEVICE_CREDENTIALS_MANAGE_PROTECTION_SETTINGS_REQUEST,
-                { twoPanePreference.startPerformProtection() },
+                launcher = confirmCredentialsProtectionLauncher,
+                legacyUnlockCallback = { twoPanePreference.startPerformProtection() },
                 shouldHideWindow = false,
                 shouldLock = false
             )
             false
         } else true
-
-
-    @Deprecated("Deprecated in Java")
-    override fun onCreateDialog(id: Int): Dialog? = run {
-        CrashHandler.report(IllegalStateException("onCreateDialog called with $id"))
-        super.onCreateDialog(id)
-    }
 
     override val createAccountTaskShouldQueryRemoteAccounts = false
     override val offerEncryption = false

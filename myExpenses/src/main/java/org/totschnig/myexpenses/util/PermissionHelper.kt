@@ -1,15 +1,12 @@
 package org.totschnig.myexpenses.util
 
 import android.Manifest
-import android.annotation.TargetApi
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Binder
-import android.os.Build
 import androidx.annotation.IntDef
-import androidx.annotation.RequiresApi
 import com.vmadalin.easypermissions.EasyPermissions
 import org.totschnig.myexpenses.R
 import java.io.File
@@ -49,7 +46,6 @@ object PermissionHelper {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    @TargetApi(Build.VERSION_CODES.TIRAMISU)
     fun getRationale(context: Context, @PermissionRequestCode requestCode: Int, vararg group: PermissionGroup): String =
         when (requestCode) {
             PERMISSIONS_REQUEST_WRITE_CALENDAR -> {
@@ -79,7 +75,6 @@ object PermissionHelper {
         CALENDAR(
             listOf(Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR)
         ),
-        @RequiresApi(Build.VERSION_CODES.TIRAMISU)
         NOTIFICATION(
             listOf(Manifest.permission.POST_NOTIFICATIONS)
         )

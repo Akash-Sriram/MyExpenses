@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.fragment
 
 import android.view.Menu
 import android.view.MenuItem
-import androidx.annotation.NonNull
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.sort.Sort
 import org.totschnig.myexpenses.preference.PrefHandler
@@ -21,7 +20,6 @@ abstract class SortableListFragment : ContextualActionBarFragment() {
 
     protected open fun getDefaultSortOrder(): Sort = Sort.USAGES
 
-    @NonNull
     protected fun getCurrentSortOrder(): Sort {
         val defaultSortOrder = getDefaultSortOrder()
         return try {

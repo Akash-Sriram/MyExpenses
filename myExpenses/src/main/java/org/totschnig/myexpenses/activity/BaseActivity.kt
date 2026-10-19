@@ -1,6 +1,5 @@
 package org.totschnig.myexpenses.activity
 
-import android.annotation.TargetApi
 import android.app.DownloadManager
 import android.app.KeyguardManager
 import android.app.NotificationManager
@@ -32,12 +31,12 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.CallSuper
 import androidx.annotation.DrawableRes
 import androidx.annotation.IdRes
-import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -75,9 +74,9 @@ import com.theartofdev.edmodo.cropper.CropImage
 import com.theartofdev.edmodo.cropper.CropImageView
 import com.vmadalin.easypermissions.EasyPermissions
 import com.vmadalin.easypermissions.dialogs.SettingsDialog
+import androidx.fragment.app.DialogFragment
 import eltos.simpledialogfragment.SimpleDialog
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
-import eltos.simpledialogfragment.form.AmountInputHostDialog
 import eltos.simpledialogfragment.form.Hint
 import eltos.simpledialogfragment.form.SimpleFormDialog
 import eltos.simpledialogfragment.form.Spinner
@@ -174,6 +173,51 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     private var scheduledRestart = false
     private var confirmCredentialResult: Boolean? = null
 
+    private val calculatorLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val data = result.data ?: return@registerForActivityResult
+                val inputId = data.getIntExtra(CalculatorInput.EXTRA_KEY_INPUT_ID, 0)
+                val amountStr = data.getStringExtra(KEY_AMOUNT) ?: return@registerForActivityResult
+                val amount = BigDecimal(amountStr)
+                val target = findViewById<View>(inputId)
+                if (target is AmountInput) {
+                    target.setAmount(amount, false, false)
+                } else {
+                    val dialogTarget = supportFragmentManager.fragments
+                        .filterIsInstance<DialogFragment>()
+                        .firstNotNullOfOrNull { it.dialog?.findViewById<AmountInput>(inputId) }
+                    if (dialogTarget != null) {
+                        dialogTarget.setAmount(amount, false, false)
+                    } else {
+                        showSnackBar("Calculator launched with incorrect EXTRA_KEY_INPUT_ID")
+                    }
+                }
+            }
+        }
+
+    private val confirmCredentialsUnlockLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                confirmCredentialResult = true
+                showWindow()
+                requireApplication().unlock()
+            } else {
+                confirmCredentialResult = false
+            }
+        }
+
+    private val cropImageLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { activityResult ->
+            val result = CropImage.getActivityResult(activityResult.data)
+            if (activityResult.resultCode == RESULT_OK && result != null) {
+                baseViewModel.cleanupOrigFile(result)
+                onCropResultOK(result)
+            } else {
+                processImageCaptureError(activityResult.resultCode, result)
+            }
+        }
+
     lateinit var toolbar: Toolbar
 
     open val fabActionName: String? = null
@@ -251,9 +295,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             putExtra(CalculatorInput.EXTRA_KEY_INPUT_ID, id)
             putExtra(KEY_COLOR, color)
         }
-        (supportFragmentManager.findFragmentById(0) as? AmountInputHostDialog)?.also {
-            it.startActivityForResult(intent, CALCULATOR_REQUEST)
-        } ?: kotlin.run { startActivityForResult(intent, CALCULATOR_REQUEST) }
+        calculatorLauncher.launch(intent)
     }
 
     protected open fun forwardDataEntryFromWidget(intent: Intent) {
@@ -299,12 +341,9 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         }
     }
 
-    fun startActivity(intent: Intent, notAvailableMessage: Int, forResultRequestCode: Int? = null) {
+    fun startActivity(intent: Intent, notAvailableMessage: Int) {
         try {
-            if (forResultRequestCode != null)
-                startActivityForResult(intent, forResultRequestCode)
-            else
-                startActivity(intent)
+            startActivity(intent)
         } catch (_: ActivityNotFoundException) {
             showSnackBar(notAvailableMessage)
         } catch (e: SecurityException) {
@@ -549,34 +588,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         )
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            CONFIRM_DEVICE_CREDENTIALS_UNLOCK_REQUEST -> {
-                if (resultCode == RESULT_OK) {
-                    confirmCredentialResult = true
-                    showWindow()
-                    requireApplication().unlock()
-                } else {
-                    confirmCredentialResult = false
-                }
-            }
-
-            CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE -> {
-                val result = CropImage.getActivityResult(data)
-                if (resultCode == RESULT_OK && result != null) {
-                    baseViewModel.cleanupOrigFile(result)
-                    onCropResultOK(result)
-                } else {
-                    processImageCaptureError(resultCode, result)
-                }
-            }
-
-            OCR_REQUEST -> ocrViewModel.handleOcrData(data, supportFragmentManager)
-        }
-    }
-
     open fun onCropResultOK(result: CropImage.ActivityResult) {
         startEditFromOcrResult(null, result.uri)
     }
@@ -603,7 +614,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                 confirmCredentialResult = null
             } ?: run {
                 if (requireApplication().shouldLock(this)) {
-                    confirmCredentials(CONFIRM_DEVICE_CREDENTIALS_UNLOCK_REQUEST)
+                    confirmCredentials()
                 }
             }
         }
@@ -648,7 +659,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     }
 
     protected open fun confirmCredentials(
-        requestCode: Int,
+        launcher: ActivityResultLauncher<Intent> = confirmCredentialsUnlockLauncher,
         legacyUnlockCallback: PasswordDialogUnlockedCallback? = null,
         shouldHideWindow: Boolean = true,
         shouldLock: Boolean = true,
@@ -659,7 +670,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             if (intent != null) {
                 if (shouldHideWindow) hideWindow()
                 try {
-                    startActivityForResult(intent, requestCode)
+                    launcher.launch(intent)
                     if (shouldLock) {
                         requireApplication().lock()
                     }
@@ -1169,7 +1180,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         feature?.let { (this as ContribIFace).contribFeatureCalled(it, tag) }
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     fun requestNotificationPermission(requestCode: Int) {
         requestPermission(
             requestCode,
@@ -1274,7 +1284,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         )
     }
 
-    @TargetApi(Build.VERSION_CODES.TIRAMISU)
     override fun onPermissionsDenied(requestCode: Int, perms: List<String>) {
         if (EasyPermissions.somePermissionPermanentlyDenied(this, perms)) {
             SettingsDialog.Builder(this)
@@ -1345,15 +1354,17 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                     fileName = "${fileName}_CROPPED"
                 )
             }
-            CropImage.activity()
-                .setCameraOnly(!prefHandler.getBoolean(PrefKey.CAMERA_CHOOSER, true))
-                .setCameraPackage(
-                    prefHandler.getString(PrefKey.CAMERA_APP)?.takeIf { it.isNotEmpty() })
-                .setAllowFlipping(false)
-                .setCaptureImageOutputUri(uris.first)
-                .setOutputUri(uris.second)
-                .setGuidelines(CropImageView.Guidelines.ON)
-                .start(this@BaseActivity)
+            cropImageLauncher.launch(
+                CropImage.activity()
+                    .setCameraOnly(!prefHandler.getBoolean(PrefKey.CAMERA_CHOOSER, true))
+                    .setCameraPackage(
+                        prefHandler.getString(PrefKey.CAMERA_APP)?.takeIf { it.isNotEmpty() })
+                    .setAllowFlipping(false)
+                    .setCaptureImageOutputUri(uris.first)
+                    .setOutputUri(uris.second)
+                    .setGuidelines(CropImageView.Guidelines.ON)
+                    .getIntent(this@BaseActivity)
+            )
         }
     }
 

@@ -314,7 +314,7 @@ fun LoansScreen(
                                     viewModel = viewModel,
                                     onRunPlan = {
                                         viewModel.instantiateTemplate(plan.id) { success ->
-                                            val msg = if (success) context.getString(R.string.template_applied_success)
+                                            val msg = if (success) context.resources.getString(R.string.template_applied_success)
                                             else "Failed to execute plan"
                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                         }
@@ -388,7 +388,7 @@ fun LoansScreen(
                                     viewModel = viewModel,
                                     onApply = {
                                         viewModel.instantiateTemplate(template.id) { success ->
-                                            val msg = if (success) context.getString(R.string.template_applied_success)
+                                            val msg = if (success) context.resources.getString(R.string.template_applied_success)
                                             else "Failed to instantiate template"
                                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                         }

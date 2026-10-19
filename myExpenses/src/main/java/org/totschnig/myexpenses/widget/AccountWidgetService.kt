@@ -118,7 +118,6 @@ class AccountRemoteViewsFactory(
                 if (clickInfo == null) {
                     setOnClickFillInIntent(buttonId, Intent().apply(block))
                 } else {
-                    //noinspection InlinedApi
                     setOnClickPendingIntent(
                         buttonId, PendingIntent.getBroadcast(
                             context, clickInfo.first, clickInfo.second.apply {
@@ -168,7 +167,6 @@ class AccountRemoteViewsFactory(
                 if (clickInfo == null) {
                     setOnClickFillInIntent(R.id.object_info, Intent().apply(block))
                 } else {
-                    //noinspection InlinedApi
                     setOnClickPendingIntent(
                         R.id.object_info, PendingIntent.getBroadcast(
                             context,

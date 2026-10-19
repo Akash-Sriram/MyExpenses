@@ -1,9 +1,6 @@
 package org.totschnig.myexpenses.activity
 
-import android.annotation.SuppressLint
-import android.annotation.TargetApi
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.WindowInsets
@@ -60,7 +57,6 @@ abstract class DistributionBaseActivity<T : DistributionViewModelBase<*>> :
         configureFullScreen()
     }
 
-    @TargetApi(Build.VERSION_CODES.R)
     private fun configureFullScreen() {
         if (resources.getBoolean(R.bool.allowFullScreen)) {
             window.decorView.setOnApplyWindowInsetsListener { v, insets ->
@@ -144,8 +140,6 @@ abstract class DistributionBaseActivity<T : DistributionViewModelBase<*>> :
         return true
     }
 
-    @SuppressLint("InlinedApi")
-    @TargetApi(Build.VERSION_CODES.R)
     private fun goFullScreen() {
         window.insetsController?.apply {
             hide(systemBars())

@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.preference.PrefKey
 import kotlin.system.exitProcess
@@ -32,7 +33,7 @@ class SplashActivity : Activity() {
                     flags = Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                 })
         } ?: run {
-            Handler().post { exitProcess(0) }
+            Handler(Looper.getMainLooper()).post { exitProcess(0) }
         }
         finish()
     }

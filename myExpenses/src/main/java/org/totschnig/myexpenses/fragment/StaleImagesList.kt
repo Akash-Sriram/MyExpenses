@@ -14,10 +14,8 @@
  */
 package org.totschnig.myexpenses.fragment
 
-import android.annotation.SuppressLint
 import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.util.SparseBooleanArray
 import android.view.ContextMenu
@@ -144,7 +142,6 @@ class StaleImagesList : ContextualActionBarFragment() {
         )
     }
 
-    @SuppressLint("InlinedApi")
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,

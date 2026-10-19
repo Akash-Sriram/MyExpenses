@@ -1,6 +1,5 @@
 package org.totschnig.myexpenses.testutils
 
-import android.annotation.SuppressLint
 import android.app.Instrumentation
 import android.content.ContentResolver
 import android.content.ContentUris
@@ -63,7 +62,6 @@ fun Repository.addDebugAttachment(transactionId: Long) {
     )
 }
 
-@SuppressLint("InlinedApi")
 class Fixture(inst: Instrumentation) {
     private val testContext: Context = inst.context
     private val appContext: MyApplication = inst.targetContext.myApplication

@@ -1,6 +1,5 @@
 package org.totschnig.myexpenses.preference
 
-import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 
 // the following keys are stored as string resources, so that
@@ -229,16 +228,6 @@ enum class PrefKey(internal val resId: Int, internal val _key: String?) {
     PREMIUM_NUDGE_DISMISSED("premium_nudge_dismissed"),
     SUNSET_V1_DISMISSED("sunset_v1_dismissed")
     ;
-
-    @Deprecated("")
-    fun getKey(): String? {
-        return if (resId == 0) _key else MyApplication.instance.getString(resId)
-    }
-
-    @Deprecated("")
-    fun getString(defValue: String?): String? {
-        return MyApplication.instance.settings.getString(getKey(), defValue)
-    }
 
     constructor(resId: Int) : this(resId, null)
 

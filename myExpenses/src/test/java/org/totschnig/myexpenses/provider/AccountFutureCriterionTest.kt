@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.provider
 
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,7 +18,7 @@ class AccountFutureCriterionTest: BaseTestWithRepository() {
 
     fun runQueryTest(futureCriterion: FutureCriterion) {
         testAccountId = insertAccount("Test account")
-        val prefKey = stringPreferencesKey(PrefKey.CRITERION_FUTURE.getKey()!!)
+        val prefKey = prefHandler.getStringPreferencesKey(PrefKey.CRITERION_FUTURE)
         runBlocking {
             dataStore.edit {
                 it[prefKey] = futureCriterion.name
