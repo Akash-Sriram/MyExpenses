@@ -19,7 +19,7 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Expect
-import com.google.gson.JsonParser
+import kotlinx.serialization.json.Json
 import org.apache.commons.text.translate.UnicodeEscaper
 import org.junit.Before
 import org.junit.Rule
@@ -80,7 +80,6 @@ class ExportTest : BaseTestWithRepository() {
 
     private var catForFilter = 0L
 
-    @Suppress("DEPRECATION")
     private val base = LocalDateTime.of(2017, 12, 15, 12, 0, 0)
     private val date: String = base.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
     private val time: String = base.format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -360,8 +359,8 @@ class ExportTest : BaseTestWithRepository() {
                 ExportFormat.JSON
             ).isSuccess
         ).isTrue()
-        expect.that(JsonParser.parseReader(FileReader(outFile))).isEqualTo(
-            JsonParser.parseString(
+        expect.that(Json.parseToJsonElement(outFile.readText())).isEqualTo(
+            Json.parseToJsonElement(
                 """
 {"uuid":"${account.uuid}","label":"Account 1","currency":"${CurrencyUnit.DebugInstance.code}","openingBalance":1.00,"transactions":[{"uuid":"${uuidList[0]}","date":"15/12/2017","amount":-0.10,"methodLabel":"Cheque","status":"CLEARED","referenceNumber":"1","tags":["Tag One","Tags, Tags, Tags"]},{"uuid":"${uuidList[1]}","date":"15/12/2017","payee":"N.N.","amount":-0.20,"category":["Main"],"methodLabel":"Cheque","status":"UNRECONCILED","referenceNumber":"2"},{"uuid":"${uuidList[2]}","date":"15/12/2017","amount":0.30,"category":["Main","Sub"],"status":"UNRECONCILED","attachments":["picture.png"]},{"uuid":"${uuidList[3]}","date":"15/12/2017","amount":0.40,"category":["Main","Sub"],"comment":"Note for myself with \"quote\"","status":"UNRECONCILED"},{"uuid":"${uuidList[4]}","date":"15/12/2017","amount":0.50,"transferAccount":"Account 2","status":"RECONCILED"},{"uuid":"${uuidList[5]}","date":"15/12/2017","amount":-0.60,"transferAccount":"Account 2","status":"UNRECONCILED"},{"uuid":"${uuidList[8]}","date":"15/12/2017","payee":"N.N.","amount":0.70,"status":"UNRECONCILED","splits":[{"uuid":"${uuidList[6]}","date":"15/12/2017","amount":0.40,"category":["Main","Sub2"]},{"uuid":"${uuidList[7]}","date":"15/12/2017","amount":0.30,"category":["Main","Sub3"],"tags":["Tag One","Tags, Tags, Tags"]}]}]}
                          """

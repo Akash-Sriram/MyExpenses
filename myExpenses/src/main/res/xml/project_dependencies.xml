@@ -81,11 +81,6 @@
         <licence>Apache License, Version 2.0</licence>
     </project>
     <project>
-        <name>Gson</name>
-        <url>https://github.com/google/gson</url>
-        <licence>Apache License, Version 2.0</licence>
-    </project>
-    <project>
         <name>OkHttp</name>
         <url>http://square.github.io/okhttp/</url>
         <licence>Apache License, Version 2.0</licence>

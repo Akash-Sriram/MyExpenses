@@ -756,9 +756,8 @@ class SyncAdapter @JvmOverloads constructor(
         if (account != null) {
             val dismissIntent = Intent(context, SyncNotificationDismissHandler::class.java)
             dismissIntent.putExtra(KEY_SYNC_ACCOUNT_NAME, account.name)
-            //noinspection InlinedApi
             builder.setDeleteIntent(
-                PendingIntent.getService(
+                PendingIntent.getBroadcast(
                     context, 0,
                     dismissIntent, PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
                 )

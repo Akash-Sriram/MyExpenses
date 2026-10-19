@@ -178,7 +178,6 @@ dependencies {
     ksp libs.dagger.compiler
     implementation libs.dagger
     implementation libs.android.state
-    api libs.gson
 
     implementation libs.itextpdf
     implementation libs.commons.csv

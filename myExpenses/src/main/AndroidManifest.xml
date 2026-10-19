@@ -267,7 +267,12 @@
             android:authorities="${applicationId}.calendarinstances"
             android:exported="false" />
 
-        <service android:name=".service.PlanNotificationClickHandler" />
+        <receiver
+            android:name=".service.PlanNotificationClickHandler"
+            android:exported="false" />
+        <receiver
+            android:name=".service.SyncNotificationDismissHandler"
+            android:exported="false" />
 
         <activity
             android:name=".activity.SimpleToastActivity"

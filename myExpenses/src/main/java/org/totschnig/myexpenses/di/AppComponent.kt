@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.di
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import com.google.gson.Gson
 import dagger.BindsInstance
 import dagger.Component
 import kotlinx.coroutines.CoroutineDispatcher
@@ -142,8 +141,6 @@ interface AppComponent {
     fun repositoryLoan(): RepositoryLoan
 
     fun repositoryCreditCard(): RepositoryCreditCard
-
-    fun gson(): Gson
 
     fun ocrFeature(): OcrFeature?
 

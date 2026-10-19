@@ -1,11 +1,14 @@
 package org.totschnig.myexpenses.service
 
-import android.app.IntentService
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteConstraintException
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.db2.Repository
@@ -23,8 +26,7 @@ import org.totschnig.myexpenses.viewmodel.PlanInstanceInfo
 import java.time.Instant
 import javax.inject.Inject
 
-//TODO migrate to WorkManager
-class PlanNotificationClickHandler : IntentService("PlanNotificationClickHandler") {
+class PlanNotificationClickHandler : BroadcastReceiver() {
 
     @Inject
     lateinit var exchangeRateHandler: ExchangeRateHandler
@@ -38,21 +40,32 @@ class PlanNotificationClickHandler : IntentService("PlanNotificationClickHandler
     @Inject
     lateinit var prefHandler: PrefHandler
 
-    @Deprecated("Deprecated in Java")
-    override fun onCreate() {
-        super.onCreate()
-        (application as MyApplication).appComponent.inject(this)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onHandleIntent(intent: Intent?) {
+    override fun onReceive(context: Context, intent: Intent?) {
         if (intent == null) return
         val extras = intent.extras
         val action = intent.action
         if (extras == null || action == null) return
+
+        (context.applicationContext as MyApplication).appComponent.inject(this)
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                handleIntent(context, extras, action)
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    private suspend fun handleIntent(
+        context: Context,
+        extras: android.os.Bundle,
+        action: String
+    ) {
         val title = extras.getString(PlanExecutor.KEY_TITLE)
         val builder = NotificationBuilderWrapper(
-            this,
+            context,
             NotificationBuilderWrapper.CHANNEL_ID_PLANNER
         )
             .setSmallIcon(R.drawable.ic_stat_notification_sigma)
@@ -64,28 +77,26 @@ class PlanNotificationClickHandler : IntentService("PlanNotificationClickHandler
             PlanExecutor.ACTION_APPLY -> {
                 val date =
                     extras.getLong(KEY_DATE, Instant.now().toEpochMilli())
-                runBlocking {
-                    repository.instantiateTemplate(
-                        exchangeRateHandler,
-                        PlanInstanceInfo(templateId, instanceId, date),
-                        currencyContext
-                    )
-                }.fold(
+                repository.instantiateTemplate(
+                    exchangeRateHandler,
+                    PlanInstanceInfo(templateId, instanceId, date),
+                    currencyContext
+                ).fold(
                     onSuccess = {
                         builder.setContentIntent(
                             prefHandler.createShowDetailsIntent(
-                                this.applicationContext,
+                                context.applicationContext,
                                 notificationId,
                                 it.data
                             )
                         )
                         builder.setAutoCancel(true)
-                        resources.getQuantityString(
+                        context.resources.getQuantityString(
                             R.plurals.save_transaction_from_template_success, 1, 1
                         )
                     },
                     onFailure = {
-                        getString(R.string.save_transaction_error)
+                        context.getString(R.string.save_transaction_error)
                     }
                 )
             }
@@ -96,20 +107,20 @@ class PlanNotificationClickHandler : IntentService("PlanNotificationClickHandler
                 values.put(KEY_TEMPLATEID, templateId)
                 values.put(KEY_INSTANCEID, instanceId)
                 try {
-                    contentResolver.insert(
+                    context.contentResolver.insert(
                         TransactionProvider.PLAN_INSTANCE_STATUS_URI,
                         values
                     )
-                    getString(R.string.plan_execution_canceled)
+                    context.getString(R.string.plan_execution_canceled)
                 } catch (_: SQLiteConstraintException) {
-                    getString(R.string.save_transaction_template_deleted)
+                    context.getString(R.string.save_transaction_template_deleted)
                 }
             }
 
             else -> return
         }
         builder.setContentText(message)
-        (getSystemService(NOTIFICATION_SERVICE) as? NotificationManager)?.notify(
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)?.notify(
             notificationId,
             builder.build()
         )

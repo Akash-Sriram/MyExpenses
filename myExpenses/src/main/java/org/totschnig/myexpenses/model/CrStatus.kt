@@ -5,10 +5,12 @@ import androidx.annotation.ColorRes
 import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import com.google.android.material.color.MaterialColors
+import kotlinx.serialization.Serializable
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.util.TextUtils.joinEnum
 import java.util.Locale
 
+@Serializable
 enum class CrStatus(@ColorRes val color: Int, val symbol: Char?) {
     UNRECONCILED(R.color.UNRECONCILED, null),
     CLEARED(R.color.CLEARED, '*'),

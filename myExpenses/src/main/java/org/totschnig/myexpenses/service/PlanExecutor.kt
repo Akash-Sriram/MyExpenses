@@ -273,7 +273,7 @@ class PlanExecutor(context: Context, workerParameters: WorkerParameters) :
                                     builder.addAction(
                                         R.drawable.ic_menu_close_clear_cancel,
                                         wrappedContext.getString(android.R.string.cancel),
-                                        PendingIntent.getService(
+                                        PendingIntent.getBroadcast(
                                             applicationContext,
                                             notificationId,
                                             cancelIntent,
@@ -329,7 +329,7 @@ class PlanExecutor(context: Context, workerParameters: WorkerParameters) :
                                     builder.addAction(
                                         R.drawable.ic_menu_save,
                                         wrappedContext.getString(R.string.menu_apply_template),
-                                        PendingIntent.getService(
+                                        PendingIntent.getBroadcast(
                                             applicationContext,
                                             notificationId,
                                             applyIntent,
