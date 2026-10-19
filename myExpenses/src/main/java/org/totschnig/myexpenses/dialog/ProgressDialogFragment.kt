@@ -26,6 +26,7 @@ import androidx.annotation.NonNull
 import org.totschnig.myexpenses.ui.ScrollableProgressDialog
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 
+@Suppress("DEPRECATION")
 class ProgressDialogFragment : BaseDialogFragment() {
 
     companion object {
@@ -74,7 +75,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
         set(value) {
             field = value
             if (::mDialog.isInitialized && mDialog is ProgressDialog) {
-                @Suppress("DEPRECATION")
                 (mDialog as ProgressDialog).max = value
             }
         }
@@ -91,7 +91,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
             progress = it.getInt(KEY_PROGRESS)
             max = it.getInt(KEY_MAX)
         }
-        @Suppress("DEPRECATION")
         retainInstance = true
     }
 
@@ -113,7 +112,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
 
     // http://stackoverflow.com/a/12434038/1199911
     override fun onDestroyView() {
-        @Suppress("DEPRECATION")
         if (dialog != null && retainInstance) dialog?.setDismissMessage(null)
         super.onDestroyView()
     }
@@ -125,7 +123,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
         val messageFromArguments = arguments.getString(KEY_MESSAGE)
         val titleFromArguments = arguments.getString(KEY_TITLE)
 
-        @Suppress("DEPRECATION")
         mDialog = if (progressStyle == ProgressDialog.STYLE_SPINNER) {
             ScrollableProgressDialog(requireActivity())
         } else {
@@ -158,7 +155,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
     fun setProgress(progress: Int) {
         this.progress = progress
         if (mDialog is ProgressDialog) {
-            @Suppress("DEPRECATION")
             (mDialog as ProgressDialog).progress = progress
         }
     }
@@ -187,7 +183,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
 
     private fun unsetIndeterminateDrawable() {
         if (mDialog is ProgressDialog) {
-            @Suppress("DEPRECATION")
             (mDialog as ProgressDialog).setIndeterminateDrawable(null)
         } else {
             (mDialog as ScrollableProgressDialog).unsetIndeterminateDrawable()

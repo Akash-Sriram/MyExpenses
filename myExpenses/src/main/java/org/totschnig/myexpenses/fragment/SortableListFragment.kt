@@ -9,14 +9,12 @@ import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
 import javax.inject.Inject
 
-@Suppress("deprecation")
 abstract class SortableListFragment : ContextualActionBarFragment() {
 
     @Inject
     lateinit var prefHandler: PrefHandler
 
-    @Deprecated("Deprecated in Java")
-    override fun onPrepareOptionsMenu(@NonNull menu: Menu) {
+    fun configureSortMenu(menu: Menu) {
         val menuItem = menu.findItem(R.id.SORT_COMMAND)
         menuItem?.subMenu?.findItem(getCurrentSortOrder().commandId)?.isChecked = true
     }

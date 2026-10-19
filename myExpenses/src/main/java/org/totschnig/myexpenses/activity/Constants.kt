@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.activity
 
 const val CALCULATOR_REQUEST = 0
 const val EDIT_REQUEST = 1
-const val IMPORT_FILENAME_REQUEST_CODE = 9
 const val CONTRIB_REQUEST = 12
 const val PLAN_REQUEST = 13
 const val CONFIRM_DEVICE_CREDENTIALS_UNLOCK_REQUEST = 14

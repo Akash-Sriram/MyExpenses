@@ -22,8 +22,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
+import androidx.activity.result.contract.ActivityResultContracts
 import org.totschnig.myexpenses.activity.CsvImportActivity
-import org.totschnig.myexpenses.activity.IMPORT_FILENAME_REQUEST_CODE
 import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
 import org.totschnig.myexpenses.adapter.CurrencyAdapter
 import org.totschnig.myexpenses.adapter.IdAdapter
@@ -59,6 +59,18 @@ import org.totschnig.myexpenses.ui.SpinnerHelper
 
 class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnItemSelectedListener,
     FileNameHostFragment {
+    private val browseLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                try {
+                    uri = result.data?.data
+                    ImportFileResultHandler.handleFilenameRequestResult(this, uri)
+                } catch (throwable: Throwable) {
+                    uri = null
+                    (requireActivity() as ProtectedFragmentActivity).showSnackBar(throwable.message ?: "Import error")
+                }
+            }
+        }
 
     private var _binding: ImportCsvParseBinding? = null
     private var _fileNameBinding: FilenameBinding? = null
@@ -237,21 +249,6 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
-        if (requestCode == IMPORT_FILENAME_REQUEST_CODE) {
-            if (resultCode == Activity.RESULT_OK && intent != null) {
-                try {
-                    uri = intent.data
-                    ImportFileResultHandler.handleFilenameRequestResult(this, uri)
-                } catch (throwable: Throwable) {
-                    uri = null
-                    (requireActivity() as ProtectedFragmentActivity).showSnackBar(throwable.message!!)
-                }
-            }
-        }
-    }
-
     override fun onResume() {
         super.onResume()
         ImportFileResultHandler.handleFileNameHostOnResume(this, prefHandler)
@@ -266,7 +263,7 @@ class CsvImportParseFragment : Fragment(), View.OnClickListener, AdapterView.OnI
     }
 
     override fun onClick(v: View) {
-        DialogUtils.openBrowse(uri, this)
+        DialogUtils.openBrowse(uri, browseLauncher, requireActivity() as ProtectedFragmentActivity)
     }
 
     override fun checkTypeParts(mimeType: String, extension: String): Boolean {

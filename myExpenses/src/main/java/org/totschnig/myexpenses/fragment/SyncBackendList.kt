@@ -22,6 +22,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import android.app.Activity
+import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
 import com.evernote.android.state.State
 import com.evernote.android.state.StateSaver
@@ -30,7 +32,6 @@ import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.ManageSyncBackends
 import org.totschnig.myexpenses.activity.SyncBackendSetupActivity
-import org.totschnig.myexpenses.activity.SyncBackendSetupActivity.Companion.REQUEST_CODE_RESOLUTION
 import org.totschnig.myexpenses.adapter.SyncBackendAdapter
 import org.totschnig.myexpenses.databinding.SyncBackendsListBinding
 import org.totschnig.myexpenses.dialog.AccountMetaDataDialogFragment
@@ -50,9 +51,17 @@ import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.viewmodel.AbstractSyncBackendViewModel
 import javax.inject.Inject
 
-@Suppress("DEPRECATION")
 class SyncBackendList : Fragment(), OnGroupExpandListener,
     OnChildClickListener {
+    private val resolutionLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                if (resolutionPendingForGroup != -1) {
+                    onGroupExpand(resolutionPendingForGroup)
+                    resolutionPendingForGroup = -1
+                }
+            }
+        }
     private var _binding: SyncBackendsListBinding? = null
     private val binding get() = _binding!!
     private lateinit var syncBackendAdapter: SyncBackendAdapter
@@ -78,7 +87,6 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
         val appComponent = (requireActivity().application as MyApplication).appComponent
         appComponent.inject(this)
         super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
         viewModel = ViewModelProvider(this)[modelClass]
         appComponent.inject(viewModel)
         StateSaver.restoreInstanceState(this, savedInstanceState)
@@ -301,7 +309,7 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
 
     private fun handleAuthException(throwable: Throwable) =
         (throwable as? SyncBackendProvider.AuthException)?.resolution?.let {
-            startActivityForResult(it, REQUEST_CODE_RESOLUTION)
+            resolutionLauncher.launch(it)
             true
         } ?: false
 
@@ -333,16 +341,5 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
             AccountMetaDataDialogFragment.newInstance(it).show(parentFragmentManager, "META_DATA")
         }
         return true
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_CODE_RESOLUTION && resultCode == RESULT_OK) {
-            if (resolutionPendingForGroup != -1) {
-                onGroupExpand(resolutionPendingForGroup)
-                resolutionPendingForGroup = -1
-            }
-        }
     }
 }

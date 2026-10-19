@@ -122,7 +122,6 @@ abstract class ProtectedFragmentActivity : BaseActivity(),
 
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK && requestCode == CALCULATOR_REQUEST && data != null) {
             val target = findViewById<View>(data.getIntExtra(CalculatorInput.EXTRA_KEY_INPUT_ID, 0))

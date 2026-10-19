@@ -44,10 +44,13 @@ import android.widget.ImageView
 import android.widget.SimpleCursorAdapter
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.PopupMenu
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.util.size
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.viewModels
@@ -60,7 +63,6 @@ import eltos.simpledialogfragment.SimpleDialog
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.BaseActivity
-import org.totschnig.myexpenses.activity.EDIT_REQUEST
 import org.totschnig.myexpenses.activity.ExpenseEdit
 import org.totschnig.myexpenses.activity.ManageTemplates
 import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
@@ -140,9 +142,14 @@ const val DIALOG_TAG_CONFIRM_CANCEL = "confirm_cancel"
 const val DIALOG_TAG_CONFIRM_RESET = "confirm_reset"
 const val DIALOG_TAG_CONFIRM_DELETE = "confirm_delete"
 
-@Suppress("DEPRECATION")
 class TemplatesList : SortableListFragment(),
     SimpleDialog.OnDialogResultListener {
+    private val editInstanceLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                plannerFragment?.onEditRequestOk()
+            }
+        }
     private var popup: PopupMenu? = null
     override val menuResource: Int
         get() = R.menu.templateslist_context
@@ -180,7 +187,6 @@ class TemplatesList : SortableListFragment(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setHasOptionsMenu(true)
         StateSaver.restoreInstanceState(this, savedInstanceState)
         val appComponent = (requireActivity().application as MyApplication).appComponent
         appComponent.inject(this)
@@ -260,6 +266,29 @@ class TemplatesList : SortableListFragment(),
         }
         registerForContextualActionBar(binding.list)
         return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.templates, menu)
+            }
+
+            override fun onPrepareMenu(menu: Menu) {
+                configureSortMenu(menu)
+                menu.findItem(R.id.PLANNER_COMMAND)?.setEnabledAndVisible(hasPlans)
+            }
+
+            override fun onMenuItemSelected(item: MenuItem): Boolean {
+                if (item.itemId == R.id.PLANNER_COMMAND) {
+                    PlannerFragment().show(childFragmentManager, PLANNER_FRAGMENT_TAG)
+                    return true
+                }
+                return handleSortOption(item)
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
     }
 
     private val isCalendarPermissionGranted: Boolean
@@ -357,8 +386,7 @@ class TemplatesList : SortableListFragment(),
             finishActionMode()
             i = Intent(activity, ExpenseEdit::class.java)
             i.putExtra(KEY_TEMPLATEID, menuInfo.id)
-            //TODO check what to do on Result
-            startActivityForResult(i, EDIT_REQUEST)
+            editInstanceLauncher.launch(i)
             return true
         }
         return false
@@ -426,19 +454,10 @@ class TemplatesList : SortableListFragment(),
     }
 
     fun dispatchEditInstance(transactionId: Long?) {
-        startActivityForResult(
+        editInstanceLauncher.launch(
             Intent(requireActivity(), ExpenseEdit::class.java)
-                .putExtra(KEY_ROWID, transactionId), EDIT_REQUEST
+                .putExtra(KEY_ROWID, transactionId)
         )
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == EDIT_REQUEST && resultCode == Activity.RESULT_OK) {
-            val fragment = plannerFragment
-            fragment?.onEditRequestOk()
-        }
     }
 
     private fun onTemplatesCursorLoaded(c: Cursor?) {
@@ -823,25 +842,6 @@ class TemplatesList : SortableListFragment(),
         } else false
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.templates, menu)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onPrepareOptionsMenu(menu: Menu) {
-        super.onPrepareOptionsMenu(menu)
-        menu.findItem(R.id.PLANNER_COMMAND)?.setEnabledAndVisible(hasPlans)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.PLANNER_COMMAND) {
-            PlannerFragment().show(childFragmentManager, PLANNER_FRAGMENT_TAG)
-            return true
-        }
-        return handleSortOption(item)
-    }
 
     override fun inflateContextualActionBar(menu: Menu, listId: Int) {
         if (listId == R.id.list) {

@@ -5,8 +5,6 @@ import android.accounts.AccountManager.KEY_AUTHTOKEN
 import android.accounts.AccountManager.KEY_PASSWORD
 import android.accounts.AccountManager.KEY_USERDATA
 import android.accounts.AccountManager.get
-import android.accounts.AuthenticatorException
-import android.accounts.OperationCanceledException
 import android.app.Application
 import android.content.ContentValues
 import android.database.sqlite.SQLiteConstraintException
@@ -209,18 +207,7 @@ open class SyncViewModel(application: Application) : ContentResolvingAndroidView
                     shouldQueryRemoteAccounts
                 ).onFailure {
                     //we try to remove a failed account immediately, otherwise user would need to do it, before
-                    //being able to try again
-                    @Suppress("DEPRECATION") val accountManagerFuture =
-                        accountManager.removeAccount(account, null, null)
-                    try {
-                        accountManagerFuture.result
-                    } catch (e: OperationCanceledException) {
-                        CrashHandler.report(e)
-                    } catch (e: AuthenticatorException) {
-                        CrashHandler.report(e)
-                    } catch (e: IOException) {
-                        CrashHandler.report(e)
-                    }
+                    accountManager.removeAccountExplicitly(account)
                 }
             } else {
                 Result.failure(Exception("Error while adding account"))

@@ -28,15 +28,14 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
+import androidx.activity.result.ActivityResultLauncher
 import androidx.appcompat.app.AlertDialog
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.BaseActivity
-import org.totschnig.myexpenses.activity.IMPORT_FILENAME_REQUEST_CODE
 import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
@@ -162,8 +161,11 @@ object DialogUtils {
     }
 
     @JvmStatic
-    @Suppress("DEPRECATION")
-    fun openBrowse(uri: Uri?, fragment: Fragment) {
+    fun openBrowse(
+        uri: Uri?,
+        launcher: ActivityResultLauncher<Intent>,
+        activity: ProtectedFragmentActivity
+    ) {
         val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
@@ -171,16 +173,14 @@ object DialogUtils {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try {
-            fragment.startActivityForResult(intent, IMPORT_FILENAME_REQUEST_CODE)
+            launcher.launch(intent)
         } catch (e: ActivityNotFoundException) {
-            (fragment.activity as ProtectedFragmentActivity)
-                .showSnackBar(R.string.no_filemanager_installed, Snackbar.LENGTH_SHORT)
+            activity.showSnackBar(R.string.no_filemanager_installed, Snackbar.LENGTH_SHORT)
         } catch (ex: SecurityException) {
-            (fragment.activity as ProtectedFragmentActivity)
-                .showSnackBar(
-                    "Sorry, this destination does not accept ${intent.action} request. Please select a different one.",
-                    Snackbar.LENGTH_SHORT
-                )
+            activity.showSnackBar(
+                "Sorry, this destination does not accept ${intent.action} request. Please select a different one.",
+                Snackbar.LENGTH_SHORT
+            )
         }
     }
 

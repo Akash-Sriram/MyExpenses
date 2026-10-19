@@ -31,7 +31,6 @@ import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
  * @author Michael Totschnig
  * provide helper functionality to create a CAB for a ListView
  */
-@Deprecated("")
 abstract class ContextualActionBarFragment : Fragment(), OnGroupClickListener, OnChildClickListener {
     @JvmField
     var mActionMode: ActionMode? = null

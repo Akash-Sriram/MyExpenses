@@ -12,11 +12,12 @@ import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.net.toUri
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
 import androidx.fragment.app.viewModels
 import com.google.android.material.snackbar.Snackbar
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.activity.IMPORT_FILENAME_REQUEST_CODE
+import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
 import org.totschnig.myexpenses.dialog.MessageDialogFragment.MessageDialogListener
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.util.ImportFileResultHandler
@@ -29,6 +30,19 @@ import org.totschnig.myexpenses.viewmodel.ImportSourceViewModel
 
 abstract class ImportSourceDialogFragment : BaseDialogFragment(),
     DialogInterface.OnClickListener, FileNameHostFragment {
+    private val browseLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+                uri = result.data?.data
+                try {
+                    handleFilenameRequestResult(this, uri)
+                } catch (throwable: Throwable) {
+                    uri = null
+                    CrashHandler.report(throwable)
+                    showSnackBar(throwable.safeMessage, Snackbar.LENGTH_LONG, null)
+                }
+            }
+        }
     private val viewModel: ImportSourceViewModel by viewModels()
     private var mFilename: EditText? = null
 
@@ -77,7 +91,7 @@ abstract class ImportSourceDialogFragment : BaseDialogFragment(),
     protected open fun setupDialogView(view: View) {
         mFilename = view.findViewById(R.id.Filename)
         view.findViewById<View>(R.id.btn_browse).setOnClickListener {
-            DialogUtils.openBrowse(uri, this)
+            DialogUtils.openBrowse(uri, browseLauncher, requireActivity() as ProtectedFragmentActivity)
         }
         val listButton = view.findViewById<View>(R.id.btn_list)
         if (withSelectFromAppFolder) {
@@ -112,22 +126,6 @@ abstract class ImportSourceDialogFragment : BaseDialogFragment(),
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
-        if (requestCode == IMPORT_FILENAME_REQUEST_CODE) {
-            if (resultCode == Activity.RESULT_OK && intent != null) {
-                uri = intent.data
-                try {
-                    handleFilenameRequestResult(this, uri)
-                } catch (throwable: Throwable) {
-                    uri = null
-                    CrashHandler.report(throwable)
-                    showSnackBar(throwable.safeMessage, Snackbar.LENGTH_LONG, null)
-                }
-            }
-        }
-    }
-
     override fun onClick(dialog: DialogInterface, id: Int) {
         if (id == AlertDialog.BUTTON_NEGATIVE) {
             onCancel(dialog)
@@ -159,14 +157,12 @@ abstract class ImportSourceDialogFragment : BaseDialogFragment(),
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    @Suppress("DEPRECATION")
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
         savedInstanceState?.getString(prefKey)?.toUri()?.let {
             val displayName = requireActivity().contentResolver.getDisplayName(it)
             uri = it
-            mFilename!!.setText(displayName)
+            mFilename?.setText(displayName)
         }
     }
 }
