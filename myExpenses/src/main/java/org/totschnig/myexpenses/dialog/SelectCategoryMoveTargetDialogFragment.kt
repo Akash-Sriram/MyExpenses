@@ -1,13 +1,14 @@
 package org.totschnig.myexpenses.dialog
 
 import android.os.Bundle
+import androidx.core.os.BundleCompat
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.viewmodel.data.Category
 
 class SelectCategoryMoveTargetDialogFragment: SelectCategoryBaseDialogFragment() {
 
     val source: Category
-        get() = requireArguments().getParcelable(KEY_SOURCE)!!
+        get() = BundleCompat.getParcelable(requireArguments(), KEY_SOURCE, Category::class.java)!!
 
     override val withRoot: Int?
         get() = if (source.parentId != null) R.string.transform_subcategory_to_main else null

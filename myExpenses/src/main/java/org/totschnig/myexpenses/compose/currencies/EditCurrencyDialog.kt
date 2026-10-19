@@ -33,13 +33,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.google.common.math.IntMath
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.CommodityType
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.util.Utils
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.pow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,7 +102,7 @@ fun EditCurrencyDialog(
         val part1 = stringResource(R.string.warning_change_fraction_digits_1)
         val part2 = stringResource(
             if (delta > 0) R.string.warning_change_fraction_digits_2_multiplied else R.string.warning_change_fraction_digits_2_divided,
-            IntMath.pow(10, abs(delta))
+            10.0.pow(abs(delta)).toLong()
         )
         val part3 =
             if (delta > 0) " " + stringResource(R.string.warning_change_fraction_digits_3) else ""

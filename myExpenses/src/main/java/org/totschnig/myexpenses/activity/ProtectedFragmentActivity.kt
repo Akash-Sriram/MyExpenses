@@ -38,7 +38,6 @@ import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.preference.PrefKey.UI_FONT_SIZE
 import org.totschnig.myexpenses.provider.KEY_AMOUNT
 import org.totschnig.myexpenses.ui.AmountInput
-import org.totschnig.myexpenses.util.Result
 import java.math.BigDecimal
 import javax.inject.Inject
 

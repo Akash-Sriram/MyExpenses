@@ -106,7 +106,7 @@ class RecyclerListAdapter(
         }
 
         override fun onItemSelected() {
-            itemView.setBackgroundColor(itemView.context.resources.getColor(R.color.activatedBackground))
+            itemView.setBackgroundColor(itemView.context.getColor(R.color.activatedBackground))
         }
 
         override fun onItemClear() {

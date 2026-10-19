@@ -18,6 +18,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import androidx.core.os.BundleCompat
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.Menu
@@ -387,7 +388,7 @@ class PartiesList : Fragment(), OnDialogResultListener {
             viewModel.mergeParties(
                 selectedItemIds.subtract(setOf(idToKeep)),
                 idToKeep,
-                bundle.getSerializable(KEY_STRATEGY) as MergeStrategy
+                BundleCompat.getSerializable(bundle, KEY_STRATEGY, MergeStrategy::class.java)!!
             )
             adapter.clearSelection()
             resetAdapter()

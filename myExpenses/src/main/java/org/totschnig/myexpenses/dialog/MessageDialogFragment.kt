@@ -23,6 +23,7 @@ import android.content.DialogInterface.BUTTON_NEUTRAL
 import android.content.DialogInterface.BUTTON_POSITIVE
 import android.content.DialogInterface.OnClickListener
 import android.os.Bundle
+import androidx.core.os.BundleCompat
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -93,12 +94,9 @@ class MessageDialogFragment : BaseDialogFragment(), OnClickListener {
             .setMessage(bundle.getCharSequence(KEY_MESSAGE))
             .setTitle(bundle.getCharSequence(KEY_TITLE))
 
-        @Suppress("DEPRECATION")
-        val positive = bundle.getSerializable(KEY_POSITIVE) as Button?
-        @Suppress("DEPRECATION")
-        val neutral = bundle.getSerializable(KEY_NEUTRAL) as Button?
-        @Suppress("DEPRECATION")
-        val negative = bundle.getSerializable(KEY_NEGATIVE) as Button?
+        val positive = BundleCompat.getSerializable(bundle, KEY_POSITIVE, Button::class.java)
+        val neutral = BundleCompat.getSerializable(bundle, KEY_NEUTRAL, Button::class.java)
+        val negative = BundleCompat.getSerializable(bundle, KEY_NEGATIVE, Button::class.java)
 
         positive?.let { builder.setPositiveButton(it.label, if (it.keepDialogOpen) null else this) }
         neutral?.let { builder.setNeutralButton(it.label, if (it.keepDialogOpen) null else this) }
@@ -131,15 +129,16 @@ class MessageDialogFragment : BaseDialogFragment(), OnClickListener {
     override fun onClick(dialog: DialogInterface, which: Int) {
         activity ?: return
         val bundle = requireArguments()
-        @Suppress("DEPRECATION")
-        val clicked = bundle.getSerializable(
+        val clicked = BundleCompat.getSerializable(
+            bundle,
             when (which) {
                 BUTTON_POSITIVE -> KEY_POSITIVE
                 BUTTON_NEUTRAL -> KEY_NEUTRAL
                 BUTTON_NEGATIVE -> KEY_NEGATIVE
                 else -> throw IllegalStateException("unknown button $which")
-            }
-        ) as Button?
+            },
+            Button::class.java
+        )
         if (clicked == null || clicked.command == R.id.NO_COMMAND) {
             onCancel(dialog)
         } else {

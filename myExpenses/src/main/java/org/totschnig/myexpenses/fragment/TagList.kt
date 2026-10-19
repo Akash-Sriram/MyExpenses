@@ -11,6 +11,7 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import androidx.core.os.BundleCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -320,7 +321,7 @@ class TagList : Fragment(), OnDialogResultListener {
 
     override fun onResult(dialogTag: String, which: Int, extras: Bundle) =
         if (which == BUTTON_POSITIVE) {
-            val tag: Tag = extras.getParcelable(KEY_TAG)!!
+            val tag: Tag = BundleCompat.getParcelable(extras, KEY_TAG, Tag::class.java)!!
             when (dialogTag) {
                 DELETE_TAG_DIALOG -> {
                     removeTag(tag)

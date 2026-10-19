@@ -103,10 +103,6 @@ data class Account(
             }
         }
 
-    @Suppress("DeprecatedCallableAddReplaceWith")
-    @Deprecated("Helper for legacy Java code")
-    fun withLabel(label: String) = copy(label = label)
-
     companion object {
 
         const val DEFAULT_COLOR = -0xff6978

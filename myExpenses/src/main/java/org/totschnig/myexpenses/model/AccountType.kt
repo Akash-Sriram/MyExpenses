@@ -5,8 +5,6 @@ import android.content.Context
 import android.database.Cursor
 import android.os.Parcelable
 import androidx.core.content.contentValuesOf
-import com.google.common.collect.BiMap
-import com.google.common.collect.HashBiMap
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import org.totschnig.myexpenses.R
@@ -58,7 +56,7 @@ data class AccountType(
         if (isPredefined) name.substring(1, name.length - 1) else name
 
     @IgnoredOnParcel
-    val qifName = qifToInternalMap.inverse()[name] ?: if (isAsset) "Oth A" else "Oth L"
+    val qifName = internalToQifMap[name] ?: if (isAsset) "Oth A" else "Oth L"
 
     val isCashAccount: Boolean
         get() = name == PREDEFINED_NAME_CASH
@@ -76,16 +74,15 @@ data class AccountType(
     override fun toString() = name
 
     companion object {
-        val qifToInternalMap: BiMap<String, String> = HashBiMap.create()
-
-        init {
-            qifToInternalMap["Cash"] = PREDEFINED_NAME_CASH
-            qifToInternalMap["Bank"] = PREDEFINED_NAME_BANK
-            qifToInternalMap["CCard"] = PREDEFINED_NAME_CCARD
-            qifToInternalMap["Invst"] = PREDEFINED_NAME_INVESTMENT
-            qifToInternalMap["Oth A"] = PREDEFINED_NAME_ASSET
-            qifToInternalMap["Oth L"] = PREDEFINED_NAME_LIABILITY
-        }
+        val qifToInternalMap: Map<String, String> = mapOf(
+            "Cash" to PREDEFINED_NAME_CASH,
+            "Bank" to PREDEFINED_NAME_BANK,
+            "CCard" to PREDEFINED_NAME_CCARD,
+            "Invst" to PREDEFINED_NAME_INVESTMENT,
+            "Oth A" to PREDEFINED_NAME_ASSET,
+            "Oth L" to PREDEFINED_NAME_LIABILITY
+        )
+        val internalToQifMap: Map<String, String> = qifToInternalMap.entries.associate { it.value to it.key }
 
         fun qif2Internal(qifName: String) = qifToInternalMap[qifName]
 
