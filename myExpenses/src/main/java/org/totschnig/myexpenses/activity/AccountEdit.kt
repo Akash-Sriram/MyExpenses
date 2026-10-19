@@ -37,7 +37,6 @@ import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
 import eltos.simpledialogfragment.color.SimpleColorDialog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.apache.commons.lang3.ArrayUtils
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.adapter.CurrencyAdapter
 import org.totschnig.myexpenses.adapter.GroupedSpinnerAdapter
@@ -229,7 +228,7 @@ class AccountEdit : AmountActivity<AccountEditViewModel>(), ExchangeRateEdit.Hos
     private fun configureSyncBackendAdapter(fromSavedState: Boolean) {
         val syncBackendAdapter = ArrayAdapter(
             this, android.R.layout.simple_spinner_item,
-            ArrayUtils.insert(0, getAccountNames(this), getString(R.string.synchronization_none))
+            arrayOf(getString(R.string.synchronization_none), *getAccountNames(this))
         )
         syncBackendAdapter.setDropDownViewResource(androidx.appcompat.R.layout.support_simple_spinner_dropdown_item)
         syncSpinner.adapter = syncBackendAdapter

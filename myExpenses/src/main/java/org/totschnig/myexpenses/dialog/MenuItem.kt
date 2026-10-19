@@ -108,15 +108,6 @@ sealed class MenuItem(
         R.drawable.ic_sync
     )
 
-    data object FinTsSync : MenuItem(
-        R.id.FINTS_SYNC_COMMAND,
-        0,
-        R.drawable.ic_bank
-    ) {
-        override fun getLabel(context: Context) =
-            (context as? BaseActivity)?.bankingFeature?.syncMenuTitle(context) ?: "FinTS"
-    }
-
     data object ShowStatusHandle : MenuItem(
         R.id.SHOW_STATUS_HANDLE_COMMAND,
         R.string.status,
@@ -173,14 +164,6 @@ sealed class MenuItem(
         R.string.menu_backup,
         R.drawable.ic_menu_save,
         isEnabledByDefault = false
-    )
-
-    data object WebUI : MenuItem(
-        R.id.WEB_UI_COMMAND,
-        R.string.title_webui,
-        R.drawable.ic_computer,
-        isEnabledByDefault = false,
-        isCheckable = true
     )
 
     data object ImportTrades : MenuItem(
@@ -306,7 +289,6 @@ sealed class MenuItem(
                 ScanMode,
                 Reset,
                 Sync,
-                FinTsSync,
                 ShowStatusHandle,
                 Balance,
                 Sort,
@@ -316,7 +298,6 @@ sealed class MenuItem(
                 Settings,
                 Help,
                 Backup,
-                WebUI,
                 Restore
             )
 
@@ -328,7 +309,6 @@ sealed class MenuItem(
                 Settings,
                 Help,
                 Backup,
-                WebUI,
                 Restore
             )
 
@@ -337,7 +317,6 @@ sealed class MenuItem(
                 Distribution,
                 History,
                 Sync,
-                FinTsSync,
                 Balance,
                 Reset,
                 Print,

@@ -75,13 +75,11 @@ fun Context.getLocale(): Locale =
     ConfigurationCompat.getLocales(resources.configuration).get(0) ?: Locale.getDefault()
 
 val Context.quotationStart: String
-    get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-        LocaleData.getInstance(ULocale.forLocale(getLocale()))
-            .getDelimiter(LocaleData.QUOTATION_START) else "\""
+    get() = LocaleData.getInstance(ULocale.forLocale(getLocale()))
+        .getDelimiter(LocaleData.QUOTATION_START)
 val Context.quotationEnd: String
-    get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
-        LocaleData.getInstance(ULocale.forLocale(getLocale()))
-            .getDelimiter(LocaleData.QUOTATION_END) else "\""
+    get() = LocaleData.getInstance(ULocale.forLocale(getLocale()))
+        .getDelimiter(LocaleData.QUOTATION_END)
 
 fun Context.localizedQuote(input: String) = "$quotationStart$input$quotationEnd"
 

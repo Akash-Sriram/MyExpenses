@@ -284,11 +284,8 @@ fun MainScreenAdaptive(
     val quickItems = menuConfig.take(maxQuickItems)
     val overflowItems = menuConfig.drop(maxQuickItems)
 
-    val isWebUiActive by viewModel.isWebUiActive.collectAsState(false)
-
     fun MenuItem.onMenuItemClicked() {
         val tag = when (this) {
-            MenuItem.WebUI -> !isWebUiActive
             MenuItem.Help -> when (navigator.currentDestination?.pane) {
                 ListDetailPaneScaffoldRole.List -> if (viewModel.currentAccountsTab.value == AccountsScreenTab.BALANCE_SHEET ) HELP_VARIANT_BALANCE_SHEET else HELP_VARIANT_ACCOUNTS
                 ListDetailPaneScaffoldRole.Detail -> if ((viewModel.accountList.value.find { it.id == selectedAccountId } as? FullAccount)?.isPortfolio == true) HELP_VARIANT_PORTFOLIO else HELP_VARIANT_TRANSACTIONS
@@ -365,7 +362,7 @@ fun MainScreenAdaptive(
 
                 (if (splitMenu) quickItems else menuConfig).forEach {
                     item(
-                        selected = if (it == MenuItem.WebUI) isWebUiActive else false,
+                        selected = false,
                         onClick = {
                             it.onMenuItemClicked()
                         },
@@ -537,12 +534,7 @@ fun MainScreenAdaptive(
                         headlineContent = { Text(it.getLabel(LocalContext.current)) },
                         leadingContent = {
                             Icon(
-                                if (it == MenuItem.WebUI) {
-                                    rememberVectorPainter(
-                                        if (isWebUiActive) Icons.Filled.CheckBox
-                                        else Icons.Filled.CheckBoxOutlineBlank
-                                    )
-                                } else it.painter,
+                                it.painter,
                                 contentDescription = null
                             )
                         },

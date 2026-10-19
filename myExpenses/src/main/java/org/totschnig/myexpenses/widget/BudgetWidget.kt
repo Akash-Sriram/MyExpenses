@@ -179,21 +179,11 @@ class BudgetWidget : BaseWidget(PrefKey.PROTECTION_ENABLE_BUDGET_WIDGET) {
                         if (context.resources.configuration.layoutDirection == LayoutDirection.RTL) -1 else 1
                     val translation = (availableWidth * todayPosition *
                             (if (progress > 1) (1 / progress) else 1f) - todayMarkerCorrection) * layoutDirection
-                    Timber.i("todayPosition: $todayPosition, translation: $translation")
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        setViewTranslationXDimen(
-                            R.id.todayMarker,
-                            translation,
-                            TypedValue.COMPLEX_UNIT_DIP
-                        )
-                    } else {
-                        val padding = TypedValue.applyDimension(
-                            TypedValue.COMPLEX_UNIT_DIP,
-                            translation,
-                            context.resources.displayMetrics
-                        ).toInt()
-                        setViewPadding(R.id.todayMarkerContainer, padding, 0, 0, 0)
-                    }
+                    setViewTranslationXDimen(
+                        R.id.todayMarker,
+                        translation,
+                        TypedValue.COMPLEX_UNIT_DIP
+                    )
                 } else {
                     setViewVisibility(R.id.todayMarkerContainer, View.GONE)
                 }
@@ -302,30 +292,4 @@ class BudgetWidget : BaseWidget(PrefKey.PROTECTION_ENABLE_BUDGET_WIDGET) {
             TransactionProvider.TRANSACTIONS_URI
         )
     }
-
-    /*    private fun RemoteViews.setProgressBarProgressColorCompat(progressBarId: Int, color: Int) {
-            val tint = ColorStateList.valueOf(color)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                setProgressBarProgressTintList(progressBarId, tint)
-            } else {
-                //This does not work on API 28..30, so we need to use alternative solution of swapping
-                between three different progressbars
-                try {
-                    RemoteViews::class.java.getMethod(
-                        "setProgressTintList",
-                        Int::class.javaPrimitiveType,
-                        ColorStateList::class.java
-                    )
-                } catch (e: Exception) {
-                    CrashHandler.report(e)
-                    null
-                }?.let {
-                    try {
-                        it.invoke(this, progressBarId, tint)
-                    } catch (e: Exception) {
-                        CrashHandler.report(e)
-                    }
-                }
-            }
-        }*/
 }

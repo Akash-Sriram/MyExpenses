@@ -171,9 +171,7 @@ class PartyInput @JvmOverloads constructor(
             0
         )
         if (withInputMethodNeeded) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                setInputMethodModeNeeded()
-            }
+            setInputMethodModeNeeded()
         }
         autoCompleteTextView.setAdapter(payeeAdapter)
         payeeAdapter.filterQueryProvider = FilterQueryProvider { constraint: CharSequence? ->

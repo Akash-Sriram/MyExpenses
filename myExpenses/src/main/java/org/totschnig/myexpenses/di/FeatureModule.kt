@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.di
 import androidx.annotation.Keep
 import dagger.Module
 import dagger.Provides
-import org.totschnig.myexpenses.feature.BankingFeature
 import org.totschnig.myexpenses.feature.FeatureManager
 import org.totschnig.myexpenses.feature.OcrFeature
 import org.totschnig.myexpenses.preference.PrefHandler
@@ -24,7 +23,6 @@ object Bogus {
 @Module
 open class FeatureModule {
     private var ocrFeature: OcrFeature? = null
-    private var bankingFeature: BankingFeature? = null
 
     @Provides
     fun provideOcrFeature(prefHandler: PrefHandler): OcrFeature? = ocrFeature ?:
@@ -36,16 +34,6 @@ open class FeatureModule {
         } catch (_: ClassNotFoundException) {
             null
         }
-
-    @Provides
-    fun provideBankingFeature(): BankingFeature? = bankingFeature ?:
-    try {
-        (Class.forName("org.totschnig.fints.BankingFeatureImpl").getConstructor().newInstance() as BankingFeature).also {
-            bankingFeature = it
-        }
-    } catch (_: ClassNotFoundException) {
-        null
-    }
 
     @Provides
     @Singleton

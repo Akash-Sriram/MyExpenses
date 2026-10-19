@@ -29,23 +29,15 @@ class StaleImagesViewModel(application: Application) :
     val result: StateFlow<CharSequence?> = _result
 
     private fun buildArchiveUri(fileName: String, mimeType: String): Uri? {
-        return if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-                .takeIf { it.exists() || it.mkdir() }
-                ?.let { File(it, "MyExpenses.Attachments.Archive") }
-                ?.takeIf { it.exists() || it.mkdir() }
-                ?.let { Uri.fromFile(File(it, fileName)) }
-        } else {
-            val contentValues = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-                put(
-                    MediaStore.MediaColumns.RELATIVE_PATH,
-                    "Documents/MyExpenses.Attachments.Archive"
-                )
-            }
-            contentResolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+            put(
+                MediaStore.MediaColumns.RELATIVE_PATH,
+                "Documents/MyExpenses.Attachments.Archive"
+            )
         }
+        return contentResolver.insert(MediaStore.Files.getContentUri("external"), contentValues)
     }
 
     private fun appendSuccess(result: String) {

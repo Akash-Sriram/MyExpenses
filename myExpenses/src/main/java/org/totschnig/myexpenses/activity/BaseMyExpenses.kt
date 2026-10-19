@@ -37,8 +37,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.activity.MyExpenses.Companion.MANAGE_HIDDEN_FRAGMENT_TAG
 import org.totschnig.myexpenses.compose.conditional
+
 import org.totschnig.myexpenses.compose.filter.FilterCard
 import org.totschnig.myexpenses.compose.filter.FilterDialog
 import org.totschnig.myexpenses.compose.filter.FilterHandler
@@ -157,6 +157,7 @@ import javax.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 
 const val DIALOG_TAG_NEW_BALANCE = "NEW_BALANCE"
+const val MANAGE_HIDDEN_FRAGMENT_TAG = "MANAGE_HIDDEN"
 
 typealias RenderFactory = (
     renderType: RenderType,
@@ -427,22 +428,10 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             .show(supportFragmentManager, "DELETE_ACCOUNT")
     }
 
-    private fun toggleWebUI(enabled: Boolean) {
-        if (enabled) {
-            contribFeatureRequested(ContribFeature.WEB_UI, false)
-        } else {
-            baseViewModel.toggleWebUi(false)
-        }
-    }
-
     override fun dispatchCommand(command: Int, tag: Any?): Boolean {
         if (super.dispatchCommand(command, tag)) {
             return true
         } else when (command) {
-
-            R.id.WEB_UI_COMMAND -> {
-                toggleWebUI(tag as Boolean)
-            }
 
             R.id.BACKUP_COMMAND -> startActivity(
                 Intent(
@@ -534,15 +523,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                                 false
                             )
                         ) null else it.uuid
-                    )
-                }
-
-            R.id.FINTS_SYNC_COMMAND -> (currentAccount as? FullAccount)
-                ?.takeIf { it.bankId != null }
-                ?.let {
-                    contribFeatureRequested(
-                        ContribFeature.BANKING,
-                        Triple(it.bankId, it.id, it.type.id)
                     )
                 }
 
@@ -950,16 +930,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                     val i = Intent(this, ManageBudgets::class.java)
                     startActivity(i)
                 }
-            }
-
-            ContribFeature.BANKING -> {
-                val (bankId, accountId, accountTypeId) = tag as Triple<Long, Long, Long>
-                bankingFeature.startSyncFragment(
-                    bankId,
-                    accountId,
-                    accountTypeId,
-                    supportFragmentManager
-                )
             }
 
             ContribFeature.OCR -> {

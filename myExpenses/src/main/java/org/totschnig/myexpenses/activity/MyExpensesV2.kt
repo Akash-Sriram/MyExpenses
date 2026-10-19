@@ -91,7 +91,7 @@ const val HELP_VARIANT_BALANCE_SHEET = "balanceSheet"
 /**
  * Help,
  */
-class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
+open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
     SortUtilityDialogFragment.OnConfirmListener {
 
     @Inject
@@ -430,15 +430,7 @@ class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                             onPrepareMenuItem = { itemId -> currentAccount.isMenuItemVisible(itemId) },
                             flags = viewModel.accountFlags.collectAsState(emptyList()).value,
                             adView = {},
-                            bankIcon = { modifier, id ->
-                                banks.value.find { it.id == id }
-                                    ?.let { bank ->
-                                        bankingFeature.bankIconRenderer?.invoke(
-                                            modifier,
-                                            bank
-                                        )
-                                    }
-                            },
+                            bankIcon = { _, _ -> },
                             isNavigationVisible = isNavigationVisible
                         ) { pageAccount, isCurrent ->
                             if (pageAccount.isPortfolio) {

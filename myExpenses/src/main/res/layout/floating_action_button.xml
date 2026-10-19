@@ -8,8 +8,5 @@
     android:layout_gravity="bottom|end"
     android:layout_marginEnd="@dimen/fab_margin_right"
     android:layout_marginBottom="@dimen/fab_margin_bottom"
-    app:elevation="6dp"
-    app:fabSize="normal"
     app:srcCompat="@drawable/ic_menu_add_fab"
-    tools:ignore="ContentDescription"
-    tools:showIn="@layout/activity_main" />
+    tools:ignore="ContentDescription" />

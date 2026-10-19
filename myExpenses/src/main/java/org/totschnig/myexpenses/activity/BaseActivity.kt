@@ -75,7 +75,6 @@ import com.theartofdev.edmodo.cropper.CropImage
 import com.theartofdev.edmodo.cropper.CropImageView
 import com.vmadalin.easypermissions.EasyPermissions
 import com.vmadalin.easypermissions.dialogs.SettingsDialog
-import de.cketti.mailto.EmailIntentBuilder
 import eltos.simpledialogfragment.SimpleDialog
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
 import eltos.simpledialogfragment.form.AmountInputHostDialog
@@ -104,7 +103,6 @@ import org.totschnig.myexpenses.dialog.MessageDialogFragment
 import org.totschnig.myexpenses.dialog.ProgressDialogFragment
 import org.totschnig.myexpenses.dialog.TransactionDetailFragment
 import org.totschnig.myexpenses.dialog.VersionDialogFragment
-import org.totschnig.myexpenses.feature.BankingFeature
 import org.totschnig.myexpenses.feature.Feature
 import org.totschnig.myexpenses.feature.FeatureManager
 import org.totschnig.myexpenses.feature.Module
@@ -241,7 +239,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     override fun onPermissionsGranted(requestCode: Int, perms: List<String>) {
         when (requestCode) {
             PermissionHelper.PERMISSIONS_REQUEST_WRITE_CALENDAR -> enqueuePlanner(true)
-            PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_WEBUI -> activateWebUi()
         }
     }
 
@@ -283,11 +280,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             report(e)
             showSnackBar(e.safeMessage)
         }
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
-            showSnackBar(
-                "${getString(R.string.toast_text_copied)}: $text"
-            )
-        }
     }
 
     fun sendEmail(
@@ -295,12 +287,14 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         subject: String,
         body: String,
     ) {
-        if (!EmailIntentBuilder.from(this)
-                .to(recipient)
-                .subject(subject)
-                .body(body)
-                .start()
-        ) {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = Uri.parse("mailto:$recipient")
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, body)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: ActivityNotFoundException) {
             showMessage(getString(R.string.no_app_handling_email_available))
         }
     }
@@ -320,39 +314,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     }
 
     override fun contribFeatureCalled(feature: ContribFeature, tag: Serializable?) {
-        when (feature) {
-            ContribFeature.BANKING -> {
-                if (featureViewModel.isFeatureAvailable(this, Feature.FINTS)) {
-                    startBanking()
-                } else {
-                    featureViewModel.requestFeature(this, Feature.FINTS)
-                }
-            }
-
-            ContribFeature.WEB_UI -> {
-                if (featureViewModel.isFeatureAvailable(this, Feature.WEBUI)) {
-                    activateWebUi()
-                } else {
-                    featureViewModel.requestFeature(this, Feature.WEBUI)
-                }
-            }
-
-            else -> {}
-        }
     }
-
-    fun activateWebUi() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !NotificationManagerCompat.from(this).areNotificationsEnabled()
-        ) {
-            requestNotificationPermission(PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_WEBUI)
-        } else {
-            baseViewModel.toggleWebUi(true)
-            onWebUiActivated()
-        }
-    }
-
-    open fun onWebUiActivated() {}
 
     private fun onDownloadComplete() {
         downloadPending?.let {
@@ -412,11 +374,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     @CallSuper
     open fun onFeatureAvailable(feature: Feature) {
         featureManager.initActivity(this)
-        when (feature) {
-            Feature.FINTS -> startBanking()
-            Feature.WEBUI -> activateWebUi()
-            else -> {}
-        }
     }
 
     fun harmonizeColors() {
@@ -590,11 +547,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                 LocaleListCompat.getEmptyLocaleList() else
                 LocaleListCompat.forLanguageTags(language)
         )
-
-        //from Tiramisu on, change of language is handled in onConfigurationChange
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            currencyFormatter.invalidate(contentResolver)
-        }
     }
 
     @Deprecated("Deprecated in Java")
@@ -830,9 +782,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             }
 
             R.id.NOTIFICATION_SETTINGS_COMMAND -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    !PermissionGroup.NOTIFICATION.hasPermission(this)
-                ) {
+                if (!PermissionGroup.NOTIFICATION.hasPermission(this)) {
                     disableFab()
                     requestPermission(
                         PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_PLANNER,
@@ -1163,9 +1113,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     override fun onMessageDialogDismissOrCancel() {}
 
     fun initLocaleContext() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            requireApplication().setUserPreferredLocale(AppCompatDelegate.getApplicationLocales()[0])
-        }
         DatabaseConstants.buildLocalized(
             getLocale(),
             this,
@@ -1227,9 +1174,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     }
 
     fun checkNotificationPermissionForAutoBackup() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !PermissionGroup.NOTIFICATION.hasPermission(this)
-        ) {
+        if (!PermissionGroup.NOTIFICATION.hasPermission(this)) {
             requestNotificationPermission(PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_AUTO_BACKUP)
         } else if (!areNotificationsEnabled(NotificationBuilderWrapper.CHANNEL_ID_AUTO_BACKUP)) {
             showSnackBar(
@@ -1247,12 +1192,10 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
 
     fun checkPermissionsForPlaner() {
 
-        val missingPermissions = buildList {
-            add(PermissionGroup.CALENDAR)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(PermissionGroup.NOTIFICATION)
-            }
-        }.filter { !it.hasPermission(this) }
+        val missingPermissions = listOf(
+            PermissionGroup.CALENDAR,
+            PermissionGroup.NOTIFICATION
+        ).filter { !it.hasPermission(this) }
 
         if (missingPermissions.contains(PermissionGroup.CALENDAR)) {
             disableFab()
@@ -1417,7 +1360,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
 
     val canUseContentColor: Boolean by lazy {
         when {
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> false
             !prefHandler.getBoolean(PrefKey.CONTENT_BASED_COLORS, true) -> false
             else -> uiConfigIsSafe
         }
@@ -1493,9 +1435,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             Utils.getSimpleClassNameFromComponentName(it)
         } == OnboardingActivity::class.java.simpleName
 
-    val bankingFeature: BankingFeature
-        get() = requireApplication().appComponent.bankingFeature() ?: BankingFeature
-
     protected open fun restartAfterRestore() {
         (application as MyApplication).invalidateHomeCurrency()
         if (!isFinishing) {
@@ -1503,14 +1442,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             startActivity(Intent(this, prefHandler.mainScreenClass).apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             })
-        }
-    }
-
-    open fun startBanking() {
-        bankingFeature.bankingActivityClass?.let {
-            startActivity(Intent(this, bankingFeature.bankingActivityClass))
-        } ?: run {
-            showSnackBar("BankingFeature not installed")
         }
     }
 
@@ -1812,6 +1743,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
 
 
     companion object {
+        const val DIALOG_TAG_OCR_DISAMBIGUATE = "DISAMBIGUATE"
         const val ASYNC_TAG = "ASYNC_TASK"
         const val PROGRESS_TAG = "PROGRESS"
         private const val DIALOG_INACTIVE_BACKEND = "inactive_backend"

@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.preference;
 import android.content.Context;
 import android.util.AttributeSet;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.totschnig.myexpenses.R;
 import org.totschnig.myexpenses.sync.GenericAccountService;
 
@@ -29,8 +28,15 @@ public class AccountPreference extends ListPreference {
 
   public void setData(Context context) {
     String[] accounts = GenericAccountService.getAccountNames(context);
-    setEntries(ArrayUtils.insert(0, accounts, context.getString(androidx.preference.R.string.not_set)));
-    setEntryValues(ArrayUtils.insert(0, accounts, SYNCHRONIZATION_NONE));
+    String[] entries = new String[accounts.length + 1];
+    entries[0] = context.getString(androidx.preference.R.string.not_set);
+    System.arraycopy(accounts, 0, entries, 1, accounts.length);
+    setEntries(entries);
+
+    String[] entryValues = new String[accounts.length + 1];
+    entryValues[0] = SYNCHRONIZATION_NONE;
+    System.arraycopy(accounts, 0, entryValues, 1, accounts.length);
+    setEntryValues(entryValues);
     notifyChanged();
   }
 }

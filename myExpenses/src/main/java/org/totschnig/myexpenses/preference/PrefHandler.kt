@@ -9,7 +9,6 @@ import androidx.preference.PreferenceFragmentCompat
 import kotlinx.serialization.json.Json
 import org.totschnig.myexpenses.BuildConfig
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.activity.MyExpenses
 import org.totschnig.myexpenses.activity.MyExpensesV2
 import org.totschnig.myexpenses.activity.Version
 import org.totschnig.myexpenses.db2.FLAG_NEUTRAL
@@ -193,13 +192,11 @@ interface PrefHandler {
         }
 
     var mainScreenLegacy: Boolean
-        get() = enumValueOrDefault(PrefKey.UI_MAIN_SCREEN_VERSION, Version.V2) == Version.V1
-        set(value) {
-            putString(PrefKey.UI_MAIN_SCREEN_VERSION, if (value) Version.V1.name else Version.V2.name)
-        }
+        get() = false
+        set(_) {}
 
     val mainScreenClass: Class<*>
-        get() = if (mainScreenLegacy) MyExpenses::class.java else MyExpensesV2::class.java
+        get() = MyExpensesV2::class.java
 
     fun createShowDetailsIntent(
         context: Context,

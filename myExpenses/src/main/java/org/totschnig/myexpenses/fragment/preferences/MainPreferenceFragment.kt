@@ -12,7 +12,6 @@ import com.evernote.android.state.StateSaver
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
 import org.totschnig.myexpenses.dialog.MoreInfoDialogFragment
-import org.totschnig.myexpenses.feature.BankingFeature
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.preference.PopupMenuPreference
 import org.totschnig.myexpenses.preference.PrefKey

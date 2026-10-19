@@ -98,11 +98,9 @@ class OnBoardingPrivacyFragment : OnboardingFragment() {
             LocalTime.of(TimePreference.DEFAULT_VALUE / 100, TimePreference.DEFAULT_VALUE % 100)
         binding.autoBackup.text =
             getString(R.string.pref_auto_backup_summary) + " ($defaultAutoBackupTime)"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            binding.autoBackup.setOnCheckedChangeListener { _, isChecked ->
-                if (isChecked) {
-                    hostActivity.requestNotificationPermission(PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_AUTO_BACKUP)
-                }
+        binding.autoBackup.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                hostActivity.requestNotificationPermission(PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_AUTO_BACKUP)
             }
         }
         nextButton.isVisible = true

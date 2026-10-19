@@ -184,23 +184,18 @@ dependencies {
     api libs.gson
 
     implementation libs.itextpdf
-    implementation libs.commons.lang3
     implementation libs.commons.csv
     api libs.commons.text
     //noinspection GradleDependency
     api libs.picasso
     implementation libs.mpandroidchart
     api libs.simpledialogfragments
-
-    implementation libs.commons.collections4
-
     api libs.timber
 
     implementation libs.slf4j.api
     implementation libs.logback.android
 
     implementation libs.androidx.appcompat
-    implementation libs.androidx.legacy.support.v4
     implementation libs.androidx.recyclerview
     implementation libs.androidx.cardview
     implementation libs.androidx.viewpager2
@@ -231,6 +226,7 @@ dependencies {
 
     // Lifecycle components
     implementation libs.androidx.lifecycle.runtime.ktx
+    implementation libs.androidx.lifecycle.process
     implementation libs.androidx.lifecycle.common.java8
     implementation libs.androidx.lifecycle.viewmodel.compose
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -238,7 +234,6 @@ dependencies {
     // ViewModel Kotlin support
     implementation libs.androidx.lifecycle.viewmodel.ktx
     implementation libs.androidx.lifecycle.livedata.ktx
-    implementation libs.androidx.lifecycle.extensions
 
     implementation libs.kotlinx.coroutines.android
 
@@ -256,8 +251,6 @@ dependencies {
     implementation libs.kotlin.reflect
 
     implementation libs.androidx.work.runtime.ktx
-
-    implementation libs.email.intent.builder
 
     implementation libs.androidx.browser
 

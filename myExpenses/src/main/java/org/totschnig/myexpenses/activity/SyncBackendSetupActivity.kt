@@ -76,18 +76,10 @@ abstract class SyncBackendSetupActivity : RestoreActivity(),
         }
 
     private fun startSetupCheckPrerequisites() {
-        val backendService = getBackendServiceById(selectedFactoryId)
-        val feature = backendService?.feature
-        if (feature == null || featureManager.isFeatureInstalled(feature, this)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                !NotificationManagerCompat.from(this).areNotificationsEnabled()
-            ) {
-                requestNotificationPermission(PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_SYNC)
-            } else {
-                startSetupDo()
-            }
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            requestNotificationPermission(PermissionHelper.PERMISSIONS_REQUEST_NOTIFICATIONS_SYNC)
         } else {
-            featureManager.requestFeature(feature, this)
+            startSetupDo()
         }
     }
 

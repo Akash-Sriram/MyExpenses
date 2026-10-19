@@ -13,7 +13,6 @@ import org.totschnig.myexpenses.activity.BaseActivity
 import org.totschnig.myexpenses.activity.CsvImportActivity
 import org.totschnig.myexpenses.activity.EditActivity
 import org.totschnig.myexpenses.activity.ExpenseEdit
-import org.totschnig.myexpenses.activity.MyExpenses
 import org.totschnig.myexpenses.activity.MyExpensesV2
 import org.totschnig.myexpenses.activity.PreferenceActivity
 import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
@@ -32,7 +31,6 @@ import org.totschnig.myexpenses.dialog.TransactionListComposeDialogFragment
 import org.totschnig.myexpenses.dialog.VersionDialogFragment
 import org.totschnig.myexpenses.dialog.select.SelectFromTableDialogFragment
 import org.totschnig.myexpenses.export.pdf.PdfPrinter
-import org.totschnig.myexpenses.feature.BankingFeature
 import org.totschnig.myexpenses.feature.FeatureManager
 import org.totschnig.myexpenses.feature.OcrFeature
 import org.totschnig.myexpenses.fragment.CsvImportDataFragment
@@ -152,8 +150,6 @@ interface AppComponent {
 
     fun ocrFeature(): OcrFeature?
 
-    fun bankingFeature(): BankingFeature?
-
     fun okHttpClientBuilder(): OkHttpClient.Builder
 
     fun featureManager(): FeatureManager
@@ -171,8 +167,6 @@ interface AppComponent {
     fun inject(application: MyApplication)
 
     fun inject(expenseEdit: ExpenseEdit)
-
-    fun inject(myExpenses: MyExpenses)
 
     fun inject(myExpenses: MyExpensesV2)
 

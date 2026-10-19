@@ -13,7 +13,6 @@ import org.totschnig.myexpenses.activity.BaseActivity
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.preference.enumValueOrDefault
-import org.totschnig.myexpenses.preference.isWebUiActive
 import org.totschnig.myexpenses.sync.BackendService
 import org.totschnig.myexpenses.sync.GenericAccountService
 import org.totschnig.myexpenses.util.Utils
@@ -22,21 +21,11 @@ import java.util.Locale
 
 enum class Module(@StringRes val labelResId: Int) {
     OCR(R.string.title_scan_receipt_feature),
-    WEBUI(R.string.title_webui),
     TESSERACT(R.string.title_tesseract),
     MLKIT(R.string.title_mlkit),
     MLKIT_DEVA(R.string.title_mlkit_deva),
-    MLKIT_HAN(R.string.title_mlkit_han),
-    MLKIT_JPAN(R.string.title_mlkit_jpan),
-    MLKIT_KORE(R.string.title_mlkit_kore),
     MLKIT_LATN(R.string.title_mlkit_latn),
-    DRIVE(R.string.title_drive),
-    DROPBOX(R.string.title_dropbox),
-    WEBDAV(R.string.title_webdav),
-    ONEDRIVE(R.string.title_onedrive),
-    SQLCRYPT(R.string.title_sqlcrypt),
-    FINTS(R.string.title_fints),
-    JACKSON(R.string.title_jackson);
+    SQLCRYPT(R.string.title_sqlcrypt);
 
     val moduleName: String
         get() = name.lowercase(Locale.ROOT)
@@ -75,20 +64,6 @@ sealed class Feature(vararg val requiredModules: Module) {
 
     }
 
-    sealed class SyncBackend(vararg requiredModules: Module) :
-        Feature(*requiredModules) {
-        override suspend fun canUninstall(
-            context: Context,
-            prefHandler: PrefHandler,
-            datastore: DataStore<Preferences>
-        ) =
-            GenericAccountService.getAccountNames(context).none { account ->
-                account.startsWith(
-                    BackendService.entries.firstOrNull { it.feature == this }?.label ?: ""
-                )
-            }
-    }
-
     data object OCR : Feature(Module.OCR) {
         override suspend fun canUninstall(
             context: Context,
@@ -121,14 +96,6 @@ sealed class Feature(vararg val requiredModules: Module) {
                     getUserConfiguredMlkitScriptModule(context, prefHandler) != this
     }
 
-    data object WEBUI : Feature(Module.WEBUI) {
-        override suspend fun canUninstall(
-            context: Context,
-            prefHandler: PrefHandler,
-            datastore: DataStore<Preferences>
-        ) = !datastore.isWebUiActive.first()
-    }
-
     data object TESSERACT : OcrEngine(
         "org.totschnig.tesseract.Engine",
         Module.TESSERACT
@@ -138,14 +105,7 @@ sealed class Feature(vararg val requiredModules: Module) {
         Module.MLKIT
     )
     data object DEVA : MlkitProcessor(Module.MLKIT_DEVA)
-    data object HAN : MlkitProcessor(Module.MLKIT_HAN)
-    data object JPAN : MlkitProcessor(Module.MLKIT_JPAN)
-    data object KORE : MlkitProcessor(Module.MLKIT_KORE)
     data object LATN : MlkitProcessor(Module.MLKIT_LATN)
-    data object DRIVE : SyncBackend(Module.DRIVE)
-    data object DROPBOX : SyncBackend(Module.DROPBOX, Module.JACKSON)
-    data object WEBDAV : SyncBackend(Module.WEBDAV)
-    data object ONEDRIVE : SyncBackend(Module.ONEDRIVE, Module.JACKSON)
     data object SQLCRYPT: Feature(Module.SQLCRYPT) {
         override suspend fun canUninstall(
             context: Context,
@@ -155,11 +115,10 @@ sealed class Feature(vararg val requiredModules: Module) {
             return !prefHandler.encryptDatabase
         }
     }
-    data object FINTS: Feature(Module.FINTS)
 }
 
 enum class Script {
-    Latn, Han, Deva, Jpan, Kore
+    Latn, Deva
 }
 
 fun getUserConfiguredOcrEngine(context: Context, prefHandler: PrefHandler): Feature.OcrEngine =
@@ -173,12 +132,9 @@ fun getUserConfiguredOcrEngine(context: Context, prefHandler: PrefHandler): Feat
         ?: getDefaultOcrEngine(context)
 
 fun getUserConfiguredMlkitScriptModule(context: Context, prefHandler: PrefHandler): Feature =
-    when( getUserConfiguredMlkitScript(context, prefHandler)) {
-        Script.Latn -> Feature.LATN
-        Script.Han -> Feature.HAN
+    when(getUserConfiguredMlkitScript(context, prefHandler)) {
         Script.Deva -> Feature.DEVA
-        Script.Jpan -> Feature.JPAN
-        Script.Kore -> Feature.KORE
+        else -> Feature.LATN
     }
 
 fun getUserConfiguredMlkitScript(context: Context, prefHandler: PrefHandler) =
@@ -186,10 +142,7 @@ fun getUserConfiguredMlkitScript(context: Context, prefHandler: PrefHandler) =
 
 private fun defaultScript(context: Context) =
     when (getLocaleForUserCountry(context).language) {
-        "zh" -> Script.Han
         "hi", "mr", "ne" -> Script.Deva
-        "ja" -> Script.Jpan
-        "ko" -> Script.Kore
         else -> Script.Latn
     }
 

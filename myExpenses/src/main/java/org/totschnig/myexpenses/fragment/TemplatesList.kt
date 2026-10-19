@@ -17,14 +17,13 @@ package org.totschnig.myexpenses.fragment
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.provider.CalendarContract
 import android.database.Cursor
 import android.graphics.Typeface
 import android.os.Bundle
-import android.os.Handler
-import android.os.Message
 import android.text.SpannableStringBuilder
 import android.text.TextUtils
 import android.text.style.StyleSpan
@@ -116,7 +115,9 @@ import org.totschnig.myexpenses.provider.getString
 import org.totschnig.myexpenses.provider.getStringIfExists
 import org.totschnig.myexpenses.provider.getStringOrNull
 import org.totschnig.myexpenses.provider.isNull
-import org.totschnig.myexpenses.task.TaskExecutionFragment
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.util.ICurrencyFormatter
 import org.totschnig.myexpenses.util.PermissionHelper.PermissionGroup
 import org.totschnig.myexpenses.util.TextUtils.concatResStrings
@@ -492,10 +493,7 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
                         templatesCursor.moveToNext()
                     }
                     if (missingUuids.isNotEmpty()) {
-                        RepairHandler(this).obtainMessage(
-                            0, missingUuids.toTypedArray()
-                        )
-                            .sendToTarget()
+                        repairPlan(missingUuids)
                     }
                 }
             }
@@ -626,22 +624,33 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
         }
     }
 
-    private class RepairHandler(fragment: TemplatesList) : Handler() {
-        private val mFragment: WeakReference<TemplatesList> = WeakReference(fragment)
-        override fun handleMessage(msg: Message) {
-            val missingUuids = msg.obj as Array<String>
-            mFragment.get()?.let { fragment ->
-                fragment.activity?.let {
-                    fragment.repairTriggered = true
-                    (it as ProtectedFragmentActivity).startTaskExecution(
-                        TaskExecutionFragment.TASK_REPAIR_PLAN,
-                        missingUuids,
-                        null,
-                        0
-                    )
+    private fun repairPlan(missingUuids: List<String>) {
+        repairTriggered = true
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val calendarId = PrefKey.PLANNER_CALENDAR_ID.getString("-1")
+            if (calendarId == "-1") return@launch
+            val cr = context?.contentResolver ?: return@launch
+            val values = ContentValues()
+            for (uuid in missingUuids) {
+                cr.query(
+                    CalendarContract.Events.CONTENT_URI,
+                    arrayOf(CalendarContract.Events._ID),
+                    "${CalendarContract.Events.CALENDAR_ID} = ? AND ${CalendarContract.Events.DESCRIPTION} LIKE ?",
+                    arrayOf(calendarId, "%$uuid%"),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        values.clear()
+                        values.put(KEY_PLANID, cursor.getLong(0))
+                        cr.update(
+                            TransactionProvider.TEMPLATES_URI,
+                            values,
+                            "$KEY_UUID = ?",
+                            arrayOf(uuid)
+                        )
+                    }
                 }
             }
-
         }
     }
 

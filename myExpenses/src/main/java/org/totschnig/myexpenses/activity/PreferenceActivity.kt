@@ -31,7 +31,6 @@ import org.totschnig.myexpenses.fragment.preferences.PreferencesAdvancedFragment
 import org.totschnig.myexpenses.fragment.preferences.PreferencesBackupRestoreFragment
 import org.totschnig.myexpenses.fragment.preferences.PreferencesBackupRestoreFragment.Companion.KEY_CHECKED_FILES
 import org.totschnig.myexpenses.fragment.preferences.PreferencesOcrFragment
-import org.totschnig.myexpenses.fragment.preferences.PreferencesWebUiFragment
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.preference.PrefKey
@@ -305,10 +304,6 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
                 twoPanePreference.getDetailFragment<PreferencesOcrFragment>()
                     ?.configureOcrEnginePrefs()
 
-            Feature.WEBUI ->
-                twoPanePreference.getDetailFragment<PreferencesWebUiFragment>()
-                    ?.bindToWebUiService()
-
             else -> {}
         }
     }
@@ -319,16 +314,6 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
         )
     }
 
-    fun onStartWebUi() {
-        if (licenceHandler.hasAccessTo(ContribFeature.WEB_UI) &&
-            featureViewModel.isFeatureAvailable(this, Feature.WEBUI)
-        ) {
-            activateWebUi()
-        } else {
-            contribFeatureRequested(ContribFeature.WEB_UI)
-        }
-    }
-
     override fun onPositive(args: Bundle, checked: Boolean) {
         super.onPositive(args, checked)
         when (args.getInt(ConfirmationDialogFragment.KEY_COMMAND_POSITIVE)) {
@@ -337,8 +322,6 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
                 .observe(this) {
                     showSnackBar(resources.getQuantityString(R.plurals.delete_success, it, it))
                 }
-
-            R.id.WEB_UI_COMMAND -> onStartWebUi()
         }
     }
 
@@ -399,11 +382,6 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
     override fun onCreateDialog(id: Int): Dialog? = run {
         CrashHandler.report(IllegalStateException("onCreateDialog called with $id"))
         super.onCreateDialog(id)
-    }
-
-    override fun onWebUiActivated() {
-        super.onWebUiActivated()
-        resultCode = RESULT_INVALIDATE_OPTIONS_MENU
     }
 
     override val createAccountTaskShouldQueryRemoteAccounts = false

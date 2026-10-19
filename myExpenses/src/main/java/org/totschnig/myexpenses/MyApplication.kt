@@ -44,20 +44,13 @@ import org.totschnig.myexpenses.activity.OnboardingActivity
 import org.totschnig.myexpenses.compose.transactions.TL_TAG
 import org.totschnig.myexpenses.di.AppComponent
 import org.totschnig.myexpenses.di.DaggerAppComponent
-import org.totschnig.myexpenses.feature.BankingFeature
 import org.totschnig.myexpenses.feature.FeatureManager
-import org.totschnig.myexpenses.feature.IWebInputService
-import org.totschnig.myexpenses.feature.IWebInputService.Companion.log
 import org.totschnig.myexpenses.feature.OcrFeature
-import org.totschnig.myexpenses.feature.RESTART_ACTION
-import org.totschnig.myexpenses.feature.START_ACTION
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.model.Grouping
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
-import org.totschnig.myexpenses.preference.isWebUiActive
-import org.totschnig.myexpenses.preference.setWebUiActive
 import org.totschnig.myexpenses.provider.BaseTransactionProvider
 import org.totschnig.myexpenses.provider.DataBaseAccount
 import org.totschnig.myexpenses.provider.INVALID_CALENDAR_ID
@@ -76,7 +69,6 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler.Companion.repor
 import org.totschnig.myexpenses.util.licence.LicenceHandler
 import org.totschnig.myexpenses.util.log.TagFilterFileLoggingTree
 import org.totschnig.myexpenses.util.ui.setNightMode
-import org.totschnig.myexpenses.viewmodel.WebUiViewModel.Companion.getServiceIntent
 import org.totschnig.myexpenses.widget.EXTRA_START_FROM_WIDGET_DATA_ENTRY
 import org.totschnig.myexpenses.widget.WidgetObserver.Companion.register
 import org.totschnig.myexpenses.widget.onConfigurationChanged
@@ -144,12 +136,9 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
     }
 
     val wrappedContext: Context
-        get() = wrapContext(this)
+        get() = this
 
-    fun wrapContext(context: Context) = _userPreferredLocale
-        ?.takeIf { Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU }
-        ?.let { ContextHelper.wrap(context, it) }
-        ?: context
+    fun wrapContext(context: Context) = context
 
     var initialLaunchWasForSystemPreferences: Boolean = false
         private set
@@ -190,25 +179,6 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
     }
 
     override fun onCreate(owner: LifecycleOwner) {
-
-        MainScope().launch {
-            dataStore.isWebUiActive.distinctUntilChanged().collectLatest { isDesired ->
-                if (isDesired) {
-                    // WAIT until the app is in the foreground before starting.
-                    // This satisfies the Android 12+ background start restriction.
-                    owner.lifecycle.currentStateFlow
-                        .map { it.isAtLeast(Lifecycle.State.STARTED) }
-                        .distinctUntilChanged()
-                        .first { it }
-
-                    if (initialLaunchWasForSystemPreferences) {
-                        log("Suppressing WebUI start")
-                    } else {
-                        controlWebUi(START_ACTION)
-                    }
-                }
-            }
-        }
     }
 
     private fun checkAppReplacingState() {
@@ -259,7 +229,6 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
                         plantTree(LicenceHandler.TAG)
                         plantTree(BaseTransactionProvider.TAG)
                         plantTree(OcrFeature.TAG)
-                        plantTree(BankingFeature.TAG)
                         plantTree(TL_TAG)
                     } catch (e: Exception) {
                         report(e)
@@ -334,37 +303,6 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
     val isProtected: Boolean
         get() = prefHandler.isProtected
 
-    private fun controlWebUi(action: String) {
-        getServiceIntent(action != RESTART_ACTION).onSuccess { intent ->
-            log("controlWebUi $action")
-            intent.setAction(action)
-            val componentName =
-                if (action == START_ACTION) {
-                    startForegroundService(intent)
-                } else {
-                    startService(intent)
-                }
-            if (componentName == null) {
-                IWebInputService.report(Exception("$action for Web User Interface failed"))
-                //Since trying to start the WebUI failed, it is likely that the STOP_ACTION triggered by
-                //onSharedPreferenceChanged listener might also fail
-                try {
-                    disableWebUi()
-                } catch (e: Exception) {
-                    IWebInputService.report(e)
-                }
-            }
-        }.onFailure {
-            disableWebUi()
-        }
-    }
-
-    fun disableWebUi() {
-        MainScope().launch {
-            dataStore.setWebUiActive(false)
-        }
-    }
-
     override fun onSharedPreferenceChanged(
         sharedPreferences: SharedPreferences,
         key: String?,
@@ -376,11 +314,6 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
         when {
             prefHandler.matches(key, PrefKey.DEBUG_LOGGING) -> {
                 setupLogging()
-            }
-
-            prefHandler.matches(key, PrefKey.WEBUI_PASSWORD, PrefKey.WEBUI_HTTPS) -> {
-                //WebInputService only "restarts" if it is actually started
-                controlWebUi(RESTART_ACTION)
             }
 
             prefHandler.matches(key, PrefKey.PLANNER_CALENDAR_ID) -> {
@@ -426,9 +359,7 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
         val vmPolicyBuilder = StrictMode.VmPolicy.Builder()
             .detectAll()
             .penaltyLog()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            vmPolicyBuilder.detectNonSdkApiUsage()
-        }
+            .detectNonSdkApiUsage()
         StrictMode.setVmPolicy(vmPolicyBuilder.build())
     }
 

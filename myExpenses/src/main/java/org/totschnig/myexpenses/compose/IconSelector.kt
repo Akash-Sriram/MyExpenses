@@ -81,11 +81,6 @@ fun IconSelector(
     }
 
     Column(modifier = modifier) {
-        // Since Compose 1.7.3, on Oreo and below we receive an unwanted focus for the
-        // Search tab, which overrides the default focus on the selected tab
-        // We try to ignore this first focus change
-        //TODO revisit if this is still necessary (instead of harmful) with future Compose versions
-        var initialFocusProcessed by remember { mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) }
         // Get safe drawing insets
 
         ScrollableTabRow(
@@ -106,11 +101,7 @@ fun IconSelector(
                     modifier = Modifier
                         .onFocusChanged {
                             if (it.isFocused) {
-                                if (initialFocusProcessed) {
-                                    selectedTabIndex = 0
-                                } else {
-                                    initialFocusProcessed = true
-                                }
+                                selectedTabIndex = 0
                             }
                         },
                     value = searchTerm,

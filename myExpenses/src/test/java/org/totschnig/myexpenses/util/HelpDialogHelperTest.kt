@@ -39,7 +39,7 @@ import org.totschnig.myexpenses.activity.ManageSyncBackends
 import org.totschnig.myexpenses.activity.ManageTags
 import org.totschnig.myexpenses.activity.ManageTemplates
 import org.totschnig.myexpenses.activity.MethodEdit
-import org.totschnig.myexpenses.activity.MyExpenses
+import org.totschnig.myexpenses.activity.MyExpensesV2
 import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
 
 @RunWith(ParameterizedRobolectricTestRunner::class)
@@ -68,7 +68,7 @@ class HelpDialogHelperTest(private val activity: Class<out ProtectedFragmentActi
             arrayOf(ManageTags::class.java),
             arrayOf(ManageTemplates::class.java),
             arrayOf(MethodEdit::class.java),
-            arrayOf(MyExpenses::class.java)
+            arrayOf(MyExpensesV2::class.java)
         )
     }
 

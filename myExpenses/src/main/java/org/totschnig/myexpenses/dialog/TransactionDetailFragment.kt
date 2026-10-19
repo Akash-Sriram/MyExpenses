@@ -95,8 +95,6 @@ import org.totschnig.myexpenses.compose.scrollbar.LazyColumnWithScrollbar
 import org.totschnig.myexpenses.compose.size
 import org.totschnig.myexpenses.compose.transactions.COMMENT_SEPARATOR
 import org.totschnig.myexpenses.compose.transactions.voidMarker
-import org.totschnig.myexpenses.db2.FinTsAttribute
-import org.totschnig.myexpenses.feature.BankingFeature
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.CrStatus
 import org.totschnig.myexpenses.model.CurrencyContext
@@ -136,9 +134,6 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
 
     override val fullScreenIfNotLarge: Boolean
         get() = requireArguments().getBoolean(KEY_FULL_SCREEN)
-
-    private val bankingFeature: BankingFeature
-        get() = injector.bankingFeature() ?: object : BankingFeature {}
 
     val sortOrder: String?
         get() = requireArguments().getString(KEY_SORT_ORDER)
@@ -572,9 +567,7 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
 
                 entry.value.filter { it.first.userVisible }.forEach {
                     TableRow(
-                        label = (it.first as? FinTsAttribute)?.let { attribute ->
-                            bankingFeature.resolveAttributeLabel(requireContext(), attribute)
-                        } ?: it.first.name,
+                        label = it.first.name,
                         content = it.second
                     )
                 }

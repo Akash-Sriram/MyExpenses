@@ -108,14 +108,7 @@ class StaleImagesList : ContextualActionBarFragment(), LoaderManager.LoaderCallb
         val activity = requireActivity() as BaseActivity
         if (command == R.id.SAVE_COMMAND) {
             selectedItemIds = itemIds
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                activity.requestPermission(
-                    PermissionHelper.PERMISSIONS_REQUEST_STORAGE,
-                    PermissionHelper.PermissionGroup.STORAGE
-                )
-            } else {
-                saveImageDo()
-            }
+            saveImageDo()
         } else if (command == R.id.DELETE_COMMAND) {
             activity.showSnackBar(R.string.progress_dialog_deleting)
             viewModel.deleteImages(itemIds)

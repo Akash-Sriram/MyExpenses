@@ -251,40 +251,22 @@ fun attachmentInfoMap(context: Context, withFile: Boolean = false): Map<Uri, Att
                 } else null
                 contentResolver.getType(uri)?.let {
                     if (it.startsWith("image")) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            val size = UiUtils.dp2Px(48f, context.resources)
-                            try {
-                                AttachmentInfo.of(
-                                    it,
-                                    contentResolver.loadThumbnail(
-                                        uri,
-                                        Size(size, size),
-                                        null
-                                    ), contentDescription, file
-                                )
-                            } catch (_: Exception) {
-                                null
-                            }
-                        } else {
+                        val size = UiUtils.dp2Px(48f, context.resources)
+                        try {
                             AttachmentInfo.of(
                                 it,
-                                R.drawable.ic_menu_camera,
-                                contentDescription,
-                                file
+                                contentResolver.loadThumbnail(
+                                    uri,
+                                    Size(size, size),
+                                    null
+                                ), contentDescription, file
                             )
+                        } catch (_: Exception) {
+                            null
                         }
                     } else {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            val icon = contentResolver.getTypeInfo(it).icon
-                            AttachmentInfo.of(it, icon, contentDescription, file)
-                        } else {
-                            AttachmentInfo.of(
-                                it,
-                                R.drawable.ic_menu_template,
-                                contentDescription,
-                                file
-                            )
-                        }
+                        val icon = contentResolver.getTypeInfo(it).icon
+                        AttachmentInfo.of(it, icon, contentDescription, file)
                     }
                 }
             }

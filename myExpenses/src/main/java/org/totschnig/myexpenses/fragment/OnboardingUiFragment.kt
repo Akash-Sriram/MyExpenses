@@ -102,19 +102,7 @@ class OnboardingUiFragment : OnboardingFragment() {
         //theme
         val theme = prefHandler.uiMode(requireContext())
 
-        themeSelectionBinding.themeSwitch?.let {
-            val isLight = ProtectedFragmentActivity.ThemeType.light.name == theme
-            it.isChecked = isLight
-            setContentDescriptionToThemeSwitch(it, isLight)
-            it.setOnCheckedChangeListener { _: CompoundButton?, isChecked: Boolean ->
-                prefHandler.putString(
-                    PrefKey.UI_THEME,
-                    (if (isChecked) ProtectedFragmentActivity.ThemeType.light else ProtectedFragmentActivity.ThemeType.dark).name
-                )
-                setNightMode(prefHandler, requireContext())
-            }
-        }
-        themeSelectionBinding.themeSpinner?.let {
+        themeSelectionBinding.themeSpinner.let {
             val spinnerHelper = SpinnerHelper(it)
             val themeValues = resources.getStringArray(R.array.pref_ui_theme_values)
             spinnerHelper.setOnItemSelectedListener(object : AdapterView.OnItemSelectedListener {
@@ -234,19 +222,11 @@ class OnboardingUiFragment : OnboardingFragment() {
 
     private fun updateFontSizeDisplayName(fontScale: Int) {
         val entry = FontSizeDialogPreference.getEntry(activity, fontScale)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            binding.fontSize.stateDescription = entry
-        }
+        binding.fontSize.stateDescription = entry
         binding.fontSizeDisplayName.text = entry
         binding.fontSizeDisplayName.contentDescription =
             "${getString(R.string.title_font_size)}: $entry"
         binding.fontSizeDisplayName.updateTextSize(requireContext(), fontScale)
-    }
-
-    private fun setContentDescriptionToThemeSwitch(themeSwitch: View, isLight: Boolean) {
-        themeSwitch.contentDescription = getString(
-            if (isLight) R.string.pref_ui_theme_light else R.string.pref_ui_theme_dark
-        )
     }
 
     override fun onDestroyView() {

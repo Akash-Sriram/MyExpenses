@@ -13,7 +13,6 @@ import androidx.annotation.CallSuper
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
-import org.apache.commons.lang3.StringUtils
 import org.totschnig.myexpenses.BuildConfig
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.injector
@@ -402,12 +401,8 @@ abstract class AbstractSyncBackendProvider<Res>(protected val context: Context) 
         )
     }
 
-    protected fun getLastFileNamePart(fileName: String): String {
-        return if (fileName.contains("/")) StringUtils.substringAfterLast(
-            fileName,
-            "/"
-        ) else fileName
-    }
+    protected fun getLastFileNamePart(fileName: String): String =
+        fileName.substringAfterLast('/')
 
     @Throws(IOException::class)
     protected abstract fun saveFileContents(
