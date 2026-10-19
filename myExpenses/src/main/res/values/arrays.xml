@@ -21,11 +21,13 @@
         <item>ISO-8859-1</item>
     </string-array>
 
-    <string-array name="pref_ui_theme_values" tools:ignore="InconsistentArrays">
+    <string-array name="pref_ui_theme_values">
+        <item>default</item>
         <item>dark</item>
         <item>light</item>
     </string-array>
-    <string-array name="pref_ui_theme_entries" tools:ignore="InconsistentArrays">
+    <string-array name="pref_ui_theme_entries">
+        <item>@string/system_default</item>
         <item>@string/pref_ui_theme_dark</item>
         <item>@string/pref_ui_theme_light</item>
     </string-array>

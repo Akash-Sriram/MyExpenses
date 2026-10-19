@@ -3,7 +3,7 @@ package org.totschnig.myexpenses.activity
 import android.content.Context
 import android.content.Intent
 import androidx.annotation.StringRes
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick

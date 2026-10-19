@@ -25,7 +25,7 @@ class PreferencesAttachPictureFragment : BasePreferenceFragment() {
         requirePreference<Preference>(PrefKey.OPTIMIZE_PICTURE_QUALITY).isEnabled =
             prefHandler.enumValueOrDefault(
                 PrefKey.OPTIMIZE_PICTURE_FORMAT,
-                Bitmap.CompressFormat.WEBP
+                Bitmap.CompressFormat.WEBP_LOSSY
             ) != Bitmap.CompressFormat.PNG
     }
 

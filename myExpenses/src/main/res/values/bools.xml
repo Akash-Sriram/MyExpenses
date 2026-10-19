@@ -2,8 +2,8 @@
 <resources>
     <bool name="showTransactionBulkActions">false</bool>
     <bool name="fints">false</bool>
-    <bool name="allowFullScreen">false</bool>
+    <bool name="allowFullScreen">true</bool>
     <bool name="isLarge">false</bool>
     <bool name="isCompact">true</bool>
-    <bool name="contentBasedColors">false</bool>
+    <bool name="contentBasedColors">true</bool>
 </resources>

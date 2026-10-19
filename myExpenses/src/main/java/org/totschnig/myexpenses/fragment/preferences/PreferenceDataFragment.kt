@@ -118,8 +118,8 @@ class PreferenceDataFragment : BasePreferenceFragment() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 preferenceDataStore.handleList(findPreference(DYNAMIC_EXCHANGE_RATES_DEFAULT_KEY)!!) {
-                    requireContext().contentResolver.notifyChange(DYNAMIC_CURRENCIES_URI, null, false)
-                    requireContext().contentResolver.notifyChange(ACCOUNTS_URI, null, false)
+                    requireContext().contentResolver.notifyChange(DYNAMIC_CURRENCIES_URI, null)
+                    requireContext().contentResolver.notifyChange(ACCOUNTS_URI, null)
                 }
             }
         }

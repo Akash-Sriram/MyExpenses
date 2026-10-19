@@ -6,7 +6,6 @@ import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.view.View
 import androidx.annotation.IdRes
 import androidx.appcompat.widget.MenuPopupWindow.MenuDropDownListView
@@ -139,9 +138,7 @@ abstract class BaseUiTest<A : ProtectedFragmentActivity> {
         *buildList {
             add(Manifest.permission.WRITE_CALENDAR)
             add(Manifest.permission.READ_CALENDAR)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                add(Manifest.permission.POST_NOTIFICATIONS)
-            }
+            add(Manifest.permission.POST_NOTIFICATIONS)
             add(Manifest.permission.CHANGE_CONFIGURATION)
         }.toTypedArray()
     )

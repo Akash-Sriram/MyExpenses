@@ -1,6 +1,5 @@
 package org.totschnig.myexpenses.testutils
 
-import android.os.Build
 import androidx.compose.ui.test.filter
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onChildren
@@ -69,10 +68,6 @@ abstract class TestMain(locale: String?) : BaseMyExpensesTest() {
                 takeScreenshot("export")
                 pressBack()
                 clickContextItem(R.string.details)
-                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q) {
-                    //https://github.com/android/android-test/issues/444
-                    Thread.sleep(500)
-                }
                 composeTestRule.onNodeWithText(getString(R.string.menu_edit)).performClick()
                 closeSoftKeyboard()
                 takeScreenshot("split")

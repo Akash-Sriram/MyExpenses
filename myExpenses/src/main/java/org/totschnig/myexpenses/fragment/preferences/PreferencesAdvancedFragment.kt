@@ -158,7 +158,7 @@ class PreferencesAdvancedFragment : BasePreferenceFragment(),
                 PrefKey.FEATURE_UNINSTALL_LANGUAGES,
                 featureManager.installedLanguages() - "en",
                 featureManager::uninstallLanguages
-            ) { language -> Locale(language).let { it.getDisplayName(it) } }
+            ) { language -> Locale.forLanguageTag(language).let { it.getDisplayName(it) } }
         }
     }
 

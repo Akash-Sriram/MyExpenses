@@ -14,7 +14,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -571,16 +570,10 @@ fun DraggableItem(
     Box(
         modifier = modifier
             .background(bgColor, shape = RoundedCornerShape(4.dp))
-            .dragAndDropSource { ->
-                detectTapGestures(
-                    onPress = {
-                        startTransfer(
-                            DragAndDropTransferData(
-                                clipData = ClipData.newPlainText(field.toString(), ""),
-                                localState = field
-                            )
-                        )
-                    }
+            .dragAndDropSource { offset ->
+                DragAndDropTransferData(
+                    clipData = ClipData.newPlainText(field.toString(), ""),
+                    localState = field
                 )
             }
             .dragAndDropTarget(

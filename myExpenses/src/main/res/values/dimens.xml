@@ -39,7 +39,7 @@
     <dimen name="widget_default_height">40dp</dimen>
     <dimen name="widget_min_width">40dp</dimen>
 
-    <dimen name="preview_today_translation">0dp</dimen>
+    <dimen name="preview_today_translation">75dp</dimen>
     <dimen name="progress_donut_stroke_width">3dp</dimen>
 
 </resources>

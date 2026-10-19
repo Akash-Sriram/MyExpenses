@@ -95,5 +95,5 @@ along with My Expenses.  If not, see <http://www.gnu.org/licenses/>.
         <item name="textInputStyle">@style/MyTextInputLayout</item>
     </style>
 
-    <style name="Starting" parent="android:Theme.NoDisplay" />
+    <style name="Starting" parent="android:Theme.DeviceDefault.DayNight" />
 </resources>
