@@ -19,9 +19,9 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.loader.app.LoaderManager
-import androidx.loader.content.CursorLoader
-import androidx.loader.content.Loader
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
+import org.totschnig.myexpenses.viewmodel.HistoryQueryParams
 import com.github.mikephil.charting.components.AxisBase
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.components.YAxis
@@ -84,8 +84,7 @@ import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
 
-@Suppress("DEPRECATION")
-class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
+class HistoryChart : Fragment() {
     private var _binding: HistoryChartBinding? = null
     private val binding
         get() = _binding!!
@@ -129,7 +128,6 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
             inject(this@HistoryChart)
             inject(viewModel)
         }
-        setHasOptionsMenu(true)
         val typedValue = TypedValue()
         requireActivity().theme.resolveAttribute(
             android.R.attr.textAppearanceSmall,
@@ -147,7 +145,7 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.grouping.collect {
-                    requireActivity().invalidateOptionsMenu()
+                    requireActivity().invalidateMenu()
                     if (::accountInfo.isInitialized) {
                         reset()
                     }
@@ -161,31 +159,38 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
         container: ViewGroup?,
         savedInstanceState: Bundle?,
     ): View {
-        lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.accountInfo(requireActivity().intent.extras!!).collect { (account, grouping, openingBalances) ->
-                    Timber.d("openingBalances: $openingBalances")
-                    val currency = currencyContext[account.currency]
-                    accountInfo = HistoryAccountInfo(
-                        accountId = account.id,
-                        label = account.label(requireActivity(), currencyContext),
-                        currencyUnit = currency,
-                        color = account.color,
-                        openingBalance = Money(currency, account.openingBalance),
-                        grouping = grouping,
-                        typeId = account.typeId,
-                        flagId = account.flagId,
-                        accountGrouping = account.accountGrouping
-                    )
-                    this@HistoryChart.openingBalances = openingBalances
-                    (requireActivity() as ProtectedFragmentActivity).supportActionBar?.title =
-                        accountInfo.label
-                    showBalance = prefHandler.getBoolean(
-                        PrefKey.HISTORY_SHOW_BALANCE,
-                        showBalance
-                    )
-                    requireActivity().invalidateOptionsMenu()
-                    reset()
+                launch {
+                    viewModel.accountInfo(requireActivity().intent.extras!!).collect { (account, grouping, openingBalances) ->
+                        Timber.d("openingBalances: $openingBalances")
+                        val currency = currencyContext[account.currency]
+                        accountInfo = HistoryAccountInfo(
+                            accountId = account.id,
+                            label = account.label(requireActivity(), currencyContext),
+                            currencyUnit = currency,
+                            color = account.color,
+                            openingBalance = Money(currency, account.openingBalance),
+                            grouping = grouping,
+                            typeId = account.typeId,
+                            flagId = account.flagId,
+                            accountGrouping = account.accountGrouping
+                        )
+                        this@HistoryChart.openingBalances = openingBalances
+                        (requireActivity() as ProtectedFragmentActivity).supportActionBar?.title =
+                            accountInfo.label
+                        showBalance = prefHandler.getBoolean(
+                            PrefKey.HISTORY_SHOW_BALANCE,
+                            showBalance
+                        )
+                        requireActivity().invalidateMenu()
+                        reset()
+                    }
+                }
+                launch {
+                    viewModel.historyCursor.collect { cursor ->
+                        onHistoryCursorLoaded(cursor)
+                    }
                 }
             }
         }
@@ -246,6 +251,57 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
         return binding.root
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        val menuHost: MenuHost = requireActivity()
+        menuHost.addMenuProvider(object : MenuProvider {
+            override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+                menuInflater.inflate(R.menu.history, menu)
+                menuInflater.inflate(R.menu.grouping, menu.findItem(R.id.GROUPING_COMMAND).subMenu)
+            }
+
+            override fun onPrepareMenu(menu: Menu) {
+                menu.findItem(R.id.GROUPING_COMMAND).subMenu?.let {
+                    it.findItem(R.id.GROUPING_NONE_COMMAND).isVisible = false
+                    Utils.configureGroupingMenu(it, grouping)
+                }
+                menu.findItem(R.id.TOGGLE_BALANCE_COMMAND)?.let {
+                    it.isChecked = showBalance
+                }
+                menu.findItem(R.id.TOGGLE_INCLUDE_TRANSFERS_COMMAND)?.isChecked = includeTransfers
+                menu.findItem(R.id.TOGGLE_TOTALS_COMMAND)?.isChecked = showTotals
+            }
+
+            override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+                if (handleGrouping(menuItem)) return true
+                return when (menuItem.itemId) {
+                    R.id.TOGGLE_BALANCE_COMMAND -> {
+                        showBalance = !showBalance
+                        prefHandler.putBoolean(PrefKey.HISTORY_SHOW_BALANCE, showBalance)
+                        reset()
+                        true
+                    }
+
+                    R.id.TOGGLE_INCLUDE_TRANSFERS_COMMAND -> {
+                        includeTransfers = !includeTransfers
+                        prefHandler.putBoolean(PrefKey.HISTORY_INCLUDE_TRANSFERS, includeTransfers)
+                        reset()
+                        true
+                    }
+
+                    R.id.TOGGLE_TOTALS_COMMAND -> {
+                        showTotals = !showTotals
+                        prefHandler.putBoolean(PrefKey.HISTORY_SHOW_TOTALS, showTotals)
+                        reset()
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+        }, viewLifecycleOwner, Lifecycle.State.RESUMED)
+    }
+
     private fun formatXValue(value: Float): String = when (grouping) {
         Grouping.DAY -> LocalDateTime.MIN.with(JulianFields.JULIAN_DAY, value.toLong())
             .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT))
@@ -280,57 +336,27 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
         else -> null
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
-        inflater.inflate(R.menu.history, menu)
-        inflater.inflate(R.menu.grouping, menu.findItem(R.id.GROUPING_COMMAND).subMenu)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onPrepareOptionsMenu(menu: Menu) {
-        menu.findItem(R.id.GROUPING_COMMAND).subMenu?.let {
-            it.findItem(R.id.GROUPING_NONE_COMMAND).isVisible = false
-            Utils.configureGroupingMenu(it, grouping)
-        }
-        menu.findItem(R.id.TOGGLE_BALANCE_COMMAND)?.let {
-            it.isChecked = showBalance
-        }
-        menu.findItem(R.id.TOGGLE_INCLUDE_TRANSFERS_COMMAND)?.isChecked = includeTransfers
-        menu.findItem(R.id.TOGGLE_TOTALS_COMMAND)?.isChecked = showTotals
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (handleGrouping(item)) return true
-        when (item.itemId) {
-            R.id.TOGGLE_BALANCE_COMMAND -> {
-                showBalance = !showBalance
-                prefHandler.putBoolean(PrefKey.HISTORY_SHOW_BALANCE, showBalance)
-                reset()
-                return true
-            }
-
-            R.id.TOGGLE_INCLUDE_TRANSFERS_COMMAND -> {
-                includeTransfers = !includeTransfers
-                prefHandler.putBoolean(PrefKey.HISTORY_INCLUDE_TRANSFERS, includeTransfers)
-                reset()
-                return true
-            }
-
-            R.id.TOGGLE_TOTALS_COMMAND -> {
-                showTotals = !showTotals
-                prefHandler.putBoolean(PrefKey.HISTORY_SHOW_TOTALS, showTotals)
-                reset()
-                return true
-            }
-
-            else -> return false
-        }
-    }
-
     private fun reset() {
         binding.historyChart.clear()
-        LoaderManager.getInstance(this).restartLoader(GROUPING_CURSOR, null, this)
+        if (!::accountInfo.isInitialized) return
+        val (builder, selection, selectionArgs) = accountInfo.groupingQuery(filter)
+        if (shouldUseGroupStart()) {
+            builder.appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_WITH_JULIAN_START)
+        }
+        if (includeTransfers) {
+            builder.appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_INCLUDE_TRANSFERS)
+        }
+        if (
+            accountInfo.isHomeAggregate || //v1
+            accountInfo.accountId == 0L && accountInfo.accountGrouping != AccountGrouping.CURRENCY //v2
+        ) {
+            builder.appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_BREAKDOWN_BY_ACCOUNT)
+        }
+        viewModel.historyQueryParams.value = HistoryQueryParams(
+            uri = builder.build(),
+            selection = selection,
+            selectionArgs = selectionArgs
+        )
     }
 
     private fun handleGrouping(item: MenuItem): Boolean {
@@ -342,30 +368,6 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
             return true
         }
         return false
-    }
-
-    override fun onCreateLoader(id: Int, args: Bundle?): Loader<Cursor> {
-        if (id == GROUPING_CURSOR) {
-            val (builder, selection, selectionArgs) = accountInfo.groupingQuery(filter)
-            if (shouldUseGroupStart()) {
-                builder.appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_WITH_JULIAN_START)
-            }
-            if (includeTransfers) {
-                builder.appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_INCLUDE_TRANSFERS)
-            }
-            if (
-                accountInfo.isHomeAggregate || //v1
-                accountInfo.accountId == 0L && accountInfo.accountGrouping != AccountGrouping.CURRENCY //v2
-                ) {
-                builder.appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_BREAKDOWN_BY_ACCOUNT)
-            }
-            return CursorLoader(
-                requireActivity(),
-                builder.build(),
-                null, selection, selectionArgs, null
-            )
-        }
-        throw IllegalArgumentException()
     }
 
     private fun shouldUseGroupStart(): Boolean {
@@ -380,7 +382,7 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
         else -> 0
     }
 
-    override fun onLoadFinished(loader: Loader<Cursor?>, cursor: Cursor?) {
+    private fun onHistoryCursorLoaded(cursor: Cursor?) {
         val context = activity as? ProtectedFragmentActivity ?: return
         if (cursor != null && cursor.moveToFirst()) {
             val columnIndexGroupSumIncome = cursor.getColumnIndex(KEY_SUM_INCOME)
@@ -538,12 +540,13 @@ class HistoryChart : Fragment(), LoaderManager.LoaderCallbacks<Cursor> {
     private fun convertAmount(value: Float) =
         currencyFormatter.convAmount(value.toLong(), accountInfo.currencyUnit)
 
-    override fun onLoaderReset(loader: Loader<Cursor?>) {
+    override fun onDestroyView() {
+        super.onDestroyView()
         binding.historyChart.clear()
+        _binding = null
     }
 
     companion object {
-        private const val GROUPING_CURSOR = 1
         private const val MONTH_GROUPING_YEAR_X = 12
 
         //julian day 0 is monday -> Only if week starts with monday it divides without remainder by 7

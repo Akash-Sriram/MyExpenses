@@ -8,6 +8,13 @@ import android.os.Parcelable
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
+import android.database.Cursor
+import app.cash.copper.flow.observeQuery
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import org.totschnig.myexpenses.MyApplication
@@ -16,11 +23,13 @@ import org.totschnig.myexpenses.db2.instantiateTemplate
 import org.totschnig.myexpenses.provider.KEY_DATE
 import org.totschnig.myexpenses.provider.KEY_DEFAULT_ACTION
 import org.totschnig.myexpenses.provider.KEY_INSTANCEID
+import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_TEMPLATEID
 import org.totschnig.myexpenses.provider.KEY_TRANSACTIONID
 import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.provider.TransactionProvider.Companion.PLAN_INSTANCE_STATUS_URI
+import org.totschnig.myexpenses.provider.appendBooleanQueryParameter
 import org.totschnig.myexpenses.util.ExchangeRateHandler
 import org.totschnig.myexpenses.util.ShortcutHelper
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
@@ -41,6 +50,25 @@ class TemplatesListViewModel(application: Application) :
 
     @Inject
     lateinit var exchangeRateHandler: ExchangeRateHandler
+
+    val sortOrder = MutableSharedFlow<String?>(replay = 1)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val templatesCursor: Flow<Cursor?> = sortOrder.flatMapLatest { sort ->
+        contentResolver.observeQuery(
+            TransactionProvider.TEMPLATES_URI.buildUpon()
+                .appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_WITH_PLAN_INFO)
+                .build(),
+            null,
+            "$KEY_PARENTID IS NULL",
+            null,
+            sort
+        ).map { it.run() }
+    }
+
+    fun setSortOrder(sort: String?) {
+        sortOrder.tryEmit(sort)
+    }
 
     fun updateDefaultAction(itemIds: LongArray, action: Template.Action) =
         liveData(context = coroutineContext()) {

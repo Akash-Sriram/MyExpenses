@@ -17,7 +17,6 @@ import android.text.TextUtils
 import android.text.format.DateUtils.DAY_IN_MILLIS
 import android.text.style.IconMarginSpan
 import android.view.SubMenu
-import androidx.loader.app.LoaderManager
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.CurrencyEnum
@@ -365,21 +364,6 @@ object Utils {
             R.id.GROUPING_MONTH_COMMAND -> Grouping.MONTH
             R.id.GROUPING_YEAR_COMMAND -> Grouping.YEAR
             else -> null
-        }
-    }
-
-    @JvmStatic
-    fun <D> requireLoader(
-        manager: LoaderManager,
-        loaderId: Int,
-        args: Bundle?,
-        callback: LoaderManager.LoaderCallbacks<D>
-    ) {
-        val loader = manager.getLoader<D>(loaderId)
-        if (loader != null && !loader.isReset) {
-            manager.restartLoader(loaderId, args, callback)
-        } else {
-            manager.initLoader(loaderId, args, callback)
         }
     }
 

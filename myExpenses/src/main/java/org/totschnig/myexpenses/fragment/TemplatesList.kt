@@ -51,9 +51,8 @@ import androidx.core.util.size
 import androidx.core.view.isVisible
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.viewModels
-import androidx.loader.app.LoaderManager
-import androidx.loader.content.CursorLoader
-import androidx.loader.content.Loader
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.evernote.android.state.State
 import com.evernote.android.state.StateSaver
 import com.google.android.material.snackbar.Snackbar
@@ -142,7 +141,7 @@ const val DIALOG_TAG_CONFIRM_RESET = "confirm_reset"
 const val DIALOG_TAG_CONFIRM_DELETE = "confirm_delete"
 
 @Suppress("DEPRECATION")
-class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Cursor?>,
+class TemplatesList : SortableListFragment(),
     SimpleDialog.OnDialogResultListener {
     private var popup: PopupMenu? = null
     override val menuResource: Int
@@ -152,7 +151,6 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     val templatesCursor: Cursor
         get() = _templatesCursor!!
     private lateinit var mAdapter: SimpleCursorAdapter
-    private lateinit var mManager: LoaderManager
     private var hasPlans = false
 
     /**
@@ -191,6 +189,8 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
 
     override fun onDestroyView() {
         super.onDestroyView()
+        _templatesCursor = null
+        mAdapter.swapCursor(null)
         _binding = null
     }
 
@@ -206,8 +206,14 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     ): View {
         val ctx = requireActivity() as ProtectedFragmentActivity
         _binding = TemplatesListBinding.inflate(inflater, container, false)
-        mManager = LoaderManager.getInstance(this)
-        mManager.initLoader(SORTABLE_CURSOR, null, this)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.templatesCursor.collect { cursor ->
+                    onTemplatesCursorLoaded(cursor)
+                }
+            }
+        }
+        loadData()
         mAdapter = MyAdapter(ctx)
         binding.list.adapter = mAdapter
         binding.list.emptyView = binding.empty
@@ -435,72 +441,55 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
         }
     }
 
-    override fun onCreateLoader(id: Int, bundle: Bundle?): Loader<Cursor?> {
-        return if (id == SORTABLE_CURSOR) {
-            CursorLoader(
-                requireActivity(),
-                TransactionProvider.TEMPLATES_URI.buildUpon()
-                    .appendBooleanQueryParameter(TransactionProvider.QUERY_PARAMETER_WITH_PLAN_INFO)
-                    .build(),
-                null,
-                "$KEY_PARENTID IS NULL",
-                null,
-                preferredOrderByForTemplatesWithPlans(prefHandler, Sort.USAGES, prefHandler.collate)
-            )
-        } else throw IllegalArgumentException()
-    }
-
-    override fun onLoadFinished(loader: Loader<Cursor?>, c: Cursor?) {
-        val ctx = requireActivity() as ManageTemplates
-        if (loader.id == SORTABLE_CURSOR) {
-            _templatesCursor = c
-            invalidateCAB()
-            hasPlans = false
-            if (isCalendarPermissionGranted && _templatesCursor != null && templatesCursor.moveToFirst()) {
-                val needToExpand =
-                    if (expandedHandled) ManageTemplates.NOT_CALLED else ctx.calledFromCalendarWithId
-                while (!templatesCursor.isAfterLast) {
-                    val planId = templatesCursor.getLong(KEY_PLANID)
-                    if (planId != 0L) {
-                        hasPlans = true
+    private fun onTemplatesCursorLoaded(c: Cursor?) {
+        val ctx = activity as? ManageTemplates ?: return
+        _templatesCursor = c
+        invalidateCAB()
+        hasPlans = false
+        if (isCalendarPermissionGranted && _templatesCursor != null && templatesCursor.moveToFirst()) {
+            val needToExpand =
+                if (expandedHandled) ManageTemplates.NOT_CALLED else ctx.calledFromCalendarWithId
+            while (!templatesCursor.isAfterLast) {
+                val planId = templatesCursor.getLong(KEY_PLANID)
+                if (planId != 0L) {
+                    hasPlans = true
+                }
+                val templateId = templatesCursor.getLong(KEY_ROWID)
+                if (needToExpand == templateId && planId != 0L) {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, planId)
                     }
-                    val templateId = templatesCursor.getLong(KEY_ROWID)
-                    if (needToExpand == templateId && planId != 0L) {
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, planId)
-                        }
-                        ctx.startActivity(intent)
+                    ctx.startActivity(intent)
+                }
+                templatesCursor.moveToNext()
+            }
+            if (needToExpand != ManageTemplates.NOT_CALLED) {
+                expandedHandled = true
+            }
+            //look for plans that we could possible relink
+            if (!repairTriggered && templatesCursor.moveToFirst()) {
+                val missingUuids = ArrayList<String>()
+                while (!templatesCursor.isAfterLast) {
+                    if (!templatesCursor.isNull(KEY_PLANID) &&
+                        templatesCursor.isNull(KEY_PLAN_INFO)
+                    ) {
+                        missingUuids.add(
+                            templatesCursor.getString(
+                                templatesCursor.getColumnIndexOrThrow(
+                                    KEY_UUID
+                                )
+                            )
+                        )
                     }
                     templatesCursor.moveToNext()
                 }
-                if (needToExpand != ManageTemplates.NOT_CALLED) {
-                    expandedHandled = true
-                }
-                //look for plans that we could possible relink
-                if (!repairTriggered && templatesCursor.moveToFirst()) {
-                    val missingUuids = ArrayList<String>()
-                    while (!templatesCursor.isAfterLast) {
-                        if (!templatesCursor.isNull(KEY_PLANID) &&
-                            templatesCursor.isNull(KEY_PLAN_INFO)
-                        ) {
-                            missingUuids.add(
-                                templatesCursor.getString(
-                                    templatesCursor.getColumnIndexOrThrow(
-                                        KEY_UUID
-                                    )
-                                )
-                            )
-                        }
-                        templatesCursor.moveToNext()
-                    }
-                    if (missingUuids.isNotEmpty()) {
-                        repairPlan(missingUuids)
-                    }
+                if (missingUuids.isNotEmpty()) {
+                    repairPlan(missingUuids)
                 }
             }
-            mAdapter.swapCursor(_templatesCursor)
-            requireActivity().invalidateOptionsMenu()
         }
+        mAdapter.swapCursor(_templatesCursor)
+        requireActivity().invalidateOptionsMenu()
     }
 
     fun showSnackbar(msg: String) {
@@ -652,13 +641,6 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
                     }
                 }
             }
-        }
-    }
-
-    override fun onLoaderReset(loader: Loader<Cursor?>) {
-        if (loader.id == SORTABLE_CURSOR) {
-            _templatesCursor = null
-            mAdapter.swapCursor(null)
         }
     }
 
@@ -868,11 +850,12 @@ class TemplatesList : SortableListFragment(), LoaderManager.LoaderCallbacks<Curs
     }
 
     public override fun loadData() {
-        Utils.requireLoader(mManager, SORTABLE_CURSOR, null, this)
+        viewModel.setSortOrder(
+            preferredOrderByForTemplatesWithPlans(prefHandler, Sort.USAGES, prefHandler.collate)
+        )
     }
 
     companion object {
-        private const val SORTABLE_CURSOR = -1
         const val PLANNER_FRAGMENT_TAG = "PLANNER_FRAGMENT"
     }
 
