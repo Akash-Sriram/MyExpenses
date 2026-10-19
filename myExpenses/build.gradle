@@ -25,30 +25,30 @@ def getPropertyIfDefined(property, defaultValue) {
 }
 
 android {
-    compileSdk project.compileSdkVersion
+    compileSdk = rootProject.ext.compileSdkVersion
     useLibrary 'android.test.runner'
     useLibrary 'android.test.mock'
     useLibrary 'android.test.base'
 
     defaultConfig {
-        applicationId "org.totschnig.myexpenses"
-        minSdkVersion project.minSdkVersion
-        targetSdkVersion project.targetSdkVersion
-        versionCode project.versionCode
-        versionName project.versionName
+        applicationId = "org.totschnig.myexpenses"
+        minSdk = rootProject.ext.minSdkVersion
+        targetSdk = rootProject.ext.targetSdkVersion
+        versionCode = rootProject.ext.versionCode
+        versionName = rootProject.ext.versionName
 
         buildConfigField "String", "DISTRIBUTION", "\"GITHUB\""
         buildConfigField "java.time.LocalDateTime", "BUILD_DATE", getDate()
-        testInstrumentationRunner "org.totschnig.myexpenses.MyTestRunner"
+        testInstrumentationRunner = "org.totschnig.myexpenses.MyTestRunner"
 
-        resourceConfigurations = resConfig
+        resourceConfigurations.addAll(rootProject.ext.resConfig)
         missingDimensionStrategy 'textRecognition', 'intern'
     }
 
     compileOptions {
-        coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        coreLibraryDesugaringEnabled = true
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     /*signingConfigs {
@@ -63,8 +63,8 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
-            shrinkResources true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-project.txt'
             //signingConfig signingConfigs.release
             manifestPlaceholders["appName"] = "@string/app_name"
@@ -118,18 +118,18 @@ android {
     }
 
     buildFeatures {
-        viewBinding true
-        compose true
-        buildConfig true
-        resValues true
+        viewBinding = true
+        compose = true
+        buildConfig = true
+        resValues = true
     }
     //It does not seem possible to define dynamicFeatures dependent on variant
     //If you want to build intern variant, you need to include mlkit (+ at least one of ':mlkit_latn', ':mlkit_han', ':mlkit_deva', ':mlkit_jpan', ':mlkit_kore') and/or tesseract module
     dynamicFeatures = []
 
     lint {
-        abortOnError true
-        checkDependencies true
+        abortOnError = true
+        checkDependencies = true
         disable 'InvalidPackage', 'MissingQuantity', 'MissingTranslation', 'ImpliedQuantity', 'Instantiatable'
     }
 
@@ -141,7 +141,7 @@ android {
         }
     }
 
-    namespace 'org.totschnig.myexpenses'
+    namespace = 'org.totschnig.myexpenses'
 }
 
 kotlin.sourceSets.configureEach {
@@ -325,10 +325,10 @@ tasks.register('echoPublishTag') {
         def currentBranch = 'git branch --show-current'.execute().text.trim()
 
         if (currentBranch == 'master') {
-            println "git add metadata/*/changelogs/${versionCode}.txt"
-            println "git commit -m \"Release ${versionName}\""
+            println "git add metadata/*/changelogs/${rootProject.ext.versionCode}.txt"
+            println "git commit -m \"Release ${rootProject.ext.versionName}\""
             println "git push"
-            println "git tag r${versionCode}; git push origin r${versionCode}"
+            println "git tag r${rootProject.ext.versionCode}; git push origin r${rootProject.ext.versionCode}"
         } else {
             println "Release should be built on master, current branch is $currentBranch"
         }
