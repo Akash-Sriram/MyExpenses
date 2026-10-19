@@ -334,13 +334,13 @@ abstract class BaseTransactionProvider : ContentProvider() {
             KEY_DISPLAY_AMOUNT -> if (expandDisplayAmount)
                 "${getAmountHomeEquivalent(table, homeCurrency)} AS $it" else it
 
-            KEY_HAS_SEALED_DEBT -> "MAX(${checkForSealedDebt(table)})"
+            KEY_HAS_SEALED_DEBT -> "MAX(${checkForSealedDebt(table)}) AS $it"
             KEY_HAS_SEALED_ACCOUNT -> """
-                MAX(${checkForSealedAccount(table, TABLE_TRANSACTIONS, false)})
+                MAX(${checkForSealedAccount(table, TABLE_TRANSACTIONS, false)}) AS $it
                 """.trimIndent()
 
             KEY_HAS_SEALED_ACCOUNT_WITH_TRANSFER -> """
-                MAX(${checkForSealedAccount(table, TABLE_TRANSACTIONS, true)})
+                MAX(${checkForSealedAccount(table, TABLE_TRANSACTIONS, true)}) AS $it
                 """.trimIndent()
 
             KEY_AMOUNT_HOME_EQUIVALENT -> getAmountHomeEquivalent(table, homeCurrency) + " AS $it"

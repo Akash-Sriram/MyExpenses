@@ -75,6 +75,7 @@ class ManagePartiesTest {
             .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount)))
         clickMenu(R.id.SEARCH_COMMAND)
         onView(withId(androidx.appcompat.R.id.search_src_text)).perform(typeText("John"))
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
         ShadowLooper.idleMainLooper()
         onView(withId(R.id.list))
             .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount -1)))
