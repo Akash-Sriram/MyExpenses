@@ -11,16 +11,33 @@ import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.adevinta.android.barista.interaction.BaristaMenuClickInteractions.clickMenu
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.shadows.ShadowLooper
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.db2.requireParty
+import org.totschnig.myexpenses.provider.TransactionProvider
 
 @RunWith(AndroidJUnit4::class)
 class ManagePartiesTest {
     private lateinit var activityScenario: ActivityScenario<ManageParties>
     private var payee1 = "John Doe"
     private var payee2 = "Hinz Finz"
+
+    @Before
+    fun setUp() {
+        contentResolver.delete(TransactionProvider.PAYEES_URI, null, null)
+    }
+
+    @After
+    fun tearDown() {
+        if (::activityScenario.isInitialized) {
+            activityScenario.close()
+        }
+        contentResolver.delete(TransactionProvider.PAYEES_URI, null, null)
+    }
 
     private val contentResolver: ContentResolver
         get() = getInstrumentation().targetContext.contentResolver
@@ -58,6 +75,7 @@ class ManagePartiesTest {
             .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount)))
         clickMenu(R.id.SEARCH_COMMAND)
         onView(withId(androidx.appcompat.R.id.search_src_text)).perform(typeText("John"))
+        ShadowLooper.idleMainLooper()
         onView(withId(R.id.list))
             .check(ViewAssertions.matches(ViewMatchers.hasChildCount(expectedInitialCount -1)))
     }

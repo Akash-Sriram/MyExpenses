@@ -128,7 +128,7 @@ open class TransactionProvider : BaseTransactionProvider() {
           table = CTE_SEARCH
           CTE_SEARCH
         } else {
-          if (needsExtendedJoin(proj!!)) {
+          if (needsExtendedJoin(proj)) {
             exchangeRateJoin(table, KEY_ACCOUNTID, homeCurrency, table) + equivalentAmountJoin(homeCurrency)
           } else {
             table
@@ -714,7 +714,7 @@ open class TransactionProvider : BaseTransactionProvider() {
     }
 
     @Suppress("UNCHECKED_CAST")
-    c = qb!!.measureAndLogQuery(uri, db, proj, computeWhere(sel, additionalWhere.toString()), selArgs, groupBy, having, sOrder, limit, cte)
+    c = qb.measureAndLogQuery(uri, db, proj, computeWhere(sel, additionalWhere.toString()), selArgs, groupBy, having, sOrder, limit, cte)
 
     c = wrapWithResultCompat(c, extras)
 
@@ -1322,7 +1322,7 @@ open class TransactionProvider : BaseTransactionProvider() {
         val contentProviderOperation = operations[i]
         try {
           Timber.d("URI: %s", contentProviderOperation.uri)
-          @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+          @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS", "UNCHECKED_CAST")
           val result = contentProviderOperation.apply(this, results as Array<ContentProviderResult>, i)
           Timber.d("Result: %s", result)
           results[i] = result
@@ -1346,6 +1346,7 @@ open class TransactionProvider : BaseTransactionProvider() {
     }
   }
 
+  @Suppress("DEPRECATION")
   override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
     log("Call method: %s, arg: %s, extras: %s", method, arg, extras)
     when (method) {

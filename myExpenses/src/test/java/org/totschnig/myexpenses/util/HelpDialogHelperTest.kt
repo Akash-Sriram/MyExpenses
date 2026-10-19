@@ -169,6 +169,10 @@ class HelpDialogHelperTest(private val activity: Class<out ProtectedFragmentActi
                 HELP_VARIANT_PLANNER
             )
 
+            MyExpensesV2::class.java -> listOf(
+                "accounts", "transactions", "portfolio", "balanceSheet"
+            )
+
             else -> emptyList()
         }
 }

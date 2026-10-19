@@ -190,8 +190,6 @@ suspend fun Repository.loadBudgetProgress(budgetId: Long, period: Pair<Int, Int>
                         LocalDate.ofYearDay(info.year, 1),
                         LocalDate.of(info.year, 12, 31)
                     )
-
-                    else -> throw IllegalStateException()
                 },
                 description = grouping.getDisplayTitle(
                     context,

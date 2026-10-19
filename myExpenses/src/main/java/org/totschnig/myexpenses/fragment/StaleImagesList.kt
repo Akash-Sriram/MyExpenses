@@ -55,6 +55,7 @@ import org.totschnig.myexpenses.viewmodel.StaleImagesViewModel
 import org.totschnig.myexpenses.viewmodel.data.AttachmentInfo
 import javax.inject.Inject
 
+@Suppress("DEPRECATION")
 class StaleImagesList : ContextualActionBarFragment(), LoaderManager.LoaderCallbacks<Cursor> {
     private lateinit var adapter: SimpleCursorAdapter
     private var imagesCursor: Cursor? = null

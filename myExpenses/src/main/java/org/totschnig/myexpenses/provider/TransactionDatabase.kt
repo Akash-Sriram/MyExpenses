@@ -1001,18 +1001,16 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
                   .builder("templates LEFT JOIN payee ON payee_id = payee._id" +
               " LEFT JOIN accounts ON account_id = accounts._id" +
               " LEFT JOIN paymentmethods ON method_id = paymentmethods._id").columns(projection).create();
-          val c = db.query(q);
-          if (c != null) {
+          db.query(q).use { c ->
             if (c.moveToFirst()) {
               val templateValues = ContentValues()
               while (c.getPosition() < c.getCount()) {
                 templateValues.put("uuid", generateUuid());
-                var templateId = c.getLong(c.getColumnIndexOrThrow("_id"));
+                val templateId = c.getLong(c.getColumnIndexOrThrow("_id"));
                 db.update("templates", CONFLICT_NONE, templateValues, "_id = " + templateId, null);
                 c.moveToNext();
               }
             }
-            c.close();
           }
         }
       }
@@ -1028,14 +1026,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       }
 
       if (oldVersion < 51) {
-        var pictureDir = PictureDirHelper.getPictureDir(context, false);
-        //fallback if not mounted
-        if (pictureDir == null) {
-          pictureDir = File(
-              Environment.getExternalStorageDirectory().getPath() +
-                  "/Android/data/" + context.getPackageName() + "/files",
-              Environment.DIRECTORY_PICTURES);
-        }
+        val pictureDir = PictureDirHelper.getPictureDir(context, false);
         if (!pictureDir.exists()) {
           CrashHandler.report(Exception("Unable to calculate pictureDir during upgrade"));
         }

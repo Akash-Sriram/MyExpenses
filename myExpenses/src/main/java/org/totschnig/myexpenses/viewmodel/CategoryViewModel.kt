@@ -103,7 +103,7 @@ open class CategoryViewModel(
             true
         ).mapToResult(keepCriterion, withColors, idMapper)
             .map {
-                if (it is LoadingState.Data && effectiveOrder?.startsWith(KEY_LABEL) == true) {
+                if (it is LoadingState.Data && effectiveOrder.startsWith(KEY_LABEL)) {
                     LoadingState.Data(it.data.sortChildrenByLabelNaturalRecursive())
                 } else it
             }

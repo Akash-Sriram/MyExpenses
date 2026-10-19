@@ -59,6 +59,11 @@ class DistributionHelperTest {
         val mockPackageManager = Mockito.mock(PackageManager::class.java)
         Mockito.`when`(mockContext.packageManager).thenReturn(mockPackageManager)
         Mockito.`when`(mockContext.packageName).thenReturn(BuildConfig.APPLICATION_ID)
+        val mockInstallSourceInfo = Mockito.mock(android.content.pm.InstallSourceInfo::class.java)
+        Mockito.`when`(mockInstallSourceInfo.installingPackageName).thenReturn(installer)
+        Mockito.`when`(mockPackageManager.getInstallSourceInfo(BuildConfig.APPLICATION_ID))
+            .thenReturn(mockInstallSourceInfo)
+        @Suppress("DEPRECATION")
         Mockito.`when`(mockPackageManager.getInstallerPackageName(BuildConfig.APPLICATION_ID))
             .thenReturn(installer)
         return mockContext

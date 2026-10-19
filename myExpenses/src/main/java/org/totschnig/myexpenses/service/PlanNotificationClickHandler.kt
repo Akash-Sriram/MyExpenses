@@ -24,6 +24,7 @@ import java.time.Instant
 import javax.inject.Inject
 
 //TODO migrate to WorkManager
+@Suppress("DEPRECATION")
 class PlanNotificationClickHandler : IntentService("PlanNotificationClickHandler") {
 
     @Inject

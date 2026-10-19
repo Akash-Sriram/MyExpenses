@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package org.totschnig.myexpenses.util
 
 import android.content.Context

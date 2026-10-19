@@ -164,7 +164,7 @@ class ManageCategoriesViewModel(application: Application, savedStateHandle: Save
             queryParameter = type?.let { mapOf(KEY_TYPE to type.toString()) } ?: emptyMap(),
             projection = null,
             keepCriterion = if (normalizedFilter.isNullOrEmpty()) null else {
-                { Utils.normalize(it.label)?.contains(normalizedFilter) == true }
+                { Utils.normalize(it.label).contains(normalizedFilter) }
             },
             withColors = false
         )

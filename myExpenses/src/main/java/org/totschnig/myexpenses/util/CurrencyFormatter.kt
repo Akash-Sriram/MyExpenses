@@ -75,9 +75,9 @@ open class CurrencyFormatter(
     }
 
     private fun notifyUris(contentResolver: ContentResolver) {
-        contentResolver.notifyChange(TransactionProvider.TEMPLATES_URI, null, false)
-        contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, false)
-        contentResolver.notifyChange(TransactionProvider.ACCOUNTS_URI, null, false)
+        contentResolver.notifyChange(TransactionProvider.TEMPLATES_URI, null, 0)
+        contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, 0)
+        contentResolver.notifyChange(TransactionProvider.ACCOUNTS_URI, null, 0)
     }
 
     /**

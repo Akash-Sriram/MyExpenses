@@ -6,6 +6,7 @@ import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.text.method.LinkMovementMethod
 import android.view.LayoutInflater
 import android.view.Menu
@@ -170,7 +171,7 @@ class PlannerFragment : DialogViewBinding<PlannerFragmentBinding>() {
         }
     }
 
-    inner class StateObserver : ContentObserver(Handler()) {
+    inner class StateObserver : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean, uri: Uri?) {
             Timber.d("received state change for uri: %s", uri)
             uri?.let { viewModel.getUpdateFor(it) }

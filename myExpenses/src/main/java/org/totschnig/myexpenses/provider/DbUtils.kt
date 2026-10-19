@@ -40,7 +40,7 @@ object DbUtils {
                     app.contentResolver.acquireContentProviderClient(TransactionProvider.AUTHORITY)!!
                 val provider = client.localContentProvider as TransactionProvider
                 provider.restore(backupFile, encrypt)
-                client.release()
+                client.close()
                 true
             } else false
         } catch (e: Exception) {

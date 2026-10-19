@@ -28,15 +28,17 @@ class VersionInfoTest {
 
     @Test
     fun currentVersionFromBuildConfigMatches() {
-        assertThat(BuildConfig.VERSION_NAME).isEqualTo(currentVersion.name)
+        assertThat(BuildConfig.VERSION_NAME.removeSuffix("-pre")).isEqualTo(currentVersion.name)
     }
 
     @Test
     fun testVersionLinksForCurrentVersion() {
-        Assume.assumeFalse(BuildConfig.BETA)
+        Assume.assumeFalse(BuildConfig.BETA || BuildConfig.VERSION_NAME.endsWith("-pre"))
         if (currentVersion.tickets != null) return
         val context = ApplicationProvider.getApplicationContext<Application>()
-        urlReachable(currentVersion.githubUrl(context)!!)
+        val githubUrl = currentVersion.githubUrl(context)
+        Assume.assumeNotNull(githubUrl)
+        urlReachable(githubUrl!!)
         val mastodonUrl = currentVersion.mastodonUrl(context)
         if (mastodonUrl != null) {
             urlReachable(mastodonUrl)

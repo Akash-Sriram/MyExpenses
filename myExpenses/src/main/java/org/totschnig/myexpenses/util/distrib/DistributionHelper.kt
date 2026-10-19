@@ -45,7 +45,16 @@ object DistributionHelper {
      */
     @JvmStatic
     fun getVersionInfo(ctx: Context): String {
-        val installer = ctx.packageManager.getInstallSourceInfo(ctx.packageName).installingPackageName
+        val installer = try {
+            ctx.packageManager.getInstallSourceInfo(ctx.packageName).installingPackageName
+        } catch (_: Exception) {
+            try {
+                @Suppress("DEPRECATION")
+                ctx.packageManager.getInstallerPackageName(ctx.packageName)
+            } catch (_: Exception) {
+                null
+            }
+        }
         return "${BuildConfig.VERSION_NAME} ($versionNumber) $buildDateFormatted $distributionAsString $installer"
     }
 

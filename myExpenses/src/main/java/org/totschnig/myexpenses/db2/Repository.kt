@@ -61,10 +61,12 @@ open class Repository @Inject constructor(
 
     val contentResolver: ContentResolver = context.contentResolver
 
+    @Suppress("DEPRECATION")
     fun bulkStart() {
         contentResolver.call(TRANSACTIONS_URI, TransactionProvider.METHOD_BULK_START, null, null)
     }
 
+    @Suppress("DEPRECATION")
     fun bulkEnd() {
         contentResolver.call(TRANSACTIONS_URI, TransactionProvider.METHOD_BULK_END, null, null)
     }

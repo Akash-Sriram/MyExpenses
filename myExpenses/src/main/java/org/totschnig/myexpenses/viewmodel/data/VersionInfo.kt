@@ -187,6 +187,10 @@ class VersionInfo(val code: Int, val name: String, val tickets: String? = null) 
                 // @formatter:on
             )
 
+            "413" -> arrayOf(
+                "Pure Kotlin Migration & Performance Optimizations"
+            )
+
             else -> {
                 //noinspection DiscouragedApi
                 val resId = res.getIdentifier(

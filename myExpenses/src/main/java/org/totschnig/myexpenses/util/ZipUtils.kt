@@ -125,7 +125,7 @@ object ZipUtils {
             if (!canonicalPath.startsWith(dirOut.canonicalPath)) {
                 throw SecurityException("Path Traversal Vulnerability")
             }
-            newFile.parentFile.mkdirs()
+            newFile.parentFile?.mkdirs()
             if (ze.isDirectory) {
                 newFile.mkdir()
             } else {

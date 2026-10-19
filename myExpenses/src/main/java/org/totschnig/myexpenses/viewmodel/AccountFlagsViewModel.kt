@@ -163,7 +163,7 @@ class AccountFlagsViewModel(application: Application) : ContentResolvingAndroidV
         viewModelScope.launch(coroutineDispatcher) {
             repository.saveSelectedAccountsForFlag(currentSelectionFlag.id, selected)
             repository.saveSelectedAccountsForFlag(DEFAULT_FLAG_ID, unselectedIds)
-            contentResolver.notifyChange(ACCOUNT_FLAGS_URI, null, false)
+            contentResolver.notifyChange(ACCOUNT_FLAGS_URI, null, 0)
          }
     }
 

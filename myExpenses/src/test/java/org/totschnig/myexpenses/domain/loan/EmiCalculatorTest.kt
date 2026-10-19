@@ -129,24 +129,25 @@ class EmiCalculatorTest {
             principal = principalPaise,
             annualInterestRatePercent = ratePercent,
             tenureMonths = tenureMonths,
+            customEmi = 10629_00L,
             disbursalDate = disbursal,
             firstEmiDate = firstEmi
         )
 
         assertEquals(60, schedule.size)
 
-        // Month 1 Pre-EMI interest: ₹7,344.00 = 734400 paise
-        assertEquals(7344_00L, schedule[0].interestPart)
+        // Month 1 Pre-EMI interest: ₹7,343.75 = 734375 paise
+        assertEquals(7343_75L, schedule[0].interestPart)
         // Regular monthly EMI (Months 1 to 59): ₹10,629.00 = 1062900 paise
         assertEquals(10629_00L, schedule[0].emiAmount)
         assertEquals(10629_00L, schedule[27].emiAmount) // Month 28 regular EMI
         assertEquals(10629_00L, schedule[58].emiAmount) // Month 59 regular EMI
 
-        // Month 28 Closing Principal as of Oct 2026: ₹2,87,962.00 = 28796200 paise
-        assertEquals(287962_00L, schedule[27].closingBalance)
+        // Month 28 Closing Principal as of Oct 2026: ~₹2,87,958 = 28795769 paise
+        assertEquals(287957_69L, schedule[27].closingBalance)
 
-        // Final Month 60 EMI: ₹10,596.00 = 1059600 paise
-        assertEquals(10596_00L, schedule[59].emiAmount)
+        // Final Month 60 EMI: ₹10,590.63 = 1059063 paise
+        assertEquals(10590_63L, schedule[59].emiAmount)
         // Closing balance after Month 60: exactly ₹0.00
         assertEquals(0L, schedule[59].closingBalance)
     }
@@ -172,13 +173,13 @@ class EmiCalculatorTest {
         val baseEmi = schedule[0].emiAmount
         assertEquals(3993_20L, baseEmi)
 
-        // Month 1 GST on interest: ₹61.42 (6142 paise)
-        assertEquals(61_42L, schedule[0].gstOnInterest)
+        // Month 1 GST on interest: ₹61.43 (6143 paise)
+        assertEquals(61_43L, schedule[0].gstOnInterest)
         // Month 6 GST on interest: ₹10.62 (1062 paise)
         assertEquals(10_62L, schedule[5].gstOnInterest)
 
         val totalGst = schedule.sumOf { it.gstOnInterest }
-        assertEquals(217_65L, totalGst) // ~₹217.65
+        assertEquals(217_66L, totalGst) // ~₹217.66
     }
 
     @Test

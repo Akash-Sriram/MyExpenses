@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package org.totschnig.myexpenses.util
 
 import android.annotation.SuppressLint
@@ -316,7 +318,7 @@ object Utils {
     fun escapeSqlLikeExpression(str: String?): String {
         if (str == null) return ""
         return str
-            .replace(LIKE_ESCAPE_CHAR.toString(), "$LIKE_ESCAPE_CHAR$LIKE_ESCAPE_CHAR")
+            .replace(LIKE_ESCAPE_CHAR, "$LIKE_ESCAPE_CHAR$LIKE_ESCAPE_CHAR")
             .replace("%", "$LIKE_ESCAPE_CHAR%")
             .replace("_", "${LIKE_ESCAPE_CHAR}_")
     }
@@ -403,7 +405,7 @@ object Utils {
 
     private fun scaledBitmap(ctx: Context, icon: Int): Bitmap {
         val drawable = InsetDrawable(UiUtils.getTintedDrawableForContext(ctx, icon), 0, 20, 0, 0)
-        val bitmap = UiUtils.drawableToBitmap(drawable!!)
+        val bitmap = UiUtils.drawableToBitmap(drawable)
         return Bitmap.createScaledBitmap(bitmap, (bitmap.width * 0.5).toInt(), (bitmap.height * 0.5).toInt(), true)
     }
 

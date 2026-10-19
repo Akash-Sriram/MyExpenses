@@ -120,11 +120,14 @@ fun Repository.ensureCategoryTree(categoryExport: CategoryExport): Int {
     })!!.getInt(KEY_COUNT)
 }
 
-fun Repository.ensureCategory(categoryInfo: CategoryInfo, parentId: Long?) =
-    contentResolver.call(DUAL_URI, METHOD_ENSURE_CATEGORY, null, Bundle().apply {
+@Suppress("UNCHECKED_CAST")
+fun Repository.ensureCategory(categoryInfo: CategoryInfo, parentId: Long?): Pair<Long, Boolean> {
+    val bundle = contentResolver.call(DUAL_URI, METHOD_ENSURE_CATEGORY, null, Bundle().apply {
         putParcelable(KEY_CATEGORY_INFO, categoryInfo)
         parentId?.let { putLong(KEY_PARENTID, it) }
-    })!!.getSerializable(KEY_RESULT) as Pair<Long, Boolean>
+    })!!
+    return androidx.core.os.BundleCompat.getSerializable(bundle, KEY_RESULT, Pair::class.java) as Pair<Long, Boolean>
+}
 
 fun Repository.getCategoryPath(id: Long) = contentResolver.query(
     ContentUris.withAppendedId(BaseTransactionProvider.CATEGORY_TREE_URI, id),
