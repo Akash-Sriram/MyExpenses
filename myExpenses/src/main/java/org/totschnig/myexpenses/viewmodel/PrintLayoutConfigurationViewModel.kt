@@ -11,6 +11,7 @@ import androidx.compose.ui.util.fastForEachReversed
 import androidx.lifecycle.AndroidViewModel
 import com.livefront.sealedenum.GenSealedEnum
 import kotlinx.coroutines.delay
+import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 import org.totschnig.myexpenses.R
@@ -63,7 +64,8 @@ sealed class SimpleField(@StringRes val label: Int) : Field() {
 @Parcelize
 @Serializable
 data object Date : SimpleField(R.string.date) {
-    const val KEY_IS_TIME_FIELD = "isTimeField"
+    @IgnoredOnParcel
+    val KEY_IS_TIME_FIELD = "isTimeField"
     override fun toString(context: Context, extra: Bundle?): String {
         val isTimeField = extra?.getBoolean(KEY_IS_TIME_FIELD) == true
         return if (isTimeField) context.getString(R.string.time) else super.toString(context, extra)

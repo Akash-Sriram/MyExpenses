@@ -363,7 +363,7 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                 ) {
                     val format = prefHandler.enumValueOrDefault(
                         PrefKey.OPTIMIZE_PICTURE_FORMAT,
-                        Bitmap.CompressFormat.WEBP
+                        Bitmap.CompressFormat.WEBP_LOSSY
                     )
 
                     val homeUri = PictureDirHelper.getOutputMediaUri(

@@ -264,9 +264,9 @@ open class ContentResolvingAndroidViewModel(application: Application) :
                     DeleteState.DeleteProgress(success + failure, idsToDelete.size)
                 }
             }
-            contentResolver.notifyChange(TRANSACTIONS_URI, null, true)
-            contentResolver.notifyChange(ACCOUNTS_URI, null, false)
-            contentResolver.notifyChange(DEBTS_URI, null, false)
+            contentResolver.notifyChange(TRANSACTIONS_URI, null, ContentResolver.NOTIFY_SYNC_TO_NETWORK)
+            contentResolver.notifyChange(ACCOUNTS_URI, null, 0)
+            contentResolver.notifyChange(DEBTS_URI, null, 0)
             bulkDeleteStateInternal.update {
                 DeleteState.DeleteComplete(success, failure)
             }

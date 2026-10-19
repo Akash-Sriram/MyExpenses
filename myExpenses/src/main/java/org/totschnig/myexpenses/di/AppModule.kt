@@ -45,7 +45,7 @@ open class AppModule {
     open fun provideTracker(): Tracker = try {
         Class.forName(
             "org.totschnig.myexpenses.util.tracking.PlatformTracker"
-        ).newInstance() as Tracker
+        ).getDeclaredConstructor().newInstance() as Tracker
     } catch (_: Exception) {
         NoOpTracker
     }

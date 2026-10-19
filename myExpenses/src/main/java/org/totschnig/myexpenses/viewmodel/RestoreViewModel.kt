@@ -300,12 +300,11 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                     //
                     //we open the backup file and read every entry
                     //getSharedPreferences does not allow to access file if it not in private data directory
-                    //hence we copy it there first
-                    //upon application install does not exist yet
-                    application.settings
-                        .unregisterOnSharedPreferenceChangeListener(application)
-                    val edit = application.settings.edit()
-                    application.settings.all.forEach {
+                    @Suppress("DEPRECATION")
+                    val settings = application.settings
+                    settings.unregisterOnSharedPreferenceChangeListener(application)
+                    val edit = settings.edit()
+                    settings.all.forEach {
                         val key = it.key
                         if (key != prefHandler.getKey(PrefKey.NEW_LICENCE) && key != prefHandler.getKey(
                                 PrefKey.LICENCE_EMAIL
@@ -374,6 +373,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                         R.string.restore_calendar_success,
                         restorePlanner()
                     )
+                    @Suppress("DEPRECATION")
                     application.settings
                         .registerOnSharedPreferenceChangeListener(application)
                     Timber.i("now emptying event cache")
@@ -482,6 +482,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
             TransactionProvider.ACCOUNTS_URI, projection,
             "$KEY_SYNC_ACCOUNT_NAME IS NOT null", null, null
         )?.use {
+            @Suppress("DEPRECATION")
             val sharedPreferences = application.settings
             val editor = sharedPreferences.edit()
             if (it.moveToFirst()) {
@@ -532,7 +533,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
     }
 
     private fun registerAsStale(secure: Boolean) {
-        val dir = PictureDirHelper.getPictureDir(getApplication(), secure) ?: return
+        val dir = PictureDirHelper.getPictureDir(getApplication(), secure)
         val files = dir.listFiles() ?: return
         val values = ContentValues(1)
         for (file: File in files) {

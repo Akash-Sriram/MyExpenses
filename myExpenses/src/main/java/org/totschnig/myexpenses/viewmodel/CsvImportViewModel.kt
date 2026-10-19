@@ -3,7 +3,7 @@ package org.totschnig.myexpenses.viewmodel
 import android.app.Application
 import android.net.Uri
 import android.os.Bundle
-import androidx.core.os.bundleOf
+
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.liveData
@@ -25,7 +25,7 @@ import java.io.InputStreamReader
 
 data class AccountConfiguration(val id: Long, val currency: String, val type: AccountType)
 
-private fun BooleanArray.saveSelection() = bundleOf("selection" to this)
+private fun BooleanArray.saveSelection() = Bundle(1).apply { putBooleanArray("selection", this@saveSelection) }
 
 private fun Bundle.restoreSelection() = getBooleanArray("selection")
 
@@ -133,12 +133,13 @@ class CsvImportViewModel(application: Application, val savedStateHandle: SavedSt
     private fun doParse(uri: Uri, delimiter: Char, encoding: String, fromProcessDeath: Boolean = false) =
         contentResolver.openInputStream(uri)?.use {
             setDataInternal(
-                CSVFormat.DEFAULT.withDelimiter(delimiter)
+                CSVFormat.DEFAULT.builder().setDelimiter(delimiter).get()
                     .parse(InputStreamReader(it, encoding)).records,
                 fromProcessDeath
             )
         }
 
+    @Suppress("DEPRECATION")
     fun importData(
         data: List<CSVRecord>,
         columnToFieldMap: IntArray,

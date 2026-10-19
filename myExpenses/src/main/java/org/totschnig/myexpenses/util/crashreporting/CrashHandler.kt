@@ -75,7 +75,7 @@ abstract class BaseCrashHandler(val prefHandler: PrefHandler): CrashHandler {
 
     open fun setKeys(context: Context) {
         putCustomData("Distribution", getVersionInfo(context))
-        context.packageManager.getInstallerPackageName(context.packageName)?.let {
+        context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName?.let {
             putCustomData("Installer", it)
         }
         putCustomData("Locale", Locale.getDefault().toString())

@@ -106,6 +106,7 @@ class PriceCalculationViewModel(application: Application, val savedStateHandle: 
         accountId: Long? = null,
     ): Pair<Int, Int> =
         withContext(coroutineContext()) {
+            @Suppress("UNCHECKED_CAST")
             contentResolver.call(
                 TransactionProvider.DUAL_URI,
                 TransactionProvider.METHOD_RECALCULATE_EQUIVALENT_AMOUNTS, null,
@@ -113,6 +114,6 @@ class PriceCalculationViewModel(application: Application, val savedStateHandle: 
                     putString(KEY_CURRENCY, newHomeCurrency)
                     accountId?.let { putLong(KEY_ACCOUNTID, it) }
                 }
-            )!!.getSerializable(TransactionProvider.KEY_RESULT) as Pair<Int, Int>
+            )!!.getSerializable(TransactionProvider.KEY_RESULT, Pair::class.java) as Pair<Int, Int>
         }
 }

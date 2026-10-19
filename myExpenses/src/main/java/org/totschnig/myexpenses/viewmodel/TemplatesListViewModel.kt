@@ -124,7 +124,7 @@ class TemplatesListViewModel(application: Application) :
 
     override fun deleteTransactions(ids: LongArray, markAsVoid: Boolean) {
         super.deleteTransactions(ids, markAsVoid)
-        contentResolver.notifyChange(PLAN_INSTANCE_STATUS_URI, null, false)
+        contentResolver.notifyChange(PLAN_INSTANCE_STATUS_URI, null, 0)
     }
 
     fun relink(instance: PlanInstanceInfo, adjustDate: Boolean) {

@@ -75,7 +75,7 @@ class ExportViewModel(application: Application) : ContentResolvingAndroidViewMod
 
     fun startExport(args: Bundle) {
         viewModelScope.launch(coroutineDispatcher) {
-            val format: ExportFormat = args.getSerializable(KEY_FORMAT) as ExportFormat
+            val format: ExportFormat = args.getSerializable(KEY_FORMAT, ExportFormat::class.java)!!
             _result.update {
                 format to buildList {
 

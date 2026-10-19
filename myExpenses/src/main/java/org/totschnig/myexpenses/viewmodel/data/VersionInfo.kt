@@ -148,14 +148,14 @@ class VersionInfo(val code: Int, val name: String, val tickets: String? = null) 
 
             "399" -> arrayOf(
                 t(R.string.whats_new_399),
-                "${t(R.string.pref_translation_title)} : ${Locale("bn").displayLanguage}"
+                "${t(R.string.pref_translation_title)} : ${Locale.forLanguageTag("bn").displayLanguage}"
             )
 
             "400" -> arrayOf(
                 t(R.string.whats_new_400_1),
                 t(R.string.whats_new_400_2),
-                "${t(R.string.pref_translation_title)} : ${Locale("th").displayLanguage}",
-                "${t(R.string.pref_translation_title)} : ${Locale("be").displayLanguage}"
+                "${t(R.string.pref_translation_title)} : ${Locale.forLanguageTag("th").displayLanguage}",
+                "${t(R.string.pref_translation_title)} : ${Locale.forLanguageTag("be").displayLanguage}"
             )
 
             "401" -> arrayOf(
@@ -173,11 +173,11 @@ class VersionInfo(val code: Int, val name: String, val tickets: String? = null) 
             )
 
             "408" -> arrayOf(
-                "${t(R.string.pref_translation_title)} : ${Locale("sv").displayLanguage}"
+                "${t(R.string.pref_translation_title)} : ${Locale.forLanguageTag("sv").displayLanguage}"
             )
 
             "409" -> arrayOf(
-                "${t(R.string.pref_translation_title)} : ${Locale("id").displayLanguage}"
+                "${t(R.string.pref_translation_title)} : ${Locale.forLanguageTag("id").displayLanguage}"
             )
 
             "412" -> arrayOf(

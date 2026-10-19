@@ -394,12 +394,13 @@ class ManageCategoriesViewModel(application: Application, savedStateHandle: Save
     fun importCats() {
         viewModelScope.launch(context = coroutineContext()) {
             _importResult.update {
+                @Suppress("UNCHECKED_CAST")
                 contentResolver.call(
                     TransactionProvider.DUAL_URI,
                     TransactionProvider.METHOD_SETUP_CATEGORIES,
                     null,
                     null
-                )?.getSerializable(TransactionProvider.KEY_RESULT) as? Pair<Int, Int> ?: (0 to 0)
+                )?.getSerializable(TransactionProvider.KEY_RESULT, Pair::class.java) as? Pair<Int, Int> ?: (0 to 0)
             }
         }
     }

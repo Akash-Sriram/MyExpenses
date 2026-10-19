@@ -162,6 +162,7 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
         setupLogging()
         if (!syncService) {
             ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+            @Suppress("DEPRECATION")
             settings.registerOnSharedPreferenceChangeListener(this)
             register(this)
         }
@@ -369,7 +370,7 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
             contentResolver,
             DataBaseAccount.AGGREGATE_HOME_CURRENCY_CODE
         )
-        contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, false)
+        contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, 0)
     }
 
     companion object {

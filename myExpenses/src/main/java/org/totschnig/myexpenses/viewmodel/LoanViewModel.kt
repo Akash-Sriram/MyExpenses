@@ -32,7 +32,9 @@ import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.util.ExchangeRateHandler
 import org.totschnig.myexpenses.viewmodel.data.AccountMinimal
 import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel(application) {
 
     @Inject

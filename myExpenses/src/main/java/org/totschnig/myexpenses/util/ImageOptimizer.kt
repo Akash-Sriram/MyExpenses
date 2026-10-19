@@ -24,7 +24,7 @@ object ImageOptimizer {
         contentResolver: ContentResolver,
         inputUri: Uri,
         outputUri: Uri,
-        compressFormat: Bitmap.CompressFormat = Bitmap.CompressFormat.WEBP,
+        compressFormat: Bitmap.CompressFormat = Bitmap.CompressFormat.WEBP_LOSSY,
         maxWidth: Int = 1000,
         maxHeight: Int = 1000,
         quality: Int = 80
