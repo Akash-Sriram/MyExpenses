@@ -206,7 +206,7 @@ object QifUtils {
                     val formatter = NumberFormat.getNumberInstance()
                     result = try {
                         val num = formatter.parse(sMoney)
-                        BigDecimal.valueOf(num.toFloat().toDouble())
+                        if (num != null) BigDecimal.valueOf(num.toDouble()) else BigDecimal.ZERO
                     } catch (_: ParseException) {
                         BigDecimal(0)
                     }

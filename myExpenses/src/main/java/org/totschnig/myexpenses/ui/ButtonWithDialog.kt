@@ -47,6 +47,7 @@ abstract class ButtonWithDialog<T: DialogFragment> @JvmOverloads constructor(
 
     abstract fun attachListener(dialogFragment: T)
 
+    @Suppress("UNCHECKED_CAST")
     private fun reAttachListener(supportFragmentManager: FragmentManager) {
         (supportFragmentManager.findFragmentByTag(fragmentTag) as? T)?.apply {
             attachListener(this)

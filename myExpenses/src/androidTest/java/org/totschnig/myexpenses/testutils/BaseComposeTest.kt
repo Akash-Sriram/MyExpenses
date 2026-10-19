@@ -20,7 +20,7 @@ abstract class BaseComposeTest<A : ProtectedFragmentActivity> : BaseUiTest<A>() 
         get() = composeTestRule.onNodeWithTag(TEST_TAG_LIST, useUnmergedTree = true)
 
     @get:Rule
-    val composeTestRule = createEmptyComposeRule()
+    val composeTestRule = androidx.compose.ui.test.junit4.v2.createEmptyComposeRule()
 
     fun assertTextAtPosition(
         text: String,

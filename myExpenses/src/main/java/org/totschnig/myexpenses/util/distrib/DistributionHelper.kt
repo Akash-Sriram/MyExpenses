@@ -49,7 +49,6 @@ object DistributionHelper {
             ctx.packageManager.getInstallSourceInfo(ctx.packageName).installingPackageName
         } catch (_: Exception) {
             try {
-                @Suppress("DEPRECATION")
                 ctx.packageManager.getInstallerPackageName(ctx.packageName)
             } catch (_: Exception) {
                 null

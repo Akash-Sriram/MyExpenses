@@ -97,8 +97,8 @@ class SelectivePieChartRenderer(
 
                 if (selector.shouldDrawEntry(j, entry, value)) {
                     val entryLabel = entry.label
-                    val sliceXBase = cos(transformedAngle * Utils.FDEG2RAD).toFloat()
-                    val sliceYBase = sin(transformedAngle * Utils.FDEG2RAD).toFloat()
+                    val sliceXBase = cos(transformedAngle * Utils.FDEG2RAD)
+                    val sliceYBase = sin(transformedAngle * Utils.FDEG2RAD)
 
                     val drawXOutside = drawEntryLabels &&
                             xValuePosition == PieDataSet.ValuePosition.OUTSIDE_SLICE
@@ -122,7 +122,7 @@ class SelectivePieChartRenderer(
 
                         val polyline2Width = if (dataSet.isValueLineVariableLength)
                             labelRadius * valueLineLength2 *
-                                    abs(sin(transformedAngle * Utils.FDEG2RAD)).toFloat()
+                                    abs(sin(transformedAngle * Utils.FDEG2RAD))
                         else labelRadius * valueLineLength2
 
                         val pt0x = line1Radius * sliceXBase + center.x

@@ -41,7 +41,7 @@ import java.time.LocalDateTime
 @TestShard1
 class DistributionTest : BaseUiTest<DistributionActivity>() {
     @get:Rule
-    val composeTestRule = createEmptyComposeRule()
+    val composeTestRule = androidx.compose.ui.test.junit4.v2.createEmptyComposeRule()
 
     private lateinit var account: Account
 

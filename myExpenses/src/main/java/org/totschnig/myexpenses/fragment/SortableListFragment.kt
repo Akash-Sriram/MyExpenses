@@ -15,6 +15,7 @@ abstract class SortableListFragment : ContextualActionBarFragment() {
     @Inject
     lateinit var prefHandler: PrefHandler
 
+    @Deprecated("Deprecated in Java")
     override fun onPrepareOptionsMenu(@NonNull menu: Menu) {
         val menuItem = menu.findItem(R.id.SORT_COMMAND)
         menuItem?.subMenu?.findItem(getCurrentSortOrder().commandId)?.isChecked = true

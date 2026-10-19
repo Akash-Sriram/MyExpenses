@@ -21,7 +21,7 @@ class OcrResultTest {
         val result = Parcel.obtain().run {
             unmarshall(serializedBytes, 0, serializedBytes.size)
             setDataPosition(0)
-            readParcelable<OcrResult>(OcrResult::class.java.classLoader)
+            androidx.core.os.ParcelCompat.readParcelable(this, OcrResult::class.java.classLoader, OcrResult::class.java)
         }
         assertEquals(ocrResult, result)
     }
@@ -36,7 +36,7 @@ class OcrResultTest {
         val result = Parcel.obtain().run {
             unmarshall(serializedBytes, 0, serializedBytes.size)
             setDataPosition(0)
-            readParcelable<OcrResultFlat>(OcrResultFlat::class.java.classLoader)
+            androidx.core.os.ParcelCompat.readParcelable(this, OcrResultFlat::class.java.classLoader, OcrResultFlat::class.java)
         }
         assertEquals(ocrResult, result)
     }

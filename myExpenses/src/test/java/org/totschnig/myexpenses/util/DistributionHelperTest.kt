@@ -63,7 +63,6 @@ class DistributionHelperTest {
         Mockito.`when`(mockInstallSourceInfo.installingPackageName).thenReturn(installer)
         Mockito.`when`(mockPackageManager.getInstallSourceInfo(BuildConfig.APPLICATION_ID))
             .thenReturn(mockInstallSourceInfo)
-        @Suppress("DEPRECATION")
         Mockito.`when`(mockPackageManager.getInstallerPackageName(BuildConfig.APPLICATION_ID))
             .thenReturn(installer)
         return mockContext

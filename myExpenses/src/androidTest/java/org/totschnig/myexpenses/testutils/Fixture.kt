@@ -147,7 +147,7 @@ class Fixture(inst: Instrumentation) {
             openingBalance = 50000,
             description = formatter.format(LocalDate.now()),
             type = accountTypeCash,
-            color = testContext.resources.getColor(RT.color.material_red),
+            color = androidx.core.content.ContextCompat.getColor(testContext, RT.color.material_red),
             syncAccountName = syncAccount2
         ).createIn(repository)
         repository.storeExchangeRate(
@@ -162,7 +162,7 @@ class Fixture(inst: Instrumentation) {
             openingBalance = 200000,
             description = appContext.getString(R.string.testData_account3Description),
             type = accountTypeBank,
-            color = testContext.resources.getColor(RT.color.material_blue),
+            color = androidx.core.content.ContextCompat.getColor(testContext, RT.color.material_blue),
             grouping = Grouping.DAY,
             syncAccountName = syncAccount3
         ).createIn(repository)
@@ -170,7 +170,7 @@ class Fixture(inst: Instrumentation) {
             label = appContext.getString(R.string.testData_account3Description),
             currency = foreignCurrency.code,
             type = accountTypeCard,
-            color = testContext.resources.getColor(RT.color.material_cyan)
+            color = androidx.core.content.ContextCompat.getColor(testContext, RT.color.material_cyan)
         ).createIn(repository)
 
         val johnDoe = appContext.getString(R.string.testData_templatePayee)
@@ -461,14 +461,17 @@ class Fixture(inst: Instrumentation) {
 
     companion object {
         fun setUpCategories(contentResolver: ContentResolver) {
-            val integerIntegerPair = contentResolver
+            val bundle = contentResolver
                 .call(
                     TransactionProvider.DUAL_URI,
                     TransactionProvider.METHOD_SETUP_CATEGORIES,
                     null,
                     null
-                )!!.getSerializable(TransactionProvider.KEY_RESULT) as Pair<Int, Int>?
-            Timber.d("Set up %d categories", integerIntegerPair!!.first)
+                )
+            val integerIntegerPair = bundle?.let {
+                androidx.core.os.BundleCompat.getSerializable(it, TransactionProvider.KEY_RESULT, Pair::class.java)
+            }
+            Timber.d("Set up %s categories", integerIntegerPair?.first ?: 0)
         }
     }
 }

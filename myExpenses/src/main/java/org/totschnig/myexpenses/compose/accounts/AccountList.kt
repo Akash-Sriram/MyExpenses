@@ -245,8 +245,8 @@ fun AccountListV2(
     val grouped: Map<AccountGroupingKey, List<FullAccount>> =
         accountData.groupBy { grouping.getGroupKey(it) }
 
-    val sortedGroupKeys = remember(grouped, grouping) {
-        grouped.keys.sortedWith(grouping.comparator as Comparator<in AccountGroupingKey>)
+    val sortedGroupKeys = remember(accountData, grouping) {
+        grouping.sortedGroupKeys(accountData)
     }
 
     val layoutDirection = LocalLayoutDirection.current

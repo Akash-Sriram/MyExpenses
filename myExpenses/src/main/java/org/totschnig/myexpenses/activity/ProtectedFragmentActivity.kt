@@ -67,7 +67,7 @@ abstract class ProtectedFragmentActivity : BaseActivity(),
 
     override fun attachBaseContext(newBase: Context?) {
         super.attachBaseContext(newBase)
-        val application = MyApplication.instance
+        val application = (newBase?.applicationContext as? MyApplication) ?: return
         val customFontScale = application.appComponent.prefHandler().getInt(UI_FONT_SIZE, 0)
         if (customFontScale > 0) {
             val config = Configuration()
@@ -122,13 +122,13 @@ abstract class ProtectedFragmentActivity : BaseActivity(),
     }
 
     @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
-        super.onActivityResult(requestCode, resultCode, intent)
-        if (resultCode == RESULT_OK && requestCode == CALCULATOR_REQUEST && intent != null) {
-            val target = findViewById<View>(intent.getIntExtra(CalculatorInput.EXTRA_KEY_INPUT_ID, 0))
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK && requestCode == CALCULATOR_REQUEST && data != null) {
+            val target = findViewById<View>(data.getIntExtra(CalculatorInput.EXTRA_KEY_INPUT_ID, 0))
             if (target is AmountInput) {
-                target.setAmount(BigDecimal(intent.getStringExtra(KEY_AMOUNT)), false, false)
+                target.setAmount(BigDecimal(data.getStringExtra(KEY_AMOUNT)), false, false)
             } else {
                 showSnackBar("CALCULATOR_REQUEST launched with incorrect EXTRA_KEY_INPUT_ID")
             }

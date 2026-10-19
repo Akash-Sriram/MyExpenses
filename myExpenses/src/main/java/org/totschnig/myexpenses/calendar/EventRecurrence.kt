@@ -190,7 +190,7 @@ class EventRecurrence {
 
         private fun arraysEqual(array1: IntArray?, count1: Int, array2: IntArray?, count2: Int): Boolean {
             if (count1 != count2) return false
-            if (array1 == null || array2 == null) return array1 == array2
+            if (array1 == null || array2 == null) return array1 === array2
             for (i in 0 until count1) {
                 if (array1[i] != array2[i]) return false
             }

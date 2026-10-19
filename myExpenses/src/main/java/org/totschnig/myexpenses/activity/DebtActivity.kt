@@ -3,9 +3,13 @@ package org.totschnig.myexpenses.activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ShareCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.dialog.DebtDetailsDialogFragment
 import org.totschnig.myexpenses.dialog.MessageDialogFragment
@@ -24,25 +28,23 @@ abstract class DebtActivity : ProtectedFragmentActivity() {
 
     protected abstract val debtViewModel: DebtViewModel
 
+    private val debtEditLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_FIRST_USER) {
+            showSnackBar(R.string.object_sealed_debt)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         injector.inject(debtViewModel)
     }
 
     fun editDebt(debt: DisplayDebt) {
-        startActivityForResult(Intent(this, DebtEdit::class.java).apply {
+        debtEditLauncher.launch(Intent(this, DebtEdit::class.java).apply {
             putExtra(KEY_PAYEEID, debt.payeeId)
             putExtra(KEY_PAYEE_NAME, debt.payeeName)
             putExtra(KEY_DEBT_ID, debt.id)
-        }, DEBT_EDIT_REQUEST)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == DEBT_EDIT_REQUEST && resultCode == RESULT_FIRST_USER) {
-            showSnackBar(R.string.object_sealed_debt)
-        }
+        })
     }
 
     fun toggleDebt(debt: DisplayDebt) {
@@ -122,8 +124,10 @@ abstract class DebtActivity : ProtectedFragmentActivity() {
             if (it) {
                 (supportFragmentManager.findFragmentByTag(PartiesList.DIALOG_DEBT_DETAILS) as? DebtDetailsDialogFragment)?.dismiss()
             } else {
-                lifecycleScope.launchWhenResumed {
-                    showSnackBar("ERROR", Snackbar.LENGTH_LONG, null)
+                lifecycleScope.launch {
+                    repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                        showSnackBar("ERROR", Snackbar.LENGTH_LONG, null)
+                    }
                 }
             }
         }

@@ -38,7 +38,9 @@ fun <K, V> rememberMutableStateMapOf(vararg pairs: Pair<K, V>) =
                 // Restore the map by iterating through the saved keys.
                 val restoredPairs = (0 until savedMap.size / 2).map { index ->
                     // Re-create the key-value pairs from the flattened map.
+                    @Suppress("UNCHECKED_CAST")
                     val key = savedMap["k$index"] as K
+                    @Suppress("UNCHECKED_CAST")
                     val value = savedMap["v$index"] as V
                     key to value
                 }

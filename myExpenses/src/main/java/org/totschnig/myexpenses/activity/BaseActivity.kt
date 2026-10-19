@@ -810,7 +810,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             R.id.RATE_COMMAND -> {
                 startActivity(Intent(Intent.ACTION_VIEW).apply {
                     data = marketSelfUri.toUri()
-                }, R.string.error_accessing_market, null)
+                }, R.string.error_accessing_market)
                 true
             }
 
@@ -1090,17 +1090,21 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         negative: MessageDialogFragment.Button? = null,
         cancellable: Boolean = true,
     ) {
-        lifecycleScope.launchWhenResumed {
-            MessageDialogFragment.newInstance(title, message, positive, neutral, negative).apply {
-                isCancelable = cancellable
-            }.show(supportFragmentManager, "MESSAGE")
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                MessageDialogFragment.newInstance(title, message, positive, neutral, negative).apply {
+                    isCancelable = cancellable
+                }.show(supportFragmentManager, "MESSAGE")
+            }
         }
     }
 
     fun showVersionDialog(previousVersion: Int) {
-        lifecycleScope.launchWhenResumed {
-            VersionDialogFragment.newInstance(previousVersion)
-                .show(supportFragmentManager, "VERSION_INFO")
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                VersionDialogFragment.newInstance(previousVersion)
+                    .show(supportFragmentManager, "VERSION_INFO")
+            }
         }
     }
 
@@ -1297,14 +1301,16 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         currentFilter: FilterPersistence? = null,
         sortOrder: String? = null,
     ) {
-        lifecycleScope.launchWhenResumed {
-            TransactionDetailFragment.show(
-                transactionId,
-                supportFragmentManager,
-                fullScreen,
-                currentFilter,
-                sortOrder
-            )
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                TransactionDetailFragment.show(
+                    transactionId,
+                    supportFragmentManager,
+                    fullScreen,
+                    currentFilter,
+                    sortOrder
+                )
+            }
         }
     }
 

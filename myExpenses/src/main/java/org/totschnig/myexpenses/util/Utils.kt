@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package org.totschnig.myexpenses.util
 
 import android.annotation.SuppressLint

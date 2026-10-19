@@ -3,8 +3,6 @@
   licensed under the Creative Commons Attribution-ShareAlike 4.0 International license.
 */
 
-@file:Suppress("DEPRECATION")
-
 package org.totschnig.myexpenses.util.crypt
 
 import android.content.Context

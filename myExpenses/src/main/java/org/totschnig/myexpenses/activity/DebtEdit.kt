@@ -3,8 +3,11 @@ package org.totschnig.myexpenses.activity
 import android.os.Bundle
 import androidx.activity.viewModels
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.databinding.OneDebtBinding
@@ -58,7 +61,8 @@ class DebtEdit : EditActivity(), ButtonWithDialog.Host {
             inject(viewModel)
             inject(currencyViewModel)
         }
-        lifecycleScope.launchWhenStarted {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
 
             currencyViewModel.currencies.collect { list ->
                 binding.Amount.setCurrencies(list)
@@ -91,8 +95,8 @@ class DebtEdit : EditActivity(), ButtonWithDialog.Host {
                     }
                 }
             }
-
         }
+    }
         if (savedInstanceState == null) {
             if (debtId == 0L) {
                 binding.DateButton.setDate(LocalDate.now())

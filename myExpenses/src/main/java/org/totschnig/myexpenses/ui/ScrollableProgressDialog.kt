@@ -21,7 +21,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import org.totschnig.myexpenses.databinding.ScrollableProgressDialogBinding
 
-@Deprecated("Use modern progress UI instead")
 class ScrollableProgressDialog(context: Context) : AlertDialog(context) {
     private var binding: ScrollableProgressDialogBinding? = null
     private var message: CharSequence? = null

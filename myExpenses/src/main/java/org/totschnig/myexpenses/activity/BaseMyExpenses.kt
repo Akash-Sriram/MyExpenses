@@ -545,7 +545,7 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             R.id.SAFE_MODE_COMMAND -> {
                 prefHandler.putBoolean(PrefKey.DB_SAFE_MODE, true)
                 viewModel.triggerAccountListRefresh()
-                contentResolver.notifyChange(TRANSACTIONS_URI, null, false)
+                contentResolver.notifyChange(TRANSACTIONS_URI, null, 0)
             }
 
             R.id.CREATE_ACCOUNT_FOR_TRANSFER_COMMAND -> {
@@ -918,8 +918,10 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             }
 
             ContribFeature.BUDGET -> {
-                if (tag != null) {
-                    val (budgetId, headerId) = tag as Pair<Long, Int>
+                val pair = tag as? Pair<*, *>
+                if (pair != null) {
+                    val budgetId = pair.first as? Long ?: return
+                    val headerId = pair.second as? Int ?: 0
                     startActivity(Intent(this, BudgetActivity::class.java).apply {
                         putExtra(KEY_ROWID, budgetId)
                         fillIntentForGroupingFromTag(headerId)

@@ -55,6 +55,19 @@ abstract class AmountActivity<T: TagHandlingViewModel> : EditActivity() {
         amountInput.setTypeChangedListener { isChecked: Boolean -> onTypeChanged(isChecked) }
     }
 
+    private val selectTagsLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        data?.getLongArrayExtra(TagBaseViewModel.KEY_DELETED_IDS)?.let {
+            handleDeletedTagIds(it)
+        }
+        if (result.resultCode == RESULT_OK && data != null) {
+            androidx.core.content.IntentCompat.getParcelableArrayListExtra(data, KEY_TAG_LIST, Tag::class.java)?.let {
+                viewModel.updateTags(it, true)
+                setDirty()
+            }
+        }
+    }
+
     fun TagRowBinding.bindListener() {
         TagSelection.setOnClickListener {
             val i = Intent(this@AmountActivity, ManageTags::class.java).apply {
@@ -64,25 +77,7 @@ abstract class AmountActivity<T: TagHandlingViewModel> : EditActivity() {
                 }
                 putExtra(KEY_COLOR, color)
             }
-            startActivityForResult(i, SELECT_TAGS_REQUEST)
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        data?.getLongArrayExtra(TagBaseViewModel.KEY_DELETED_IDS)?.let {
-            handleDeletedTagIds(it)
-        }
-        when (requestCode) {
-            SELECT_TAGS_REQUEST -> data?.also {
-                if (resultCode == RESULT_OK) {
-                    (data.getParcelableArrayListExtra<Tag>(KEY_TAG_LIST))?.let {
-                        viewModel.updateTags(it, true)
-                        setDirty()
-                    }
-                }
-            }
+            selectTagsLauncher.launch(i)
         }
     }
 

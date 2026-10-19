@@ -167,7 +167,7 @@ object EmiCalculator {
                 java.time.temporal.ChronoUnit.DAYS.between(disbursalDate, firstEmiDate) > 30
 
         val month1Interest = if (hasBrokenPeriod) {
-            calculateBrokenPeriodInterest(principal, annualInterestRatePercent, disbursalDate!!, firstEmiDate!!)
+            calculateBrokenPeriodInterest(principal, annualInterestRatePercent, disbursalDate, firstEmiDate)
         } else {
             if (annualInterestRatePercent > 0.0) (principal.toDouble() * r).roundToLong() else 0L
         }

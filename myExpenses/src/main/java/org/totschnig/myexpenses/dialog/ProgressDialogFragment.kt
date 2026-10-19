@@ -26,7 +26,6 @@ import androidx.annotation.NonNull
 import org.totschnig.myexpenses.ui.ScrollableProgressDialog
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 
-@Deprecated("Use modern progress UI instead")
 class ProgressDialogFragment : BaseDialogFragment() {
 
     companion object {
@@ -38,7 +37,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
         private const val KEY_PROGRESS = "progress"
         private const val KEY_MAX = "max"
 
-        @Deprecated("Use modern progress UI instead")
         @JvmStatic
         fun newInstance(message: String, withButton: Boolean): ProgressDialogFragment {
             return newInstance(null, message, ProgressDialog.STYLE_SPINNER, withButton)

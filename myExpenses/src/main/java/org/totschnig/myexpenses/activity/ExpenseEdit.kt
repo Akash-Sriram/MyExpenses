@@ -25,6 +25,7 @@ import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.provider.CalendarContract
 import android.view.ContextMenu
 import android.view.LayoutInflater
@@ -276,7 +277,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
 
     @Suppress("UNCHECKED_CAST")
     val parentOriginalAmountExchangeRate: Pair<BigDecimal, Currency>?
-        get() = (intent.getSerializableExtra(KEY_PARENT_ORIGINAL_AMOUNT_EXCHANGE_RATE) as? Pair<BigDecimal, Currency>)
+        get() = (androidx.core.content.IntentCompat.getSerializableExtra(intent, KEY_PARENT_ORIGINAL_AMOUNT_EXCHANGE_RATE, Pair::class.java) as? Pair<BigDecimal, Currency>)
 
     private val isClone: Boolean
         get() = intent.getBooleanExtra(KEY_CLONE, false)
@@ -776,7 +777,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             }
         }
         lifecycleScope.launch {
-            val targetMethod = data.paymentMethodHint ?: "UPI"
+            val targetMethod = data.paymentMethodHint
             val methodId = viewModel.findMethodIdForLabel(targetMethod) ?: viewModel.findMethodIdForLabel("UPI")
             methodId?.let {
                 delegate.methodId = it
@@ -900,10 +901,12 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
     }
 
     private fun loadCurrencies() {
-        lifecycleScope.launchWhenStarted {
-            currencyViewModel.currencies.collect { currencies ->
-                if (::delegate.isInitialized) {
-                    (delegate as? MainDelegate)?.setCurrencies(currencies)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                currencyViewModel.currencies.collect { currencies ->
+                    if (::delegate.isInitialized) {
+                        (delegate as? MainDelegate)?.setCurrencies(currencies)
+                    }
                 }
             }
         }
@@ -970,7 +973,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             abortWithMessage(errMsg)
             return
         }
-        intent.getParcelableExtra<OcrResultFlat>(KEY_OCR_RESULT)?.let { ocrResultFlat ->
+        androidx.core.content.IntentCompat.getParcelableExtra(intent, KEY_OCR_RESULT, OcrResultFlat::class.java)?.let { ocrResultFlat ->
             if (ocrResultFlat.isEmpty) {
                 showSnackBar(R.string.no_data)
             } else {
@@ -1438,7 +1441,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         delegate.configureType()
     }
 
-    private inner class PlanObserver : ContentObserver(Handler()) {
+    private inner class PlanObserver : ContentObserver(Handler(Looper.getMainLooper())) {
         @RequiresPermission(allOf = [Manifest.permission.WRITE_CALENDAR, Manifest.permission.READ_CALENDAR])
         override fun onChange(selfChange: Boolean) {
             refreshPlanData(true)

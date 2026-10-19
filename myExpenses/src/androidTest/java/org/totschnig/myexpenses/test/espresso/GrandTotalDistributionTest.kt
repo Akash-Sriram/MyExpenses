@@ -43,7 +43,7 @@ import java.util.Currency
 @TestShard3
 class GrandTotalDistributionTest : BaseUiTest<DistributionActivity>() {
     @get:Rule
-    val composeTestRule = createEmptyComposeRule()
+    val composeTestRule = androidx.compose.ui.test.junit4.v2.createEmptyComposeRule()
 
     val currency1 = CurrencyUnit(Currency.getInstance("USD"))
     val currency2 = CurrencyUnit(Currency.getInstance("EUR"))

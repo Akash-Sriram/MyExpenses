@@ -11,7 +11,7 @@ import org.totschnig.myexpenses.util.doAsync
 class ExecutionTrigger : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         doAsync {
-            val prefHandler = MyApplication.instance.prefHandler
+            val prefHandler = (context.applicationContext as MyApplication).prefHandler
             when (intent.action) {
                 "TRIGGER_SYNC" -> GenericAccountService.requestSync(intent.getStringExtra("ACCOUNT")!!)
                 "TRIGGER_PLANNER" -> PlanExecutor.enqueueSelf(context, prefHandler, true)

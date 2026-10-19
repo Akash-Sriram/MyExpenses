@@ -179,7 +179,7 @@ class DistributionActivity : DistributionBaseActivity<DistributionViewModel>(),
         if (savedInstanceState == null) {
             viewModel.initWithAccount(
                 intent.extras!!,
-                intent.getSerializableExtra(KEY_GROUPING) as? Grouping ?: Grouping.NONE,
+                IntentCompat.getSerializableExtra(intent, KEY_GROUPING, Grouping::class.java) ?: Grouping.NONE,
                 whereFilter
             )
         }

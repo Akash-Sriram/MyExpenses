@@ -155,7 +155,7 @@ class ManageSyncBackends : SyncBackendSetupActivity(), ContribIFace {
         }
         when (command) {
             R.id.SYNC_LINK_COMMAND_LOCAL -> {
-                val (uuid, syncAccountName) = tag as Pair<String, String>
+                val (uuid, syncAccountName) = (tag as? Pair<*, *>).let { (it?.first as? String).orEmpty() to (it?.second as? String).orEmpty() }
                 ConfirmationDialogFragment.newInstance(Bundle().apply {
                     putString(
                         ConfirmationDialogFragment.KEY_MESSAGE,
@@ -177,7 +177,7 @@ class ManageSyncBackends : SyncBackendSetupActivity(), ContribIFace {
             }
 
             R.id.SYNC_LINK_COMMAND_REMOTE -> {
-                val (uuid, syncAccountName) = tag as Pair<String, String>
+                val (uuid, syncAccountName) = (tag as? Pair<*, *>).let { (it?.first as? String).orEmpty() to (it?.second as? String).orEmpty() }
                 ConfirmationDialogFragment.newInstance(Bundle().apply {
                     putString(
                         ConfirmationDialogFragment.KEY_MESSAGE,

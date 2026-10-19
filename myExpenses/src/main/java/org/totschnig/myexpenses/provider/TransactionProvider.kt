@@ -1346,7 +1346,6 @@ open class TransactionProvider : BaseTransactionProvider() {
     }
   }
 
-  @Suppress("DEPRECATION")
   override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
     log("Call method: %s, arg: %s, extras: %s", method, arg, extras)
     when (method) {

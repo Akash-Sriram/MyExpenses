@@ -1537,7 +1537,7 @@ abstract class BaseTransactionDatabase(
                         }
                     )
                 }
-                if (bankTypeId != null && methodId != null && methodId > 0) {
+                if (bankTypeId != null && methodId > 0) {
                     val alreadyLinked = query(
                         "SELECT 1 FROM $TABLE_ACCOUNTTYES_METHODS WHERE $KEY_METHODID = ? AND $KEY_TYPE = ?",
                         arrayOf(methodId.toString(), bankTypeId.toString())

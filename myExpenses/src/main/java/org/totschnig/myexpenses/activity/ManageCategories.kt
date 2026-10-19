@@ -800,7 +800,7 @@ class ManageCategories : ProtectedFragmentActivity(),
         }
 
     private val protectionInfo: ProtectionInfo?
-        get() = intent.getParcelableExtra(KEY_PROTECTION_INFO)
+        get() = androidx.core.content.IntentCompat.getParcelableExtra(intent, KEY_PROTECTION_INFO, ProtectionInfo::class.java)
 
     private fun checkImportableCategories() {
         viewModel.checkImportableCategories().observe(this) {
@@ -838,10 +838,12 @@ class ManageCategories : ProtectedFragmentActivity(),
 
     override fun contribFeatureCalled(feature: ContribFeature, tag: Serializable?) {
         if (feature == ContribFeature.CATEGORY_TREE) {
-            val (command, category) = tag as Pair<Int, Category>
-            if (command == R.id.CREATE_SUB_COMMAND) {
+            val pair = tag as? Pair<*, *>
+            val command = pair?.first as? Int
+            val category = pair?.second as? Category
+            if (command == R.id.CREATE_SUB_COMMAND && category != null) {
                 createCat(category)
-            } else if (command == R.id.SELECT_COMMAND) {
+            } else if (command == R.id.SELECT_COMMAND && category != null) {
                 doSingleSelection(category)
             }
         }
