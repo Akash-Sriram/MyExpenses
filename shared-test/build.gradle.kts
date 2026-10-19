@@ -4,11 +4,11 @@ plugins {
 
 android {
     namespace = "org.totschnig.shared_test"
-    compileSdk = rootProject.ext.compileSdkVersion
+    compileSdk = (rootProject.extra["compileSdkVersion"] as Int)
 
     defaultConfig {
-        missingDimensionStrategy 'textRecognition', 'intern'
-        minSdk = rootProject.ext.minSdkVersion
+        missingDimensionStrategy("textRecognition", "intern")
+        minSdk = (rootProject.extra["minSdkVersion"] as Int)
     }
 
     compileOptions {

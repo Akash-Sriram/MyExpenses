@@ -18,5 +18,5 @@ dependencyResolutionManagement {
         maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") }
     }
 }
-include ':myExpenses'
-include ':shared-test'
+include(":myExpenses")
+include(":shared-test")
