@@ -13,10 +13,10 @@ import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.TABLE_TRANSACTIONS
 import org.totschnig.myexpenses.provider.TransactionInfo
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.ATTACHMENTS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.KEY_RESULT
-import org.totschnig.myexpenses.provider.TransactionProvider.STALE_IMAGES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_ATTACHMENTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ATTACHMENTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.KEY_RESULT
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.STALE_IMAGES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_ATTACHMENTS_URI
 import org.totschnig.myexpenses.provider.insert
 import org.totschnig.myexpenses.testutils.BaseDbTest
 import org.totschnig.shared_test.CursorSubject.Companion.useAndAssert

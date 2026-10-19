@@ -20,7 +20,7 @@ import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_TEMPLATEID
 import org.totschnig.myexpenses.provider.KEY_TRANSACTIONID
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.PLAN_INSTANCE_STATUS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.PLAN_INSTANCE_STATUS_URI
 import org.totschnig.myexpenses.util.ExchangeRateHandler
 import org.totschnig.myexpenses.util.ShortcutHelper
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler

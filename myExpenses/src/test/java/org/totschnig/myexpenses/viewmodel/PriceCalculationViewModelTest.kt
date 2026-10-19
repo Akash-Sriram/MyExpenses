@@ -20,7 +20,7 @@ import org.totschnig.myexpenses.provider.KEY_EQUIVALENT_AMOUNT
 import org.totschnig.myexpenses.provider.KEY_EXCHANGE_RATE
 import org.totschnig.myexpenses.provider.KEY_VALUE
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.PRICES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.PRICES_URI
 import org.totschnig.myexpenses.provider.requireString
 import org.totschnig.myexpenses.provider.useAndMapToList
 import org.totschnig.myexpenses.retrofit.ExchangeRateApi

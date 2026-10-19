@@ -27,8 +27,8 @@ import org.totschnig.myexpenses.preference.DYNAMIC_EXCHANGE_RATES_DEFAULT_KEY
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.KEY_COMMODITY
 import org.totschnig.myexpenses.provider.KEY_CURRENCY
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.DYNAMIC_CURRENCIES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DYNAMIC_CURRENCIES_URI
 import org.totschnig.myexpenses.util.TextUtils
 import org.totschnig.myexpenses.viewmodel.CurrencyViewModel
 import org.totschnig.myexpenses.viewmodel.data.Currency

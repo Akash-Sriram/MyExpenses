@@ -37,8 +37,8 @@ import org.totschnig.myexpenses.provider.SPLIT_CATID
 import org.totschnig.myexpenses.provider.STATUS_NONE
 import org.totschnig.myexpenses.provider.TRANSFER_ACCOUNT_LABEL
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_SEARCH
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_ATTACHMENTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_SEARCH
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_ATTACHMENTS_URI
 import org.totschnig.myexpenses.provider.asSequence
 import org.totschnig.myexpenses.provider.calculateEquivalentAmount
 import org.totschnig.myexpenses.provider.fileName

@@ -11,7 +11,7 @@ import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.Money.Companion.convertBigDecimal
 import org.totschnig.myexpenses.ui.MyTextWatcher
 
-internal class AmountInputViewHolder(field: AmountInput) : FormElementViewHolder<AmountInput>(field) {
+class AmountInputViewHolder(field: AmountInput) : FormElementViewHolder<AmountInput>(field) {
     private lateinit var inputLayout: TextInputLayout
     private lateinit var amountInput: org.totschnig.myexpenses.ui.AmountInput
     override fun getContentViewLayout(): Int {

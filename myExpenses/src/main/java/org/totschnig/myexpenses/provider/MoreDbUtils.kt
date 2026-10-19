@@ -28,9 +28,9 @@ import org.totschnig.myexpenses.myApplication
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.PlannerUtils.Companion.copyEventData
-import org.totschnig.myexpenses.provider.TransactionProvider.TEMPLATES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.pauseChangeTrigger
-import org.totschnig.myexpenses.provider.TransactionProvider.resumeChangeTrigger
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TEMPLATES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.pauseChangeTrigger
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.resumeChangeTrigger
 import org.totschnig.myexpenses.provider.filter.Operation
 import org.totschnig.myexpenses.sync.GenericAccountService.Companion.getAccount
 import org.totschnig.myexpenses.sync.GenericAccountService.Companion.getAccountNames

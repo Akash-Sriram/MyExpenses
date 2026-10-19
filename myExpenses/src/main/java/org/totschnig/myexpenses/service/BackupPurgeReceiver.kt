@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import org.totschnig.myexpenses.util.NotificationBuilderWrapper.NOTIFICATION_AUTO_BACKUP
+import org.totschnig.myexpenses.util.NOTIFICATION_AUTO_BACKUP
 
 class BackupPurgeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

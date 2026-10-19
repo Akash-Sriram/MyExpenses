@@ -25,8 +25,8 @@ import org.totschnig.myexpenses.provider.KEY_BUDGET
 import org.totschnig.myexpenses.provider.KEY_CATID
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.TEMPLATES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TEMPLATES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_URI
 import org.totschnig.myexpenses.viewmodel.CategoryViewModel
 import org.totschnig.shared_test.CursorSubject
 

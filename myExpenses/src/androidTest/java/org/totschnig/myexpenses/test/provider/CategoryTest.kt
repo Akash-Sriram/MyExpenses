@@ -13,9 +13,9 @@ import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.CATEGORIES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.DUAL_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.METHOD_SAVE_CATEGORY
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.CATEGORIES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DUAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHOD_SAVE_CATEGORY
 import org.totschnig.myexpenses.provider.insert
 import org.totschnig.myexpenses.testutils.BaseDbTest
 import org.totschnig.myexpenses.testutils.CategoryInfo

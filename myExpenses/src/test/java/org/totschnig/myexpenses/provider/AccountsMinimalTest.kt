@@ -15,7 +15,7 @@ import org.totschnig.myexpenses.model.PREDEFINED_NAME_BANK
 import org.totschnig.myexpenses.model.PREDEFINED_NAME_CASH
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.BaseTransactionProvider.Companion.ACCOUNTS_MINIMAL_URI_WITH_AGGREGATES
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_MINIMAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_MINIMAL_URI
 import org.totschnig.myexpenses.viewmodel.data.AccountMinimal
 
 @RunWith(RobolectricTestRunner::class)

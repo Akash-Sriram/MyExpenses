@@ -8,10 +8,10 @@ import org.totschnig.myexpenses.provider.KEY_TRANSACTIONID
 import org.totschnig.myexpenses.provider.KEY_URI
 import org.totschnig.myexpenses.provider.KEY_URI_LIST
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.DUAL_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.KEY_RESULT
-import org.totschnig.myexpenses.provider.TransactionProvider.METHOD_DELETE_ATTACHMENTS
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_ATTACHMENTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DUAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.KEY_RESULT
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHOD_DELETE_ATTACHMENTS
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_ATTACHMENTS_URI
 import org.totschnig.myexpenses.provider.useAndMapToList
 import java.io.IOException
 import androidx.core.net.toUri

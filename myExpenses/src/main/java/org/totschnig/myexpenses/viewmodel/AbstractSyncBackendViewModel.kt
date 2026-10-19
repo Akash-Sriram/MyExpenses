@@ -15,7 +15,7 @@ import org.totschnig.myexpenses.db2.updateAccount
 import org.totschnig.myexpenses.provider.KEY_SEALED
 import org.totschnig.myexpenses.provider.KEY_SYNC_ACCOUNT_NAME
 import org.totschnig.myexpenses.provider.KEY_UUID
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_BASE_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_BASE_URI
 import org.totschnig.myexpenses.provider.getBoolean
 import org.totschnig.myexpenses.sync.GenericAccountService
 import org.totschnig.myexpenses.sync.GenericAccountService.Companion.getAccount

@@ -14,9 +14,9 @@ import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_SORTED_IDS
 import org.totschnig.myexpenses.provider.KEY_VISIBLE
 import org.totschnig.myexpenses.provider.METHOD_FLAG_SORT
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNT_FLAGS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.DUAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNT_FLAGS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DUAL_URI
 import org.totschnig.myexpenses.provider.withAppendedId
 
 fun Repository.getAccountFlags(): Flow<List<AccountFlag>> = contentResolver.observeQuery(

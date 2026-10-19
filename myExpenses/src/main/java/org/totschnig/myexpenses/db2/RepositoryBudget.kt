@@ -35,8 +35,8 @@ import org.totschnig.myexpenses.provider.DatabaseConstants.week
 import org.totschnig.myexpenses.provider.DatabaseConstants.yearOfMonthStart
 import org.totschnig.myexpenses.provider.DatabaseConstants.yearOfWeekStart
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.BUDGETS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.BUDGET_ALLOCATIONS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.BUDGETS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.BUDGET_ALLOCATIONS_URI
 import org.totschnig.myexpenses.provider.filter.AccountCriterion
 import org.totschnig.myexpenses.provider.filter.CategoryCriterion
 import org.totschnig.myexpenses.provider.filter.CrStatusCriterion

@@ -26,8 +26,8 @@ import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_TOTAL
 import org.totschnig.myexpenses.provider.KEY_VISIBLE
 import org.totschnig.myexpenses.provider.PORTFOLIO_NONE
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_FULL_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_MERGE_CURRENCY_AGGREGATES
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_FULL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_MERGE_CURRENCY_AGGREGATES
 import org.totschnig.myexpenses.util.ICurrencyFormatter
 import org.totschnig.myexpenses.util.formatMoney
 import javax.inject.Inject

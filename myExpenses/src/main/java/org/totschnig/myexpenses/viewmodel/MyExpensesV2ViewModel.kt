@@ -94,8 +94,8 @@ import org.totschnig.myexpenses.provider.PORTFOLIO_CASH
 import org.totschnig.myexpenses.provider.PORTFOLIO_CONTAINER
 import org.totschnig.myexpenses.provider.SPLIT_CATID
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_SEARCH
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_SEARCH
 import org.totschnig.myexpenses.provider.mapToListCatching
 import org.totschnig.myexpenses.provider.triggerAccountListRefresh
 import org.totschnig.myexpenses.retrofit.ExchangeRateSource

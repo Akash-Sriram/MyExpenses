@@ -17,11 +17,11 @@ class ContribFeatureTest {
         val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as TestApp
         val licenceHandler = application.licenceHandler as MockLicenceHandler
         assertThat(licenceHandler.usagesLeft(feature)).isTrue()
-        application.advanceClock(Duration.ofDays(LicenceHandler.TRIAL_DURATION_DAYS))
+        application.advanceClock(Duration.ofDays(LicenceHandler.TRIAL_DURATION_DAYS.toLong()))
         assertThat(licenceHandler.usagesLeft(feature)).isTrue()
         licenceHandler.recordUsage(feature)
         assertThat(licenceHandler.usagesLeft(feature)).isTrue()
-        application.advanceClock(Duration.ofDays(LicenceHandler.TRIAL_DURATION_DAYS))
+        application.advanceClock(Duration.ofDays(LicenceHandler.TRIAL_DURATION_DAYS.toLong()))
         assertThat(licenceHandler.usagesLeft(feature)).isFalse()
     }
 }

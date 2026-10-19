@@ -19,8 +19,8 @@ import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.TABLE_METHODS
 import org.totschnig.myexpenses.provider.TABLE_TEMPLATES
 import org.totschnig.myexpenses.provider.TABLE_TRANSACTIONS
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTTYPES_METHODS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.METHODS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTTYPES_METHODS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHODS_URI
 import org.totschnig.myexpenses.provider.getBoolean
 import org.totschnig.myexpenses.provider.getEnumOrNull
 import org.totschnig.myexpenses.provider.useAndMapToList

@@ -45,8 +45,8 @@ import org.totschnig.myexpenses.provider.KEY_UUID
 import org.totschnig.myexpenses.provider.SPLIT_CATID
 import org.totschnig.myexpenses.provider.TABLE_PLAN_INSTANCE_STATUS
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.PLAN_INSTANCE_STATUS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.TEMPLATES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.PLAN_INSTANCE_STATUS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TEMPLATES_URI
 import org.totschnig.myexpenses.provider.getLongOrNull
 import org.totschnig.myexpenses.provider.useAndMapToList
 import org.totschnig.myexpenses.provider.useAndMapToOne

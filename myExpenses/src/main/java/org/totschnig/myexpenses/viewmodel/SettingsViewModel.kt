@@ -31,7 +31,7 @@ import org.totschnig.myexpenses.provider.PORTFOLIO_NONE
 import org.totschnig.myexpenses.provider.PlannerUtils.Companion.checkLocalCalendar
 import org.totschnig.myexpenses.provider.PlannerUtils.Companion.deleteLocalCalendar
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.DUAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DUAL_URI
 import org.totschnig.myexpenses.provider.asSequence
 import org.totschnig.myexpenses.provider.filter.Operation
 import org.totschnig.myexpenses.util.AppDirHelper

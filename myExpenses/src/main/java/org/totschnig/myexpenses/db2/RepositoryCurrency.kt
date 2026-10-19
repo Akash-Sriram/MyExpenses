@@ -14,15 +14,15 @@ import org.totschnig.myexpenses.provider.KEY_LABEL
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_SYMBOL
 import org.totschnig.myexpenses.provider.KEY_VALUES
-import org.totschnig.myexpenses.provider.TransactionProvider.CURRENCIES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.DUAL_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.KEY_RESULT
-import org.totschnig.myexpenses.provider.TransactionProvider.KEY_UPDATED_ACCOUNTS_COUNT
-import org.totschnig.myexpenses.provider.TransactionProvider.METHOD_CHECK_CURRENCY_IN_USE
-import org.totschnig.myexpenses.provider.TransactionProvider.METHOD_STORE_FRACTION_DIGITS
-import org.totschnig.myexpenses.provider.TransactionProvider.METHOD_UPDATE_CURRENCY
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_OLD_CODE
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_OLD_FRACTION_DIGITS
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.CURRENCIES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DUAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.KEY_RESULT
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.KEY_UPDATED_ACCOUNTS_COUNT
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHOD_CHECK_CURRENCY_IN_USE
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHOD_STORE_FRACTION_DIGITS
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHOD_UPDATE_CURRENCY
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_OLD_CODE
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_OLD_FRACTION_DIGITS
 
 suspend fun Repository.insertCurrency(
     code: String,

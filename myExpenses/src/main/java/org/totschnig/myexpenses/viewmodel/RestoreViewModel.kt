@@ -40,7 +40,7 @@ import org.totschnig.myexpenses.provider.KEY_UUID
 import org.totschnig.myexpenses.provider.PlannerUtils
 import org.totschnig.myexpenses.provider.PlannerUtils.Companion.copyEventData
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.TEMPLATES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TEMPLATES_URI
 import org.totschnig.myexpenses.provider.asSequence
 import org.totschnig.myexpenses.provider.checkSyncAccounts
 import org.totschnig.myexpenses.provider.getBackupDataStoreFile

@@ -34,9 +34,9 @@ import org.totschnig.myexpenses.fragment.preferences.PreferencesOcrFragment
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.preference.PrefKey
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.DYNAMIC_CURRENCIES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DYNAMIC_CURRENCIES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_URI
 import org.totschnig.myexpenses.service.AutoBackupWorker
 import org.totschnig.myexpenses.sync.GenericAccountService
 import org.totschnig.myexpenses.util.LazyFontSelector

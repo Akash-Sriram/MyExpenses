@@ -24,8 +24,8 @@ import org.totschnig.myexpenses.provider.DatabaseConstants.month
 import org.totschnig.myexpenses.provider.DatabaseConstants.week
 import org.totschnig.myexpenses.provider.DatabaseConstants.yearOfMonthStart
 import org.totschnig.myexpenses.provider.DatabaseConstants.yearOfWeekStart
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_AGGREGATE_NEUTRAL
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_INCLUDE_ALL
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_AGGREGATE_NEUTRAL
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_INCLUDE_ALL
 import org.totschnig.myexpenses.provider.filter.Criterion
 
 private fun requireIdParameter(parameter: String) {

@@ -25,7 +25,7 @@ import org.totschnig.myexpenses.model.AccountFlag
 import org.totschnig.myexpenses.model.DEFAULT_FLAG_ID
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.KEY_FLAG
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNT_FLAGS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNT_FLAGS_URI
 import org.totschnig.myexpenses.provider.triggerAccountListRefresh
 import org.totschnig.myexpenses.viewmodel.data.AccountMinimal
 

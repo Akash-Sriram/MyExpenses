@@ -26,7 +26,7 @@ class FontSizeDialogFragmentCompat : PreferenceDialogFragmentCompat() {
         if (positiveResult && mClickedDialogEntryIndex >= 0) {
             val preference = getPreference() as FontSizeDialogPreference
             if (preference.callChangeListener(mClickedDialogEntryIndex)) {
-                preference.setValue(mClickedDialogEntryIndex)
+                preference.value = mClickedDialogEntryIndex
             }
         }
     }

@@ -11,9 +11,9 @@ import org.totschnig.myexpenses.provider.KEY_SORTED_IDS
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.KEY_TYPE_SORT_KEY
 import org.totschnig.myexpenses.provider.METHOD_TYPE_SORT
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTTYPES_METHODS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNT_TYPES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.DUAL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTTYPES_METHODS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNT_TYPES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DUAL_URI
 import org.totschnig.myexpenses.provider.withAppendedId
 
 fun Repository.getAccountTypes(): Flow<List<AccountType>> = contentResolver.observeQuery(

@@ -4,10 +4,10 @@ import android.net.Uri
 import org.totschnig.myexpenses.model.AccountGrouping
 import org.totschnig.myexpenses.model.sort.SortDirection
 import org.totschnig.myexpenses.model2.AccountInfoWithGrouping
-import org.totschnig.myexpenses.provider.TransactionProvider.EXTENDED_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_SEARCH
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_SHORTEN_COMMENT
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.EXTENDED_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_SEARCH
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_SHORTEN_COMMENT
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_URI
 
 /**
  * groups databaseSpecific information

@@ -13,8 +13,8 @@ import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.METHOD_CLEANUP_UNUSED_PAYEES
-import org.totschnig.myexpenses.provider.TransactionProvider.PAYEES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.METHOD_CLEANUP_UNUSED_PAYEES
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.PAYEES_URI
 import org.totschnig.myexpenses.provider.mapToMap
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 

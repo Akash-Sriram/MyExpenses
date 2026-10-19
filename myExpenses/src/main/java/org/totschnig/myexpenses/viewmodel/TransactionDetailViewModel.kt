@@ -15,7 +15,7 @@ import org.totschnig.myexpenses.provider.KEY_SUM_INCOME
 import org.totschnig.myexpenses.provider.KEY_SUM_TRANSFERS
 import org.totschnig.myexpenses.provider.KEY_TRANSACTIONID
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_SEARCH
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_SEARCH
 import org.totschnig.myexpenses.provider.filter.Criterion
 import org.totschnig.myexpenses.provider.getLong
 import org.totschnig.myexpenses.provider.useAndMapToList

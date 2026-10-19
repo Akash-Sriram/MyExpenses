@@ -56,8 +56,8 @@ import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.KEY_UUID
 import org.totschnig.myexpenses.provider.TABLE_BUDGETS
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.BUDGETS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.CATEGORIES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.BUDGETS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.CATEGORIES_URI
 import org.totschnig.myexpenses.provider.filter.AndCriterion
 import org.totschnig.myexpenses.provider.filter.CategoryCriterion
 import org.totschnig.myexpenses.provider.filter.Criterion

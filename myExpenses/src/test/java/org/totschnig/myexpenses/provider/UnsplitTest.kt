@@ -12,7 +12,7 @@ import org.totschnig.myexpenses.db2.createSplitTransaction
 import org.totschnig.myexpenses.db2.entities.Transaction
 import org.totschnig.myexpenses.db2.loadTransactions
 import org.totschnig.myexpenses.model.generateUuid
-import org.totschnig.myexpenses.provider.TransactionProvider.UNSPLIT_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.UNSPLIT_URI
 
 @RunWith(RobolectricTestRunner::class)
 class UnsplitTest : TransactionProviderBaseTest() {

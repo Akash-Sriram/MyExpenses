@@ -27,7 +27,7 @@ import org.totschnig.myexpenses.provider.KEY_SUM_EXPENSES
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.DbUtils
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.SORT_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.SORT_URI
 import org.totschnig.shared_test.CursorSubject.Companion.useAndAssert
 
 class AccountTest {

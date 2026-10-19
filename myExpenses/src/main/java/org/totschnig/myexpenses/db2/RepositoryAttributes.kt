@@ -13,8 +13,8 @@ import org.totschnig.myexpenses.provider.KEY_TRANSACTIONID
 import org.totschnig.myexpenses.provider.KEY_VALUE
 import org.totschnig.myexpenses.provider.TABLE_ATTRIBUTES
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_ATTRIBUTES_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_ATTRIBUTES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_ATTRIBUTES_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_ATTRIBUTES_URI
 import org.totschnig.myexpenses.provider.getString
 import org.totschnig.myexpenses.provider.insert
 import org.totschnig.myexpenses.provider.useAndMapToList

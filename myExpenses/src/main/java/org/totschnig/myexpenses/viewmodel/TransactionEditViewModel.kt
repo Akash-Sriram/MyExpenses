@@ -87,8 +87,8 @@ import org.totschnig.myexpenses.provider.PlannerUtils
 import org.totschnig.myexpenses.provider.ProviderUtils
 import org.totschnig.myexpenses.provider.SPLIT_CATID
 import org.totschnig.myexpenses.provider.TransactionProvider
-import org.totschnig.myexpenses.provider.TransactionProvider.ACCOUNTS_FULL_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.QUERY_PARAMETER_ACCOUNT_TYPE_LIST
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.ACCOUNTS_FULL_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.QUERY_PARAMETER_ACCOUNT_TYPE_LIST
 import org.totschnig.myexpenses.provider.fileName
 import org.totschnig.myexpenses.provider.getLongIfExists
 import org.totschnig.myexpenses.provider.getString

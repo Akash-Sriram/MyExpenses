@@ -29,7 +29,7 @@ import org.totschnig.myexpenses.db2.writeTag
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.PreDefinedPaymentMethod
 import org.totschnig.myexpenses.model.generateUuid
-import org.totschnig.myexpenses.provider.CalendarProviderProxy.calculateId
+import org.totschnig.myexpenses.provider.CalendarProviderProxy.Companion.calculateId
 import org.totschnig.myexpenses.provider.SPLIT_CATID
 import org.totschnig.myexpenses.util.toEpoch
 import org.totschnig.myexpenses.util.toEpochMillis

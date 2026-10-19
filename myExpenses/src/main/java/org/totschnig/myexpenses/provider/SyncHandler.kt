@@ -16,8 +16,8 @@ import org.totschnig.myexpenses.db2.writePaymentMethod
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
-import org.totschnig.myexpenses.provider.TransactionProvider.TRANSACTIONS_URI
-import org.totschnig.myexpenses.provider.TransactionProvider.UNSPLIT_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_URI
+import org.totschnig.myexpenses.provider.TransactionProvider.Companion.UNSPLIT_URI
 import org.totschnig.myexpenses.sync.SyncAdapter
 import org.totschnig.myexpenses.sync.json.TransactionChange
 import java.io.IOException
