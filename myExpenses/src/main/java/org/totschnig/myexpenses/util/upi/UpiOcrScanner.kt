@@ -28,12 +28,15 @@ object UpiOcrScanner {
                     }
             }
             val parsed = UpiReceiptParser.parse(textResult)
-            android.util.Log.d("UPI_OCR", "Raw OCR text:\n$textResult")
-            android.util.Log.d("UPI_OCR", "Parsed UPI receipt: amount=${parsed.amount}, payee=${parsed.payeeName}, upiId=${parsed.upiId}, dateTime=${parsed.dateTime}, utr=${parsed.referenceNumber}, bank=${parsed.accountOrBankHint}")
-            Timber.i("Parsed UPI receipt: %s", parsed)
+            Timber.d(
+                "UPI receipt parsed successfully: hasAmount=%b, hasPayee=%b, hasUpiId=%b, hasUtr=%b",
+                parsed.amount != null,
+                parsed.payeeName != null,
+                parsed.upiId != null,
+                parsed.referenceNumber != null
+            )
             Result.success(parsed)
         } catch (e: Exception) {
-            android.util.Log.e("UPI_OCR", "Error scanning UPI receipt from $uri", e)
             Timber.e(e, "Error scanning UPI receipt from %s", uri)
             Result.failure(e)
         }
