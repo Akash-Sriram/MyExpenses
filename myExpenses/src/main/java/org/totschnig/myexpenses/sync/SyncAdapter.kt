@@ -114,7 +114,6 @@ class SyncAdapter(
         key: String, defaultValue: String,
     ): String = accountManager.getUserData(account, key) ?: defaultValue
 
-    @SuppressLint("MissingPermission")
     fun onPerformSync(
         account: Account, extras: Bundle, authority: String,
         provider: ContentProviderClient, syncResult: SyncResult,

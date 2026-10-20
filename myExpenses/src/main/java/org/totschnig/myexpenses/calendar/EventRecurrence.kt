@@ -19,7 +19,6 @@ package org.totschnig.myexpenses.calendar
 import android.util.Log
 import java.time.DayOfWeek
 import java.time.ZonedDateTime
-import java.util.HashMap
 import java.util.Locale
 
 /**

@@ -3,8 +3,6 @@ package org.totschnig.myexpenses.sync.json
 import org.totschnig.myexpenses.sync.SequenceNumber
 import org.totschnig.myexpenses.sync.SequenceNumber.Companion.max
 import org.totschnig.myexpenses.sync.json.TransactionChange
-import org.totschnig.myexpenses.sync.json.ChangeSet
-import java.util.ArrayList
 
 class ChangeSet private constructor(
     val sequenceNumber: SequenceNumber,
@@ -16,7 +14,7 @@ class ChangeSet private constructor(
         }
 
         fun empty(sequenceNumber: SequenceNumber): ChangeSet {
-            return create(sequenceNumber, ArrayList())
+            return create(sequenceNumber, emptyList())
         }
 
         fun merge(changeSet1: ChangeSet?, changeSet2: ChangeSet?): ChangeSet? {

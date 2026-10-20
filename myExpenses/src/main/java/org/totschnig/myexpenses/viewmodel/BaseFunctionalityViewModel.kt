@@ -181,7 +181,8 @@ class BaseFunctionalityViewModel(application: Application) :
                     if (scheme != null && ("mailto" == scheme || uri.host != null)) {
                         return uri
                     }
-                } catch (_: URISyntaxException) {
+                } catch (ignored: URISyntaxException) {
+                    // Invalid URI syntax; handled by returning null below
                 }
             }
             return null

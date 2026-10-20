@@ -58,7 +58,9 @@ object QifUtils {
                         dt = dt.withHour(h).withMinute(m).withSecond(sec)
                     }
                     return dt.atZone(ZoneId.systemDefault()).toInstant()
-                } catch (_: IllegalArgumentException) {}
+                } catch (ignored: IllegalArgumentException) {
+                    // Try next fallback date parsing strategy
+                }
             }
             // Fallback for "DATE TIME" where DATE has no internal spaces
             if (dateTimeChunks.size > 1) {
@@ -70,7 +72,9 @@ object QifUtils {
                     val sec = parseIntSafe(timeChunks, 2)
                     dt = dt.withHour(h).withMinute(m).withSecond(sec)
                     return dt.atZone(ZoneId.systemDefault()).toInstant()
-                } catch (_: IllegalArgumentException) {}
+                } catch (ignored: IllegalArgumentException) {
+                    // Fall back to Instant.now()
+                }
             }
             Instant.now()
         }

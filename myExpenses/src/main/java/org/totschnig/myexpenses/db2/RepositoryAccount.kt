@@ -337,7 +337,7 @@ private fun buildExchangeRateUri(accountId: Long, currency: String, homeCurrency
  */
 fun Repository.deleteAccount(accountId: Long): String? {
     val syncAccountName = getStringValue(accountId, KEY_SYNC_ACCOUNT_NAME)
-    val ops = java.util.ArrayList<ContentProviderOperation>()
+    val ops = ArrayList<ContentProviderOperation>()
     val accountIdString = accountId.toString()
     updateTransferPeersForTransactionDelete(
         ops,
@@ -411,7 +411,7 @@ fun Repository.findAnyOpen(column: String? = null, search: String? = null) = con
 )?.use { if (it.moveToFirst()) it.getLong(0) else null }
 
 fun updateTransferPeersForTransactionDelete(
-    ops: java.util.ArrayList<ContentProviderOperation>,
+    ops: ArrayList<ContentProviderOperation>,
     rowSelect: String,
     selectionArgs: Array<String>?,
 ) {

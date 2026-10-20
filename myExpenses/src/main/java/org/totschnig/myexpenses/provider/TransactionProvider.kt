@@ -1326,9 +1326,10 @@ open class TransactionProvider : BaseTransactionProvider() {
           Timber.d("Result: %s", result)
           results[i] = result
         } catch (e: Exception) {
-          val customData = HashMap<String, String>()
-          customData["i"] = i.toString()
-          customData["operation"] = contentProviderOperation.toString()
+          val customData = mapOf(
+            "i" to i.toString(),
+            "operation" to contentProviderOperation.toString()
+          )
           CrashHandler.report(e, customData, TAG)
           throw e
         }
