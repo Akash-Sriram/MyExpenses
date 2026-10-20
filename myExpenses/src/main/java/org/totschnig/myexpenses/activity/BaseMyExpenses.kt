@@ -527,22 +527,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                     )
                 }
 
-            R.id.OCR_DOWNLOAD_COMMAND -> {
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = "market://details?id=org.totschnig.ocr.tesseract".toUri()
-                }
-                packageManager.queryIntentActivities(intent, 0)
-                    .map { it.activityInfo }
-                    .find {
-                        it.packageName == "org.fdroid.fdroid" || it.packageName == "org.fdroid.basic"
-                    }?.let {
-                        intent.component = ComponentName(it.applicationInfo.packageName, it.name)
-                        startActivity(intent)
-                    }
-                    ?: run {
-                        Toast.makeText(this, "F-Droid not installed", Toast.LENGTH_LONG).show()
-                    }
-            }
 
             R.id.SAFE_MODE_COMMAND -> {
                 prefHandler.putBoolean(PrefKey.DB_SAFE_MODE, true)

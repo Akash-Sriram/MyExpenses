@@ -178,8 +178,6 @@ fun getLocaleForUserCountry(country: String?, defaultLocale: Locale): Locale {
 abstract class FeatureManager {
     lateinit var application: MyApplication
     var callback: Callback? = null
-    private val ocrFeature: OcrFeature?
-        get() = application.appComponent.ocrFeature()
 
     open fun initApplication(application: MyApplication) {
         this.application = application
@@ -188,11 +186,7 @@ abstract class FeatureManager {
     open fun initActivity(activity: Activity) {}
     open fun isFeatureInstalled(feature: Feature, context: Context) = true
 
-    open fun requestFeature(feature: Feature, context: Context) {
-        if (feature == Feature.OCR) {
-            (context as? BaseActivity)?.let { ocrFeature?.offerInstall(it) }
-        }
-    }
+    open fun requestFeature(feature: Feature, context: Context) {}
 
     open fun requestLocale(language: String) {
         callback?.onLanguageAvailable(language)

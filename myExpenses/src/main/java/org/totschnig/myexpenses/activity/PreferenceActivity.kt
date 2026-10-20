@@ -29,7 +29,6 @@ import org.totschnig.myexpenses.fragment.preferences.PreferenceDataFragment
 import org.totschnig.myexpenses.fragment.preferences.PreferencesAdvancedFragment
 import org.totschnig.myexpenses.fragment.preferences.PreferencesBackupRestoreFragment
 import org.totschnig.myexpenses.fragment.preferences.PreferencesBackupRestoreFragment.Companion.KEY_CHECKED_FILES
-import org.totschnig.myexpenses.fragment.preferences.PreferencesOcrFragment
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.preference.PrefKey
@@ -257,11 +256,6 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
                 showSnackBar(R.string.app_restart_required)
             }
 
-            getKey(PrefKey.OCR_ENGINE) -> checkOcrFeature()
-
-            getKey(PrefKey.TESSERACT_LANGUAGE) -> checkTessDataDownload()
-
-            getKey(PrefKey.MLKIT_SCRIPT) -> checkOcrFeature()
 
             getKey(PrefKey.SYNC_FREQUCENCY) ->
                 for (account in GenericAccountService.getAccounts(this)) {
@@ -299,24 +293,8 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
         }
     }
 
-    /**
-     * checks and requests OCR + engine + (script for mlkit)
-     */
-    private fun checkOcrFeature() {
-        if (!featureManager.isFeatureInstalled(Feature.OCR, this)) {
-            featureManager.requestFeature(Feature.OCR, this)
-        }
-    }
-
     override fun onFeatureAvailable(feature: Feature) {
         super.onFeatureAvailable(feature)
-        when (feature) {
-            Feature.OCR, Feature.MLKIT, Feature.TESSERACT ->
-                twoPanePreference.getDetailFragment<PreferencesOcrFragment>()
-                    ?.configureOcrEnginePrefs()
-
-            else -> {}
-        }
     }
 
     private fun showUnencryptedBackupWarning() {

@@ -45,7 +45,6 @@ import org.totschnig.myexpenses.compose.transactions.TL_TAG
 import org.totschnig.myexpenses.di.AppComponent
 import org.totschnig.myexpenses.di.DaggerAppComponent
 import org.totschnig.myexpenses.feature.FeatureManager
-import org.totschnig.myexpenses.feature.OcrFeature
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.model.Grouping
@@ -217,7 +216,6 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
                         plantTree(SyncAdapter.TAG)
                         plantTree(LicenceHandler.TAG)
                         plantTree(BaseTransactionProvider.TAG)
-                        plantTree(OcrFeature.TAG)
                         plantTree(TL_TAG)
                     } catch (e: Exception) {
                         report(e)

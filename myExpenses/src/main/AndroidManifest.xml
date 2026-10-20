@@ -25,11 +25,6 @@
 
     <queries>
         <intent>
-            <action android:name="org.totschnig.ocr.action.RECOGNIZE" />
-
-            <data android:mimeType="image/jpeg" />
-        </intent>
-        <intent>
             <action android:name="android.intent.action.VIEW" />
 
             <data

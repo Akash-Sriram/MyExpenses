@@ -30,7 +30,6 @@ import org.totschnig.myexpenses.dialog.VersionDialogFragment
 import org.totschnig.myexpenses.dialog.select.SelectFromTableDialogFragment
 import org.totschnig.myexpenses.export.pdf.PdfPrinter
 import org.totschnig.myexpenses.feature.FeatureManager
-import org.totschnig.myexpenses.feature.OcrFeature
 import org.totschnig.myexpenses.fragment.CsvImportDataFragment
 import org.totschnig.myexpenses.fragment.CsvImportParseFragment
 import org.totschnig.myexpenses.fragment.HistoryChart
@@ -70,7 +69,6 @@ import org.totschnig.myexpenses.viewmodel.ExportViewModel
 import org.totschnig.myexpenses.viewmodel.FeatureViewModel
 import org.totschnig.myexpenses.viewmodel.LoanViewModel
 import org.totschnig.myexpenses.viewmodel.MyExpensesViewModel
-import org.totschnig.myexpenses.viewmodel.OcrViewModel
 import org.totschnig.myexpenses.viewmodel.PlannerViewModel
 import org.totschnig.myexpenses.viewmodel.PriceHistoryViewModel
 import org.totschnig.myexpenses.viewmodel.PrintLayoutConfigurationViewModel
@@ -141,8 +139,6 @@ interface AppComponent {
     fun repositoryLoan(): RepositoryLoan
 
     fun repositoryCreditCard(): RepositoryCreditCard
-
-    fun ocrFeature(): OcrFeature?
 
     fun okHttpClientBuilder(): OkHttpClient.Builder
 
@@ -229,8 +225,6 @@ interface AppComponent {
     fun inject(versionDialogFragment: VersionDialogFragment)
 
     fun inject(baseActivity: BaseActivity)
-
-    fun inject(ocrViewModel: OcrViewModel)
 
     fun inject(baseDialogFragment: BaseDialogFragment)
 

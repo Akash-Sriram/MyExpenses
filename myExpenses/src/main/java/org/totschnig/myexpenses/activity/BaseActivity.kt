@@ -147,7 +147,6 @@ import org.totschnig.myexpenses.util.ui.getAmountColor
 import org.totschnig.myexpenses.util.ui.setBackgroundTintList
 import org.totschnig.myexpenses.viewmodel.BaseFunctionalityViewModel
 import org.totschnig.myexpenses.viewmodel.FeatureViewModel
-import org.totschnig.myexpenses.viewmodel.OcrViewModel
 import org.totschnig.myexpenses.widget.EXTRA_START_FROM_WIDGET_DATA_ENTRY
 import java.io.Serializable
 import java.math.BigDecimal
@@ -387,7 +386,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     val homeCurrency
         get() = currencyContext.homeCurrencyUnit
 
-    val ocrViewModel: OcrViewModel by viewModels()
     val featureViewModel: FeatureViewModel by viewModels()
     val baseViewModel: BaseFunctionalityViewModel by viewModels()
 
@@ -435,7 +433,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         with(injector) {
-            inject(ocrViewModel)
             inject(featureViewModel)
             inject(baseViewModel)
         }
@@ -778,13 +775,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     override fun dispatchCommand(command: Int, tag: Any?): Boolean {
         trackCommand(command)
         return when (command) {
-            R.id.TESSERACT_DOWNLOAD_COMMAND -> {
-                ocrViewModel.downloadTessData().observe(this) {
-                    downloadPending = it
-                }
-                true
-            }
-
             R.id.QUIT_COMMAND -> {
                 finish()
                 true
@@ -1043,17 +1033,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
 
     @IdRes
     protected open val snackBarContainerId: Int = R.id.fragment_container
-
-    private fun offerTessDataDownload() {
-        ocrViewModel.offerTessDataDownload(this)
-    }
-
-    fun checkTessDataDownload() {
-        ocrViewModel.tessDataExists().observe(this) {
-            if (!it)
-                offerTessDataDownload()
-        }
-    }
 
     fun startActionView(uri: String) {
         try {
