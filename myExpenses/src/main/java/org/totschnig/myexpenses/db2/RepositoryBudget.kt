@@ -209,7 +209,7 @@ suspend fun Repository.loadBudgetProgress(budgetId: Long, period: Pair<Int, Int>
             groupingInfo.year,
             groupingInfo.second
         ) ?: 0
-        val aggregateNeutral = dataStore.data.first()[aggregateNeutralPrefKey(budgetId)] == true
+        val aggregateNeutral = preferencesHolder[aggregateNeutralPrefKey(budgetId)] == true
         val (sumUri, sumSelection, sumSelectionArguments) =
             sumLoaderForBudget(budget, aggregateNeutral, period)
         val spent = contentResolver.query(

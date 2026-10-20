@@ -35,7 +35,6 @@ object EventRecurrenceFormatter {
     private var mMonthRepeatByDayOfWeekIds: IntArray? = null
     private var mMonthRepeatByDayOfWeekStrs: Array<Array<String>?>? = null
 
-    @JvmStatic
     fun parseUntilToMillis(until: String): Long {
         val trimmed = until.trim()
         return try {
@@ -64,7 +63,6 @@ object EventRecurrenceFormatter {
         }
     }
 
-    @JvmStatic
     fun getRepeatString(
         context: Context,
         r: Resources,

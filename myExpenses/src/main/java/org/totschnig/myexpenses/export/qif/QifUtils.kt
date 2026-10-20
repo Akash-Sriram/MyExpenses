@@ -15,7 +15,13 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.text.ParseException
-import java.util.*
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.Month
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 import java.util.regex.Pattern
 
 object QifUtils {
@@ -24,67 +30,63 @@ object QifUtils {
     private val HOUR_DELIMITER_PATTERN = Pattern.compile(":")
     private val MONEY_PREFIX_PATTERN = Pattern.compile("\\D")
     private val ISO_T_PATTERN = Regex("(\\d)T(\\d)")
-    @JvmStatic
+
     fun trimFirstChar(s: String): String {
         return if (s.length > 1) s.substring(1) else ""
     }
 
-    @JvmStatic
-    fun parseDate(sDateTime: String, format: QifDateFormat): Date {
+    fun parseDate(sDateTime: String, format: QifDateFormat): Instant {
         val s = sDateTime.trim().replace(ISO_T_PATTERN, "$1 $2")
         return try {
-            parseDateInternal(s, format).time
+            parseDateInternal(s, format).atZone(ZoneId.systemDefault()).toInstant()
         } catch (_: IllegalArgumentException) {
             val dateTimeChunks = WHITESPACE_PATTERN.split(s).let {
-                if(isWeekday(it[0])) it.drop(1).toTypedArray() else it
+                if (isWeekday(it[0])) it.drop(1).toTypedArray() else it
             }
             // If we have at least 3 chunks, they might be the D, M, and Y parts
             if (dateTimeChunks.size >= 3) {
                 try {
                     // Join them back with a standard delimiter to reuse parseDateInternal logic
                     val datePart = dateTimeChunks.slice(0..2).joinToString("/")
-                    val cal = parseDateInternal(datePart, format)
+                    var dt = parseDateInternal(datePart, format)
                     // If there's a 4th chunk, it's likely the time
                     if (dateTimeChunks.size > 3) {
                         val timeChunks = HOUR_DELIMITER_PATTERN.split(dateTimeChunks[3])
-                        cal[Calendar.HOUR_OF_DAY] = parseInt(timeChunks, 0)
-                        cal[Calendar.MINUTE] = parseInt(timeChunks, 1)
-                        cal[Calendar.SECOND] = parseInt(timeChunks, 2)
+                        val h = parseInt(timeChunks, 0)
+                        val m = parseInt(timeChunks, 1)
+                        val sec = parseInt(timeChunks, 2)
+                        dt = dt.withHour(h).withMinute(m).withSecond(sec)
                     }
-                    return cal.time
+                    return dt.atZone(ZoneId.systemDefault()).toInstant()
                 } catch (_: IllegalArgumentException) {}
             }
             // Fallback for "DATE TIME" where DATE has no internal spaces
             if (dateTimeChunks.size > 1) {
                 try {
-                    val cal = parseDateInternal(dateTimeChunks[0], format)
+                    var dt = parseDateInternal(dateTimeChunks[0], format)
                     val timeChunks = HOUR_DELIMITER_PATTERN.split(dateTimeChunks[1])
-                    cal[Calendar.HOUR_OF_DAY] = parseIntSafe(timeChunks, 0)
-                    cal[Calendar.MINUTE] = parseIntSafe(timeChunks, 1)
-                    cal[Calendar.SECOND] = parseIntSafe(timeChunks, 2)
-                    return cal.time
+                    val h = parseIntSafe(timeChunks, 0)
+                    val m = parseIntSafe(timeChunks, 1)
+                    val sec = parseIntSafe(timeChunks, 2)
+                    dt = dt.withHour(h).withMinute(m).withSecond(sec)
+                    return dt.atZone(ZoneId.systemDefault()).toInstant()
                 } catch (_: IllegalArgumentException) {}
             }
-            Date()
+            Instant.now()
         }
     }
 
-    fun parseDateInternal(sDateTime: String, format: QifDateFormat): Calendar {
-
+    fun parseDateInternal(sDateTime: String, format: QifDateFormat): LocalDateTime {
         val s = sDateTime.trim().trim('"') // Also trim quotes for CSV
 
         // 2. Handle pure numeric YYYYMMDD
         if (s.length == 8 && s.all { it.isDigit() }) {
-            val cal = Calendar.getInstance(Locale.US)
             val y = s.substring(0, 4).toInt()
             val m = s.substring(4, 6).toInt()
             val d = s.substring(6, 8).toInt()
-            cal[y, m - 1, d, 0, 0] = 0
-            cal.set(Calendar.MILLISECOND, 0)
-            return cal
+            return LocalDateTime.of(y, m, d, 0, 0, 0)
         }
 
-        val cal = Calendar.getInstance()
         var month: Int
         var day: Int
         var year: Int
@@ -113,15 +115,18 @@ object QifUtils {
                 1900
             }
         }
-        cal[year, month - 1, day, 0, 0] = 0
-        cal[Calendar.MILLISECOND] = 0
-        return cal
+        return LocalDateTime.of(year, month, day, 0, 0, 0)
     }
 
     private fun isWeekday(name: String): Boolean {
         for (locale in listOf(Locale.getDefault(), Locale.US)) {
-            val names = Calendar.getInstance(locale).getDisplayNames(Calendar.DAY_OF_WEEK, Calendar.ALL_STYLES, locale)
-            if (names?.keys?.any { it.equals(name, ignoreCase = true) } == true) return true
+            for (dayOfWeek in DayOfWeek.entries) {
+                for (style in listOf(TextStyle.FULL, TextStyle.SHORT, TextStyle.NARROW)) {
+                    if (dayOfWeek.getDisplayName(style, locale).equals(name, ignoreCase = true)) {
+                        return true
+                    }
+                }
+            }
         }
         return false
     }
@@ -137,9 +142,12 @@ object QifUtils {
     private fun findMonthByName(name: String): Int? {
         // Check current locale and English (US) as fallback
         for (locale in listOf(Locale.getDefault(), Locale.US)) {
-            val names = Calendar.getInstance(locale).getDisplayNames(Calendar.MONTH, Calendar.ALL_STYLES, locale)
-            names?.entries?.find { it.key.equals(name, ignoreCase = true) }?.value?.let {
-                return it + 1
+            for (month in Month.entries) {
+                for (style in listOf(TextStyle.FULL, TextStyle.SHORT, TextStyle.NARROW)) {
+                    if (month.getDisplayName(style, locale).equals(name, ignoreCase = true)) {
+                        return month.value
+                    }
+                }
             }
         }
         return null
@@ -164,7 +172,6 @@ object QifUtils {
      * Parse the string with a maxSize, that takes the number of fraction digits of currency into account,
      * so that the number representing the amount in the database does not exceed approximately 1/10th of [Long.MAX_VALUE]
      */
-    @JvmStatic
     fun parseMoney(money: String, currency: CurrencyUnit): BigDecimal {
         return parseMoney(money, 18 - currency.fractionDigits)
     }
@@ -176,7 +183,6 @@ object QifUtils {
      * @param maxSize maxSize of the result, as calculated by precision - scale, i.e.  the number of digits in front of the decimal point
      * @return BigDecimal, if the result exceeds maxSize, [IllegalArgumentException] is thrown
      */
-    @JvmStatic
     fun parseMoney(money: String, maxSize: Int): BigDecimal {
         var result: BigDecimal
         val sMoney = money.trim().replace(" ", "") // to be safe
@@ -220,12 +226,10 @@ object QifUtils {
         return result
     }
 
-    @JvmStatic
     fun isTransferCategory(category: String): Boolean {
         return category.isNotEmpty() && category.startsWith("[") && category.endsWith("]")
     }
 
-    @JvmStatic
     fun twoSidesOfTheSameTransfer(
         fromAccount: ImportAccount,
         fromTransaction: ImportTransaction,

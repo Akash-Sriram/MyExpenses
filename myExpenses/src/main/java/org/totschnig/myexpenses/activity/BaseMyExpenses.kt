@@ -122,7 +122,6 @@ import org.totschnig.myexpenses.util.distrib.DistributionHelper
 import org.totschnig.myexpenses.util.distrib.ReviewManager
 import org.totschnig.myexpenses.util.formatMoney
 import org.totschnig.myexpenses.util.safeMessage
-import org.totschnig.myexpenses.util.ui.asDateTimeFormatter
 import org.totschnig.myexpenses.util.ui.dateTimeFormatter
 import org.totschnig.myexpenses.util.ui.dateTimeFormatterLegacy
 import org.totschnig.myexpenses.viewmodel.AccountSealedException
@@ -149,11 +148,8 @@ import org.totschnig.myexpenses.viewmodel.data.Transaction2
 import timber.log.Timber
 import java.io.Serializable
 import java.math.BigDecimal
-import java.text.SimpleDateFormat
 import java.util.Locale
-import java.util.Optional
 import javax.inject.Inject
-import kotlin.jvm.optionals.getOrNull
 
 const val DIALOG_TAG_NEW_BALANCE = "NEW_BALANCE"
 const val MANAGE_HIDDEN_FRAGMENT_TAG = "MANAGE_HIDDEN"
@@ -192,7 +188,13 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
 
     abstract val accountCount: Int
 
-    abstract suspend fun accountForNewTransaction(): Optional<FullAccount>?
+    sealed interface AccountForNewTransactionResult {
+        data class Found(val account: FullAccount) : AccountForNewTransactionResult
+        data object Aggregate : AccountForNewTransactionResult
+        data object None : AccountForNewTransactionResult
+    }
+
+    abstract suspend fun accountForNewTransaction(): AccountForNewTransactionResult
 
     var selectionState
         get() = viewModel.selectionState.value
@@ -1331,7 +1333,7 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                             this
                         )?.let {
                             DateTimeFormatInfo(
-                                (it.first as SimpleDateFormat).asDateTimeFormatter,
+                                it.first,
                                 it.second
                             )
                         },
@@ -1687,25 +1689,26 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
         else -> "Data loading failed" to false
     }
 
-    final override suspend fun getEditIntent(): Intent? {
-        val candidate = accountForNewTransaction()
-        return if (candidate != null) {
-            super.getEditIntent()!!.apply {
-                candidate.getOrNull()?.let {
-                    putExtra(KEY_ACCOUNTID, it.id)
-                    putExtra(KEY_CURRENCY, it.currency)
-                    putExtra(KEY_COLOR, it.color)
-                }
-                val accountId = selectedAccountId
-                if (isAggregate(accountId)) {
-                    putExtra(ExpenseEdit.KEY_AUTOFILL_MAY_SET_ACCOUNT, true)
+    final override suspend fun getEditIntent(): Intent? =
+        when (val candidate = accountForNewTransaction()) {
+            is AccountForNewTransactionResult.None -> {
+                showSnackBar(R.string.no_accounts)
+                null
+            }
+            is AccountForNewTransactionResult.Found, AccountForNewTransactionResult.Aggregate -> {
+                super.getEditIntent()!!.apply {
+                    if (candidate is AccountForNewTransactionResult.Found) {
+                        putExtra(KEY_ACCOUNTID, candidate.account.id)
+                        putExtra(KEY_CURRENCY, candidate.account.currency)
+                        putExtra(KEY_COLOR, candidate.account.color)
+                    }
+                    val accountId = selectedAccountId
+                    if (isAggregate(accountId)) {
+                        putExtra(ExpenseEdit.KEY_AUTOFILL_MAY_SET_ACCOUNT, true)
+                    }
                 }
             }
-        } else {
-            showSnackBar(R.string.no_accounts)
-            null
         }
-    }
 
     override fun onAction(action: CompletedAction, index: Int?) {
         when (action) {

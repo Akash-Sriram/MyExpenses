@@ -80,7 +80,6 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.temporal.JulianFields
-import java.util.Calendar
 import java.util.Locale
 import javax.inject.Inject
 
@@ -552,6 +551,6 @@ class HistoryChart : Fragment() {
         //julian day 0 is monday -> Only if week starts with monday it divides without remainder by 7
         //for the x axis we need an Integer for proper rendering, for printing the week range, we add the offset from monday
         private val JULIAN_DAY_WEEK_OFFSET =
-            if (DatabaseConstants.weekStartsOn == Calendar.SUNDAY) 6 else DatabaseConstants.weekStartsOn - Calendar.MONDAY
+            if (DatabaseConstants.weekStartsOn == 1) 6 else DatabaseConstants.weekStartsOn - 2
     }
 }

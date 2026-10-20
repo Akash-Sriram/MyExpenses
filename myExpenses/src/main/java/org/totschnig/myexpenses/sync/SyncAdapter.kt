@@ -79,9 +79,9 @@ import org.totschnig.myexpenses.util.io.isConnectedWifi
 import org.totschnig.myexpenses.util.safeMessage
 import timber.log.Timber
 import java.io.IOException
-import java.text.SimpleDateFormat
+import java.time.LocalDate
 import java.time.LocalTime
-import java.util.Date
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -618,7 +618,7 @@ class SyncAdapter @JvmOverloads constructor(
                 try {
                     if (fileName == null) {
                         report(Exception("KEY_UPLOAD_AUTO_BACKUP_NAME empty"))
-                        fileName = "backup-" + SimpleDateFormat("yyyMMdd", Locale.US).format(Date())
+                        fileName = "backup-" + DateTimeFormatter.ofPattern("uuuuMMdd", Locale.US).format(LocalDate.now())
                     }
                     log().i("Storing backup %s (%s)", fileName, autoBackupFileUri)
                     backend.storeBackup(autoBackupFileUri.toUri(), fileName)

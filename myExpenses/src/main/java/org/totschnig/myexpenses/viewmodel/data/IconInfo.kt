@@ -68,10 +68,12 @@ data class IconInfo(val unicode: Char, @StringRes override val label: Int, val i
     val font = if (isBrand) R.font.fa_brands_400 else R.font.fa_solid_900
     val fontFamily = if (isBrand) fontAwesomeBrand else fontAwesomeSolid
     override fun asDrawable(context: Context, @AttrRes colorAttr: Int): Drawable? =
-        FontDrawable.Builder(context, unicode, ResourcesCompat.getFont(context, font))
-            .setSizeDp(24)
-            .setColor(UiUtils.getColor(context, colorAttr))
-            .build()
+        FontDrawable(
+            char = unicode,
+            typeface = ResourcesCompat.getFont(context, font),
+            sizePx = (24 * context.resources.displayMetrics.density).toInt(),
+            color = UiUtils.getColor(context, colorAttr)
+        )
 }
 
 data class ExtraIcon(@DrawableRes val drawable: Int, @StringRes override val label: Int) :

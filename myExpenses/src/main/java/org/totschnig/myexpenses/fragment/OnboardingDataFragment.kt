@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.fragment
 
 import android.content.Intent
 import android.os.Bundle
-import android.text.TextUtils
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -81,7 +80,7 @@ class OnboardingDataFragment : OnboardingFragment(), AdapterView.OnItemSelectedL
         val label = binding.Label.text.toString()
         outState.putBoolean(
             KEY_LABEL_UNCHANGED_OR_EMPTY,
-            TextUtils.isEmpty(label) || label == getString(R.string.default_account_name)
+            label.isEmpty() || label == getString(R.string.default_account_name)
         )
     }
 

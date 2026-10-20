@@ -16,7 +16,6 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import app.cash.copper.flow.mapToList
 import app.cash.copper.flow.observeQuery
-import arrow.core.Tuple4
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -289,6 +288,13 @@ open class MyExpensesV2ViewModel(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribedWithTimeout, null)
     }
 
+    private data class AccountsAggregateParams(
+        val accounts: List<FullAccount>,
+        val activeFilter: AccountGroupingKey?,
+        val grouping: AccountGrouping<*>,
+        val aggregateAccountBalanceType: BalanceType
+    )
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val accountList by lazy {
         combine(
@@ -297,7 +303,7 @@ open class MyExpensesV2ViewModel(
             accountGrouping.flow,
             aggregateAccountBalanceType.flow
         ) { accounts, activeFilter, accountGrouping, aggregateAccountBalanceType ->
-            Tuple4(accounts, activeFilter, accountGrouping, aggregateAccountBalanceType)
+            AccountsAggregateParams(accounts, activeFilter, accountGrouping, aggregateAccountBalanceType)
         }.flatMapLatest { (accounts, activeFilter, grouping, aggregateAccountBalanceType) ->
 
             combine(

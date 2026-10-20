@@ -52,7 +52,8 @@ open class Repository @Inject constructor(
     val currencyContext: CurrencyContext,
     val prefHandler: PrefHandler,
     val dataStore: DataStore<Preferences>,
-    val plannerUtils: PlannerUtils
+    val plannerUtils: PlannerUtils,
+    val preferencesHolder: org.totschnig.myexpenses.preference.PreferencesHolder,
 ) {
     companion object {
         const val UUID_SEPARATOR = ":"

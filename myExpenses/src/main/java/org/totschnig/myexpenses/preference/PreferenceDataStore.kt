@@ -17,8 +17,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.dialog.MenuItem
-import org.totschnig.myexpenses.dialog.name
-import org.totschnig.myexpenses.dialog.valueOf
 import org.totschnig.myexpenses.provider.KEY_DYNAMIC
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import java.io.IOException

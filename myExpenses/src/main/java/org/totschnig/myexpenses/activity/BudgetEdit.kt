@@ -15,7 +15,6 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.evernote.android.state.State
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
@@ -59,7 +58,6 @@ class BudgetEdit : EditActivity(), AdapterView.OnItemSelectedListener,
 
     val filterRequestKey = "confirmFilterBudget"
 
-    @State
     var accountId: Long = 0
 
     private val allFilterChips: Array<ScrollingChip>
@@ -143,6 +141,9 @@ class BudgetEdit : EditActivity(), AdapterView.OnItemSelectedListener,
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            accountId = savedInstanceState.getLong(KEY_ACCOUNT_ID, 0L)
+        }
         binding = OneBudgetBinding.inflate(layoutInflater)
         setContentView(binding.root)
         floatingActionButton = binding.fab.CREATECOMMAND
@@ -356,7 +357,16 @@ class BudgetEdit : EditActivity(), AdapterView.OnItemSelectedListener,
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putLong(KEY_ACCOUNT_ID, accountId)
+    }
+
     private fun selectedAccount() = binding.Accounts.selectedItem as AccountMinimal
+
+    companion object {
+        private const val KEY_ACCOUNT_ID = "key_account_id"
+    }
 }
 
 class GroupingAdapter(context: Context) : ArrayAdapter<Grouping>(

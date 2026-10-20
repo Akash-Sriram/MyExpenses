@@ -20,7 +20,11 @@ import android.os.Bundle
 import android.text.TextUtils
 import androidx.activity.viewModels
 import androidx.core.os.BundleCompat
-import com.evernote.android.state.State
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
 import com.google.android.material.snackbar.Snackbar
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
 import eltos.simpledialogfragment.form.Input
@@ -36,6 +40,7 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.io.displayName
 import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.viewmodel.BackupViewModel
+import org.totschnig.myexpenses.viewmodel.BackupViewModel.BackupPurgeInfo
 import org.totschnig.myexpenses.viewmodel.BackupViewModel.BackupState
 import org.totschnig.myexpenses.viewmodel.BackupViewModel.BackupState.Running
 import org.totschnig.myexpenses.viewmodel.RestoreViewModel.Companion.KEY_ENCRYPT
@@ -46,12 +51,16 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
     OnDialogResultListener {
     private val backupViewModel: BackupViewModel by viewModels()
 
-    @State
     var taskResult = RESULT_OK
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            taskResult = savedInstanceState.getInt(KEY_TASK_RESULT, RESULT_OK)
+        }
         requireApplication().appComponent.inject(backupViewModel)
-        backupViewModel.getBackupState().observe(this) { backupState: BackupState ->
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                backupViewModel.backupState.filterNotNull().collect { backupState: BackupState ->
             val onDismissed: Snackbar.Callback = object : Snackbar.Callback() {
                 override fun onDismissed(transientBottomBar: Snackbar, event: Int) {
                     if (event == DISMISS_EVENT_SWIPE || event == DISMISS_EVENT_ACTION) {
@@ -64,7 +73,7 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
                 is BackupState.Prepared -> backupState.appDir.onSuccess { file ->
                     if (supportFragmentManager.findFragmentByTag(FRAGMENT_TAG_CONFIRM_BACKUP) == null) {
                         val isProtected =
-                            !TextUtils.isEmpty(prefHandler.getString(PrefKey.EXPORT_PASSWORD, null))
+                            !prefHandler.getString(PrefKey.EXPORT_PASSWORD, null).isNullOrEmpty()
                         val message = StringBuilder().append(
                             getString(
                                 R.string.warning_backup,
@@ -132,13 +141,14 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
                             val uris = ArrayList<Uri>()
                             uris.add(file.uri)
                             baseViewModel.share(
-                                this, uris,
+                                this@BackupRestoreActivity, uris,
                                 prefHandler.requireString(PrefKey.SHARE_TARGET, "").trim(),
                                 "application/zip"
                             )
                         }
-                        extraData.fold(
-                            ifLeft = { purgeList ->
+                        when (extraData) {
+                            is BackupPurgeInfo.PendingConfirmation -> {
+                                val purgeList = extraData.files
                                 if (purgeList.isEmpty()) {
                                     showDismissibleSnackBar(message, onDismissed)
                                 } else {
@@ -166,12 +176,12 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
                                     })
                                         .show(supportFragmentManager, FRAGMENT_TAG_CONFIRM_PURGE)
                                 }
-                            },
-                            ifRight = { list ->
-                                message += BackupViewModel.purgeResult2Message(this, list)
+                            }
+                            is BackupPurgeInfo.AlreadyPurged -> {
+                                message += BackupViewModel.purgeResult2Message(this@BackupRestoreActivity, extraData.results)
                                 showDismissibleSnackBar(message, onDismissed)
                             }
-                        )
+                        }
                     }
                 }.onFailure {
                     CrashHandler.report(it)
@@ -191,6 +201,8 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
                 }
             }
         }
+    }
+}
         if (savedInstanceState != null) {
             return
         }
@@ -254,8 +266,8 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
         encrypt: Boolean
     ) {
         val args = buildRestoreArgs(mUri, encrypt)
-        backupViewModel.isEncrypted(mUri).observe(this) { result ->
-            result.onFailure {
+        lifecycleScope.launch {
+            backupViewModel.checkIsEncrypted(mUri).onFailure {
                 showDismissibleSnackBar(it.safeMessage, object : Snackbar.Callback() {
                     override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
                         finish()
@@ -269,7 +281,7 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
                                 .text(prefHandler.getString(PrefKey.EXPORT_PASSWORD, "")).required()
                         )
                         .extra(args)
-                        .show(this, DIALOG_TAG_PASSWORD)
+                        .show(this@BackupRestoreActivity, DIALOG_TAG_PASSWORD)
                 } else {
                     if (calledFromOnboarding) {
                         doRestore(args)
@@ -339,7 +351,13 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
         abort()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_TASK_RESULT, taskResult)
+    }
+
     companion object {
+        private const val KEY_TASK_RESULT = "key_task_result"
         const val FRAGMENT_TAG_CONFIRM_BACKUP = "CONFIRM_BACKUP"
         const val FRAGMENT_TAG_CONFIRM_PURGE = "CONFIRM_PURGE"
         private const val DIALOG_TAG_PASSWORD = "PASSWORD"

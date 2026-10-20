@@ -16,7 +16,6 @@ import org.totschnig.myexpenses.db2.FLAG_NEUTRAL
 import org.totschnig.myexpenses.db2.FLAG_TRANSFER
 import org.totschnig.myexpenses.db2.entities.Transaction
 import org.totschnig.myexpenses.dialog.MenuItem
-import org.totschnig.myexpenses.dialog.valueOf
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_TRANSACTIONID
 import org.totschnig.myexpenses.util.Utils
@@ -34,7 +33,6 @@ import org.totschnig.myexpenses.viewmodel.Payee
 import org.totschnig.myexpenses.viewmodel.Position
 import org.totschnig.myexpenses.viewmodel.ReferenceNumber
 import org.totschnig.myexpenses.viewmodel.Tags
-import java.util.Calendar
 import java.util.Locale
 import kotlin.jvm.java
 
@@ -137,7 +135,7 @@ interface PrefHandler {
             getString(PrefKey.GROUP_WEEK_STARTS)?.toInt()
         } catch (_: NumberFormatException) {
             null
-        }.takeIf { it in Calendar.SUNDAY..Calendar.SATURDAY }
+        }.takeIf { it in 1..7 }
 
     fun weekStartWithFallback(locale: Locale = Locale.getDefault()) =
         weekStart ?: Utils.getFirstDayOfWeek(locale)

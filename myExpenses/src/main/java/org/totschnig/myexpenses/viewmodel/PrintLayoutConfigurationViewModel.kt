@@ -9,7 +9,6 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.util.fastForEachReversed
 import androidx.lifecycle.AndroidViewModel
-import com.livefront.sealedenum.GenSealedEnum
 import kotlinx.coroutines.delay
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
@@ -55,8 +54,11 @@ data class CombinedField(val fields: List<SimpleField>) : Field() {
 
 @Serializable
 sealed class SimpleField(@StringRes val label: Int) : Field() {
-    @GenSealedEnum
-    companion object;
+    companion object {
+        val values: List<SimpleField> by lazy {
+            listOf(Date, Category, Tags, Payee, Notes, Amount, ReferenceNumber, Account, OriginalAmount)
+        }
+    }
 
     override fun toString(context: Context, extra: Bundle?) = context.getString(label)
 }

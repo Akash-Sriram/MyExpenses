@@ -25,8 +25,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import android.app.Activity
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.launch
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import com.google.android.material.snackbar.Snackbar
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
@@ -80,16 +78,17 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
     @Inject
     lateinit var currencyContext: CurrencyContext
 
-    @State
     var resolutionPendingForGroup = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val appComponent = (requireActivity().application as MyApplication).appComponent
         appComponent.inject(this)
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            resolutionPendingForGroup = savedInstanceState.getInt(KEY_RESOLUTION_PENDING_FOR_GROUP, -1)
+        }
         viewModel = ViewModelProvider(this)[modelClass]
         appComponent.inject(viewModel)
-        StateSaver.restoreInstanceState(this, savedInstanceState)
     }
 
     override fun onResume() {
@@ -315,7 +314,11 @@ class SyncBackendList : Fragment(), OnGroupExpandListener,
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
+        outState.putInt(KEY_RESOLUTION_PENDING_FOR_GROUP, resolutionPendingForGroup)
+    }
+
+    companion object {
+        private const val KEY_RESOLUTION_PENDING_FOR_GROUP = "key_resolution_pending_for_group"
     }
 
     fun getAccountForSync(packedPosition: Long): Account? {

@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.viewmodel.data
 
 import androidx.annotation.ArrayRes
 import androidx.annotation.StringRes
-import com.livefront.sealedenum.GenSealedEnum
 import org.totschnig.myexpenses.R
 
 sealed class IconCategory(
@@ -80,6 +79,21 @@ sealed class IconCategory(
     data object Writing: IconCategory(R.string.category_writing_label, R.array.category_writing_icons)
 
 
-    @GenSealedEnum
-    companion object
+    companion object {
+        val values: List<IconCategory> by lazy {
+            listOf(
+                Accessibility, Alert, Alphabet, Animals, Arrows, Astronomy, Automotive,
+                Buildings, Business, Camping, Charity, ChartsDiagrams, Childhood,
+                ClothingFashion, Coding, Communication, Connectivity, Construction,
+                Design, DevicesHardware, Disaster, Editing, Education, Emoji, Energy,
+                Files, FilmVideo, FoodBeverage, FruitsVegetables, Gaming, Gender,
+                Halloween, Hands, Holidays, Household, Humanitarian, Logistics,
+                Maps, Maritime, Marketing, Mathematics, MediaPlayback, MedicalHealth,
+                Money, Moving, MusicAudio, Nature, Numbers, PhotosImages, Political,
+                PunctuationSymbols, Religion, Science, ScienceFiction, Security,
+                Shapes, Shopping, Social, Spinners, SportsFitness, TextFormatting,
+                Time, Toggle, Transportation, TravelHotel, UsersPeople, Weather, Writing
+            )
+        }
+    }
 }

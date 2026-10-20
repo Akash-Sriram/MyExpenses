@@ -16,7 +16,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
-import com.evernote.android.state.State
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.databinding.OnboardingBinding
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
@@ -34,12 +33,13 @@ import org.totschnig.myexpenses.viewmodel.RestoreViewModel.Companion.KEY_BACKUP_
 import org.totschnig.myexpenses.viewmodel.RestoreViewModel.Companion.KEY_PASSWORD
 import org.totschnig.myexpenses.viewmodel.SyncViewModel.SyncAccountData
 
+private const val KEY_ACCOUNT_NAME = "key_account_name"
+
 class OnboardingActivity : SyncBackendSetupActivity() {
     private lateinit var binding: OnboardingBinding
     private lateinit var pagerAdapter: MyPagerAdapter
     private lateinit var onBackPressedCallback: OnBackPressedCallback
 
-    @State
     var accountName: String? = null
 
     override val drawToTopEdge = true
@@ -57,6 +57,8 @@ class OnboardingActivity : SyncBackendSetupActivity() {
                 //maybe when data is restored via Play Store app backup
                 CrashHandler.report(e)
             }
+        } else {
+            accountName = savedInstanceState.getString(KEY_ACCOUNT_NAME)
         }
         super.onCreate(savedInstanceState)
         binding = OnboardingBinding.inflate(layoutInflater)
@@ -82,6 +84,11 @@ class OnboardingActivity : SyncBackendSetupActivity() {
                 onBackPressedCallback.isEnabled = position > 0
             }
         })
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_ACCOUNT_NAME, accountName)
     }
 
     override fun onCreateOptionsMenu(menu: Menu) = false //skip help

@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.provider
 
 import android.net.Uri
-import android.text.TextUtils
 import androidx.core.text.isDigitsOnly
 import org.totschnig.myexpenses.db2.DEFAULT_CATEGORY_PATH_SEPARATOR
 import org.totschnig.myexpenses.db2.FLAG_EXPENSE
@@ -977,7 +976,7 @@ fun transactionSumQuery(
 
     val accountSelector = "$CTE_SEARCH.${uri.accountSelector}"
     val selection =
-        if (TextUtils.isEmpty(selectionIn)) accountSelector else "$selectionIn AND $accountSelector"
+        if (selectionIn.isNullOrEmpty()) accountSelector else "$selectionIn AND $accountSelector"
     val aggregateNeutral = uri.getBooleanQueryParameter(QUERY_PARAMETER_AGGREGATE_NEUTRAL, false)
     val forHome =
         uri.getQueryParameter(KEY_ACCOUNTID) == null && uri.getQueryParameter(KEY_CURRENCY) == null

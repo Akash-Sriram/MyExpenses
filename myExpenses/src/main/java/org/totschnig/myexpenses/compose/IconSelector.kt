@@ -54,7 +54,6 @@ import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.viewmodel.data.ExtraIcons
 import org.totschnig.myexpenses.viewmodel.data.IIconInfo
 import org.totschnig.myexpenses.viewmodel.data.IconCategory
-import org.totschnig.myexpenses.viewmodel.data.values
 import timber.log.Timber
 
 @Composable

@@ -23,7 +23,6 @@ import androidx.appcompat.widget.AppCompatCheckBox
 import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.evernote.android.state.State
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
@@ -40,6 +39,8 @@ import org.totschnig.myexpenses.viewmodel.MethodViewModel
 import org.totschnig.myexpenses.viewmodel.data.IIconInfo
 
 private const val KEY_SELECTED_TYPES = "selectedTypes"
+private const val KEY_PRE_DEFINED = "key_pre_defined"
+private const val KEY_ICON = "key_icon"
 
 class MethodEdit : EditActivity(), CompoundButton.OnCheckedChangeListener, OnIconSelectedListener {
     lateinit var binding: OneMethodBinding
@@ -50,10 +51,8 @@ class MethodEdit : EditActivity(), CompoundButton.OnCheckedChangeListener, OnIco
     private val rowId: Long
         get() = intent.extras?.getLong(KEY_ROWID) ?: 0
 
-    @State
     var preDefined: PreDefinedPaymentMethod? = null
 
-    @State
     var icon: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +65,8 @@ class MethodEdit : EditActivity(), CompoundButton.OnCheckedChangeListener, OnIco
         if (savedInstanceState == null) {
             populateFields()
         } else {
+            preDefined = savedInstanceState.getString(KEY_PRE_DEFINED)?.let { runCatching { PreDefinedPaymentMethod.valueOf(it) }.getOrNull() }
+            icon = savedInstanceState.getString(KEY_ICON)
             lifecycleScope.launch {
                 setUpAccountTypeGrid(
                     viewModel.accountTypesRaw.first(),
@@ -90,10 +91,14 @@ class MethodEdit : EditActivity(), CompoundButton.OnCheckedChangeListener, OnIco
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putLongArray(KEY_SELECTED_TYPES, selectedTypes.toLongArray())
+        outState.putString(KEY_PRE_DEFINED, preDefined?.name)
+        outState.putString(KEY_ICON, icon)
     }
 
     override fun onRestoreInstanceState(savedInstanceState: Bundle) {
         super.onRestoreInstanceState(savedInstanceState)
+        preDefined = savedInstanceState.getString(KEY_PRE_DEFINED)?.let { runCatching { PreDefinedPaymentMethod.valueOf(it) }.getOrNull() }
+        icon = savedInstanceState.getString(KEY_ICON)
         setupListeners()
         configureIcon()
     }

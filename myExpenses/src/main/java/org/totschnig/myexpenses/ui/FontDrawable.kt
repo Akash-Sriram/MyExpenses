@@ -9,10 +9,13 @@ class FontDrawable(
     val char: Char,
     private val typeface: Typeface?,
     private var sizePx: Int,
-    @ColorInt private var color: Int
+    @ColorInt private var color: Int = Color.BLACK
 ) : Drawable() {
 
-    @JvmField
+    init {
+        setBounds(0, 0, sizePx, sizePx)
+    }
+
     val fontCode: Char = char
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -44,23 +47,4 @@ class FontDrawable(
 
     override fun getIntrinsicWidth(): Int = sizePx
     override fun getIntrinsicHeight(): Int = sizePx
-
-    class Builder(private val context: Context, private val char: Char, private val typeface: Typeface?) {
-        private var sizePx = (24 * context.resources.displayMetrics.density).toInt()
-        private var color = Color.BLACK
-
-        fun setSizeDp(dp: Int) = apply {
-            this.sizePx = (dp * context.resources.displayMetrics.density).toInt()
-        }
-
-        fun setColor(@ColorInt color: Int) = apply {
-            this.color = color
-        }
-
-        fun build(): FontDrawable {
-            val drawable = FontDrawable(char, typeface, sizePx, color)
-            drawable.setBounds(0, 0, sizePx, sizePx)
-            return drawable
-        }
-    }
 }

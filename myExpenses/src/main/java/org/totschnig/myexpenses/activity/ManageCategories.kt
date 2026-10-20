@@ -58,6 +58,7 @@ import org.totschnig.myexpenses.compose.ExpansionMode
 import org.totschnig.myexpenses.compose.MenuEntry
 import org.totschnig.myexpenses.compose.MenuEntry.Companion.delete
 import org.totschnig.myexpenses.compose.MenuEntry.Companion.edit
+import org.totschnig.myexpenses.compose.icons.ArrowsAlt
 import org.totschnig.myexpenses.compose.MenuEntry.Companion.select
 import org.totschnig.myexpenses.compose.TypeConfiguration
 import org.totschnig.myexpenses.compose.rememberMutableStateListOf
@@ -384,7 +385,7 @@ class ManageCategories : ProtectedFragmentActivity(),
                                                         MenuEntry(
                                                             label = R.string.menu_move,
                                                             command = "MOVE_CATEGORY",
-                                                            icon = myiconpack.ArrowsAlt
+                                                            icon = ArrowsAlt
                                                         ) { showMoveTargetDialog(cat) }
                                                     )
                                             }

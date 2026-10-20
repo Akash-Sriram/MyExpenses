@@ -7,11 +7,6 @@
         <licence>GPL v2.0</licence>
     </project>
     <project>
-        <name>iText</name>
-        <url>http://itextpdf.com</url>
-        <licence>Affero General Public License</licence>
-    </project>
-    <project>
         <name>MPAndroidChart</name>
         <url>https://github.com/PhilJay/MPAndroidChart</url>
         <licence>Apache License, Version 2.0</licence>
@@ -36,11 +31,6 @@
         <name>Caldroid</name>
         <url>https://github.com/roomorama/Caldroid</url>
         <licence>MIT licence</licence>
-    </project>
-    <project>
-        <name>Android-State</name>
-        <url>https://github.com/evernote/android-state/</url>
-        <licence>Eclipse Public License -v 1.0</licence>
     </project>
     <project>
         <name>dav4android</name>

@@ -20,7 +20,6 @@ import android.text.TextWatcher
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.OnBackPressedCallback
-import com.evernote.android.state.State
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
 import org.totschnig.myexpenses.injector
@@ -38,12 +37,10 @@ abstract class EditActivity : ProtectedFragmentActivity(), TextWatcher, ButtonWi
     ExchangeRateEdit.Host {
     protected var isSaving = false
 
-    @State
     var isDirty = false
 
     private lateinit var onBackPressedCallback: OnBackPressedCallback
 
-    @State
     var newInstance = true
 
     @Inject
@@ -114,6 +111,10 @@ abstract class EditActivity : ProtectedFragmentActivity(), TextWatcher, ButtonWi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            isDirty = savedInstanceState.getBoolean(KEY_IS_DIRTY, false)
+            newInstance = savedInstanceState.getBoolean(KEY_NEW_INSTANCE, true)
+        }
         onBackPressedCallback = object : OnBackPressedCallback(isDirty) {
             override fun handleOnBackPressed() {
                 if (isDirty) {
@@ -168,4 +169,15 @@ abstract class EditActivity : ProtectedFragmentActivity(), TextWatcher, ButtonWi
             Result.failure(it.transformForUser(this, other.code, base.code))
         }
     )
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_IS_DIRTY, isDirty)
+        outState.putBoolean(KEY_NEW_INSTANCE, newInstance)
+    }
+
+    companion object {
+        private const val KEY_IS_DIRTY = "key_is_dirty"
+        private const val KEY_NEW_INSTANCE = "key_new_instance"
+    }
 }

@@ -5,7 +5,7 @@ import android.content.res.ColorStateList
 import android.util.AttributeSet
 import android.view.MotionEvent
 import androidx.core.widget.TextViewCompat
-import com.evernote.android.state.State
+import android.os.Bundle
 import com.google.android.material.datepicker.MaterialDatePicker
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.injector
@@ -33,9 +33,11 @@ class DateButton @JvmOverloads constructor(
     private var lastTouchDownX: Float? = null
     private val marginTouchWidth = UiUtils.dp2Px(36F, resources)
 
-    @State
-    @JvmField
     var date: LocalDate = LocalDate.now()
+        set(value) {
+            field = value
+            update()
+        }
 
     private val formatter: DateTimeFormatter = getDateTimeFormatter(context, shortYear = true)
 
@@ -97,13 +99,8 @@ class DateButton @JvmOverloads constructor(
     }
 
     private fun setDateInternal(localDate: LocalDate) {
-        setDate(localDate)
-        host.onValueSet(this)
-    }
-
-    fun setDate(localDate: LocalDate) {
         date = localDate
-        update()
+        host.onValueSet(this)
     }
 
     override val fragmentTag: String
@@ -134,5 +131,19 @@ class DateButton @JvmOverloads constructor(
     fun overrideText(text: CharSequence) {
         this.text = text
         setCompoundDrawables(null, null, null, null)
+    }
+
+    override fun onSaveCustomState(bundle: Bundle) {
+        bundle.putString(KEY_DATE, date.toString())
+    }
+
+    override fun onRestoreCustomState(bundle: Bundle) {
+        bundle.getString(KEY_DATE)?.let {
+            date = runCatching { LocalDate.parse(it) }.getOrDefault(LocalDate.now())
+        }
+    }
+
+    companion object {
+        private const val KEY_DATE = "date"
     }
 }

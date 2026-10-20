@@ -46,7 +46,6 @@ import java.util.Arrays
 
 object DialogUtils {
 
-    @JvmStatic
     fun showPasswordDialog(
         ctx: BaseActivity,
         dialog: AlertDialog?,
@@ -66,7 +65,6 @@ object DialogUtils {
         b?.setOnClickListener(passwordDialogListener)
     }
 
-    @JvmStatic
     fun passwordDialog(ctx: Activity, cancelable: Boolean): AlertDialog {
         val prefHandler = (ctx.application as MyApplication).appComponent.prefHandler()
         val securityQuestion = prefHandler.getString(PrefKey.SECURITY_QUESTION, "")
@@ -142,7 +140,6 @@ object DialogUtils {
         }
     }
 
-    @JvmStatic
     fun configureEncoding(spinner: Spinner, context: Context?, prefHandler: PrefHandler, prefName: String) {
         if (context == null) return
         spinner.setSelection(
@@ -151,7 +148,6 @@ object DialogUtils {
         )
     }
 
-    @JvmStatic
     fun configureDelimiter(spinner: Spinner, context: Context?, prefHandler: PrefHandler, prefName: String) {
         if (context == null) return
         spinner.setSelection(
@@ -160,7 +156,6 @@ object DialogUtils {
         )
     }
 
-    @JvmStatic
     fun openBrowse(
         uri: Uri?,
         launcher: ActivityResultLauncher<Intent>,
@@ -184,7 +179,6 @@ object DialogUtils {
         }
     }
 
-    @JvmStatic
     fun showSyncUnlinkConfirmationDialog(context: FragmentActivity, syncAccountName: String?, uuid: String?) {
         val b = Bundle().apply {
             putString(

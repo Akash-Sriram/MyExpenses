@@ -41,8 +41,8 @@ import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.io.displayName
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 class ExportViewModel(application: Application) : ContentResolvingAndroidViewModel(application) {
@@ -135,8 +135,7 @@ class ExportViewModel(application: Application) : ContentResolvingAndroidViewMod
                         }
                         if (destDir != null) {
                             val successfullyExported = ArrayList<Account>()
-                            val simpleDateFormat = SimpleDateFormat("yyyMMdd-HHmmss", Locale.US)
-                            val now = Date()
+                            val now = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.US).format(LocalDateTime.now())
                             var append = false
                             for (i in accountIds.indices) {
                                 account = repository.loadAccount(accountIds[i])
@@ -144,10 +143,7 @@ class ExportViewModel(application: Application) : ContentResolvingAndroidViewMod
                                 publishProgress(account.label + " ...")
                                 try {
                                     val fileNameForAccount =
-                                        if (oneFile) fileName else String.format(
-                                            "%s-%s", Utils.escapeForFileName(account.label),
-                                            simpleDateFormat.format(now)
-                                        )
+                                        if (oneFile) fileName else "${Utils.escapeForFileName(account.label)}-$now"
                                     val exporter = when (format) {
                                         ExportFormat.CSV -> {
                                             val withOriginalAmountAndEquivalentAmount = prefHandler.getBoolean(

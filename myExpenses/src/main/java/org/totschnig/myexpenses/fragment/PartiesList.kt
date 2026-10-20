@@ -38,8 +38,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener.BUTTON_POSITIVE
 import kotlinx.coroutines.launch
@@ -371,11 +369,13 @@ class PartiesList : Fragment(), OnDialogResultListener {
     // This property is only valid between onCreateView and onDestroyView.
     private val binding get() = _binding!!
 
-    @State
     var mergeMode: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            mergeMode = savedInstanceState.getBoolean(KEY_MERGE_MODE, false)
+        }
         with((requireActivity().application as MyApplication).appComponent) {
             inject(this@PartiesList)
             inject(viewModel)
@@ -393,8 +393,6 @@ class PartiesList : Fragment(), OnDialogResultListener {
             adapter.clearSelection()
             resetAdapter()
         }
-
-        StateSaver.restoreInstanceState(this, savedInstanceState)
     }
 
     override fun onDestroyView() {
@@ -478,7 +476,7 @@ class PartiesList : Fragment(), OnDialogResultListener {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
+        outState.putBoolean(KEY_MERGE_MODE, mergeMode)
         adapter.onSaveInstanceState(outState)
     }
 
@@ -562,6 +560,7 @@ class PartiesList : Fragment(), OnDialogResultListener {
     }
 
     companion object {
+        private const val KEY_MERGE_MODE = "key_merge_mode"
         const val DIALOG_DEBT_DETAILS = "DEBT_DETAILS"
         const val DIALOG_EDIT_PARTY = "dialogEditParty"
         const val DIALOG_MERGE_PARTY = "dialogMergeParty"

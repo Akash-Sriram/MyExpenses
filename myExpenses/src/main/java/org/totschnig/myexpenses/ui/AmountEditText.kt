@@ -6,9 +6,9 @@ import android.text.InputFilter.LengthFilter
 import android.text.InputType
 import android.util.AttributeSet
 import androidx.appcompat.widget.AppCompatEditText
-import arrow.core.flatMap
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
+import android.os.Bundle
+import androidx.core.os.BundleCompat
+import org.totschnig.myexpenses.util.flatMap
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
@@ -26,7 +26,6 @@ class AmountEditText(
 
     private val decimalSeparator: Char = Utils.getDefaultDecimalSeparator()
 
-    @State
     var fractionDigits = -1
         set(value) {
             if (field != value) {
@@ -63,11 +62,19 @@ class AmountEditText(
     private var numberFormat = DecimalFormat()
 
     override fun onSaveInstanceState(): Parcelable {
-        return StateSaver.saveInstanceState(this, super.onSaveInstanceState())
+        val bundle = Bundle()
+        bundle.putParcelable(KEY_SUPER_STATE, super.onSaveInstanceState())
+        bundle.putInt(KEY_FRACTION_DIGITS, fractionDigits)
+        return bundle
     }
 
     override fun onRestoreInstanceState(state: Parcelable) {
-        super.onRestoreInstanceState(StateSaver.restoreInstanceState(this, state))
+        if (state is Bundle) {
+            fractionDigits = state.getInt(KEY_FRACTION_DIGITS, -1)
+            super.onRestoreInstanceState(BundleCompat.getParcelable(state, KEY_SUPER_STATE, Parcelable::class.java))
+        } else {
+            super.onRestoreInstanceState(state)
+        }
     }
 
     fun setAmount(amount: BigDecimal) {
@@ -112,5 +119,10 @@ class AmountEditText(
             FractionDigitsInputFilter(decimalSeparator, otherSeparator, fractionDigits),
             LengthFilter(16)
         )
+    }
+
+    companion object {
+        private const val KEY_SUPER_STATE = "super_state"
+        private const val KEY_FRACTION_DIGITS = "fraction_digits"
     }
 }

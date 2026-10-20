@@ -2,8 +2,8 @@ package org.totschnig.myexpenses.ui
 
 import android.content.Context
 import android.content.ContextWrapper
-import android.os.Parcel
 import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.AttributeSet
@@ -17,7 +17,7 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.viewbinding.ViewBinding
-import arrow.core.flatMap
+import org.totschnig.myexpenses.util.flatMap
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.adapter.CurrencyAdapter
 import org.totschnig.myexpenses.databinding.AmountInputAlternateBinding
@@ -503,7 +503,7 @@ class AmountInput(context: Context, attrs: AttributeSet?) : ConstraintLayout(con
         val savedState = state as SavedState
         super.onRestoreInstanceState(savedState.superState)
         typeButton.onRestoreInstanceState(savedState.typeButtonState)
-        amountEditText.onRestoreInstanceState(savedState.amountEditTextState)
+        savedState.amountEditTextState?.let { amountEditText.onRestoreInstanceState(it) }
         currencySpinnerHelper.spinner.onRestoreInstanceState(savedState.currencySpinnerState)
         exchangeRateEdit.setRate(savedState.exchangeRateState, true)
         if (savedState.focusedId != 0) {
@@ -520,54 +520,13 @@ class AmountInput(context: Context, attrs: AttributeSet?) : ConstraintLayout(con
         super.dispatchThawSelfOnly(container)
     }
 
-    internal class SavedState : BaseSavedState {
-        val typeButtonState: Parcelable
-        val amountEditTextState: Parcelable
-        val currencySpinnerState: Parcelable
-        val exchangeRateState: BigDecimal?
-        val focusedId: Int
-
-        constructor(source: Parcel) : super(source) {
-            val classLoader = javaClass.classLoader
-            typeButtonState = source.readParcelable(classLoader, Parcelable::class.java)!!
-            amountEditTextState = source.readParcelable(classLoader, Parcelable::class.java)!!
-            currencySpinnerState = source.readParcelable(classLoader, Parcelable::class.java)!!
-            exchangeRateState = source.readSerializable(classLoader, BigDecimal::class.java)
-            focusedId = source.readInt()
-        }
-
-        constructor(
-            superState: Parcelable,
-            typeButtonState: Parcelable,
-            amountEditTextState: Parcelable,
-            currencySpinnerState: Parcelable,
-            exchangeRateState: BigDecimal?,
-            focusedId: Int,
-        ) : super(superState) {
-            this.typeButtonState = typeButtonState
-            this.amountEditTextState = amountEditTextState
-            this.currencySpinnerState = currencySpinnerState
-            this.exchangeRateState = exchangeRateState
-            this.focusedId = focusedId
-        }
-
-        override fun writeToParcel(destination: Parcel, flags: Int) {
-            super.writeToParcel(destination, flags)
-            destination.writeParcelable(typeButtonState, flags)
-            destination.writeParcelable(amountEditTextState, flags)
-            destination.writeParcelable(currencySpinnerState, flags)
-            destination.writeSerializable(exchangeRateState)
-            destination.writeInt(focusedId)
-        }
-
-        companion object {
-            @Suppress("unused")
-            @JvmField
-            val CREATOR: Parcelable.Creator<SavedState> = object : Parcelable.Creator<SavedState> {
-                override fun createFromParcel(source: Parcel) = SavedState(source)
-
-                override fun newArray(size: Int) = arrayOfNulls<SavedState>(size)
-            }
-        }
-    }
+    @Parcelize
+    internal class SavedState(
+        val superState: Parcelable?,
+        val typeButtonState: Parcelable,
+        val amountEditTextState: Parcelable?,
+        val currencySpinnerState: Parcelable,
+        val exchangeRateState: BigDecimal?,
+        val focusedId: Int,
+    ) : Parcelable
 }

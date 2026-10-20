@@ -4,15 +4,17 @@ import android.app.Application
 import android.content.ContentUris
 import android.content.ContentValues
 import android.database.sqlite.SQLiteConstraintException
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
 import app.cash.copper.flow.mapToList
 import app.cash.copper.flow.observeQuery
 import eltos.simpledialogfragment.form.ColorField
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.dialog.select.SelectFromMappedTableDialogFragment.Companion.accountSelection
 import org.totschnig.myexpenses.dialog.select.SelectFromMappedTableDialogFragment.Companion.accountSelectionArgs
 import org.totschnig.myexpenses.dialog.select.SelectFromMappedTableDialogFragment.Companion.accountSelectionArgsV2
@@ -31,8 +33,8 @@ import org.totschnig.myexpenses.viewmodel.data.Tag
 class TagListViewModel(application: Application, savedStateHandle: SavedStateHandle) :
     TagBaseViewModel(application, savedStateHandle) {
 
-    private val tagsInternal = MutableLiveData<List<Tag>>()
-    val tags: LiveData<List<Tag>> = tagsInternal
+    private val _tags = MutableStateFlow<List<Tag>>(emptyList())
+    val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
 
     fun toggleSelectedTagId(tagId: Long) {
         savedStateHandle[KEY_SELECTED_IDS] = selectedTagIds.apply {
@@ -80,7 +82,7 @@ class TagListViewModel(application: Application, savedStateHandle: SavedStateHan
                 notifyForDescendants = true
             ).mapToList(mapper = Tag.Companion::fromCursor)
                 .collect {
-                    tagsInternal.postValue(it.safeSortedWith(compareBy(getNaturalComparator()) { it.label }))
+                    _tags.value = it.safeSortedWith(compareBy(getNaturalComparator()) { it.label })
                 }
         }
     }
@@ -99,15 +101,15 @@ class TagListViewModel(application: Application, savedStateHandle: SavedStateHan
         }
     }
 
-    fun addTagAndPersist(label: String): LiveData<Tag> =
-        liveData(context = coroutineContext()) {
+    suspend fun addTagAndPersist(label: String): Tag? =
+        withContext(coroutineContext()) {
             contentResolver.insert(
                 TransactionProvider.TAGS_URI,
                 ContentValues().apply { put(KEY_LABEL, label) })?.let {
                 ContentUris.parseId(it)
             }?.let {
                 toggleSelectedTagId(it)
-                emit(Tag(it, label))
+                Tag(it, label)
             }
         }
 

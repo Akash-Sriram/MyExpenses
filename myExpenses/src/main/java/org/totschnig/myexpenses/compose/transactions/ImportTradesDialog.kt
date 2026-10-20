@@ -44,9 +44,9 @@ import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.apache.commons.csv.CSVFormat
-import org.apache.commons.csv.CSVParser
-import org.apache.commons.csv.CSVRecord
+import org.totschnig.myexpenses.util.csv.CSVFormat
+import org.totschnig.myexpenses.util.csv.CSVParser
+import org.totschnig.myexpenses.util.csv.CSVRecord
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.export.qif.QifDateFormat
 import org.totschnig.myexpenses.export.qif.QifUtils
@@ -60,6 +60,7 @@ import org.totschnig.myexpenses.viewmodel.data.TradeIntent
 import org.totschnig.myexpenses.viewmodel.data.TradeType
 import java.io.InputStreamReader
 import java.math.BigDecimal
+import java.time.ZoneId
 import java.math.RoundingMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -420,7 +421,7 @@ private suspend fun parseCsv(
                         TradeIntent(
                             targetAsset = asset,
                             type = type,
-                            date = epochMillis2LocalDateTime(date.time),
+                            date = date.atZone(ZoneId.systemDefault()).toLocalDateTime(),
                             quantity = finalQuantity,
                             price = finalPrice,
                             principal = finalPrincipal,

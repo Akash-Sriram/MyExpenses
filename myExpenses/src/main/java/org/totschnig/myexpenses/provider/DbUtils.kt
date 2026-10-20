@@ -53,7 +53,6 @@ object DbUtils {
         return result
     }
 
-    @JvmStatic
     fun weekStartFromGroupSqlExpression(year: Int, week: Int): String {
         return String.format(
             Locale.US,

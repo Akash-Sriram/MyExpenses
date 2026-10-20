@@ -3,21 +3,24 @@ package org.totschnig.myexpenses.viewmodel
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import org.totschnig.myexpenses.activity.BaseActivity
 import org.totschnig.myexpenses.feature.Callback
 import org.totschnig.myexpenses.feature.Feature
 import org.totschnig.myexpenses.feature.FeatureManager
-import org.totschnig.myexpenses.viewmodel.data.Event
 import javax.inject.Inject
 
 class FeatureViewModel(application: Application) : AndroidViewModel(application) {
     @Inject
     lateinit var featureManager: FeatureManager
 
+    private val _featureState = MutableSharedFlow<FeatureState>(replay = 0, extraBufferCapacity = 1)
+    val featureState: SharedFlow<FeatureState> = _featureState.asSharedFlow()
+
     private fun postAsEvent(state: FeatureState) {
-        featureState.postValue(Event(state))
+        _featureState.tryEmit(state)
     }
 
     fun registerCallback() {
@@ -57,11 +60,7 @@ class FeatureViewModel(application: Application) : AndroidViewModel(application)
         class LanguageAvailable(val language: String) : FeatureState()
     }
 
-    private val featureState = MutableLiveData<Event<FeatureState>>()
 
-    fun getFeatureState(): LiveData<Event<FeatureState>> {
-        return featureState
-    }
 
     fun isFeatureAvailable(context: Context, feature: Feature) =
         featureManager.isFeatureInstalled(feature, context)

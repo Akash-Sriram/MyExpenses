@@ -13,10 +13,9 @@ import android.view.Menu
 import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.os.BundleCompat
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.RecyclerView
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.HELP_VARIANT_PLANNER
@@ -30,9 +29,12 @@ import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.util.ICurrencyFormatter
 import org.totschnig.myexpenses.util.formatMoney
 import org.totschnig.myexpenses.util.getDateTimeFormatter
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.viewmodel.PlanInstanceInfo
 import org.totschnig.myexpenses.viewmodel.PlannerViewModel
-import org.totschnig.myexpenses.viewmodel.data.EventObserver
 import org.totschnig.myexpenses.viewmodel.data.PlanInstance
 import org.totschnig.myexpenses.viewmodel.data.PlanInstanceSet
 import org.totschnig.myexpenses.viewmodel.data.PlanInstanceState
@@ -61,10 +63,8 @@ class PlannerFragment : DialogViewBinding<PlannerFragmentBinding>() {
 
     private val viewModel: PlannerViewModel by viewModels()
 
-    @State
     var instanceUriToUpdate: Uri? = null
 
-    @State
     var selectedInstances: PlanInstanceSet = PlanInstanceSet()
 
     private lateinit var backgroundColor: ColorStateList
@@ -73,7 +73,12 @@ class PlannerFragment : DialogViewBinding<PlannerFragmentBinding>() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        StateSaver.restoreInstanceState(this, savedInstanceState)
+        if (savedInstanceState != null) {
+            instanceUriToUpdate = BundleCompat.getParcelable(savedInstanceState, KEY_INSTANCE_URI_TO_UPDATE, Uri::class.java)
+            BundleCompat.getParcelable(savedInstanceState, KEY_SELECTED_INSTANCES, PlanInstanceSet::class.java)?.let {
+                selectedInstances = it
+            }
+        }
         stateObserver = StateObserver()
         requireContext().contentResolver.registerContentObserver(
             TransactionProvider.PLAN_INSTANCE_STATUS_URI,
@@ -93,7 +98,8 @@ class PlannerFragment : DialogViewBinding<PlannerFragmentBinding>() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
+        outState.putParcelable(KEY_INSTANCE_URI_TO_UPDATE, instanceUriToUpdate)
+        outState.putParcelable(KEY_SELECTED_INSTANCES, selectedInstances)
     }
 
     override fun onDestroy() {
@@ -115,31 +121,42 @@ class PlannerFragment : DialogViewBinding<PlannerFragmentBinding>() {
         val plannerAdapter = PlannerAdapter()
         binding.recyclerView.adapter = plannerAdapter
         binding.Title.movementMethod = LinkMovementMethod.getInstance()
-        viewModel.getInstances().observe(this, EventObserver { list ->
-            val previousCount = plannerAdapter.itemCount
-            plannerAdapter.addData(list)
-            val itemCount = plannerAdapter.itemCount
-            if (previousCount > 0 && itemCount > 0) {
-                binding.recyclerView.layoutManager?.scrollToPosition(if (list.first) itemCount - 1 else 0)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.instances.collect { list ->
+                        val previousCount = plannerAdapter.itemCount
+                        plannerAdapter.addData(list)
+                        val itemCount = plannerAdapter.itemCount
+                        if (previousCount > 0 && itemCount > 0) {
+                            binding.recyclerView.layoutManager?.scrollToPosition(if (list.first) itemCount - 1 else 0)
+                        }
+                    }
+                }
+                launch {
+                    viewModel.title.collect { title ->
+                        binding.Title.text = title
+                    }
+                }
+                launch {
+                    viewModel.updates.collect { update ->
+                        plannerAdapter.postUpdate(update)
+                    }
+                }
+                launch {
+                    viewModel.bulkCompleted.collect { list ->
+                        list.forEach { planInstance ->
+                            viewModel.getUpdateFor(
+                                TransactionProvider.PLAN_INSTANCE_SINGLE_URI(
+                                    planInstance.templateId,
+                                    planInstance.instanceId
+                                )
+                            )
+                        }
+                    }
+                }
             }
-        })
-        viewModel.getTitle().observe(this) { title ->
-            binding.Title.text = title
         }
-        viewModel.getUpdates().observe(this) { update ->
-            //Timber.d("Update posted")
-            plannerAdapter.postUpdate(update)
-        }
-        viewModel.getBulkCompleted().observe(this, EventObserver { list ->
-            list.forEach { planInstance ->
-                viewModel.getUpdateFor(
-                    TransactionProvider.PLAN_INSTANCE_SINGLE_URI(
-                        planInstance.templateId,
-                        planInstance.instanceId
-                    )
-                )
-            }
-        })
         viewModel.loadInstances()
         val alertDialog = builder
             .setPositiveButton(android.R.string.ok, null)
@@ -332,4 +349,8 @@ class PlannerFragment : DialogViewBinding<PlannerFragmentBinding>() {
         }
     }
 
+    companion object {
+        private const val KEY_INSTANCE_URI_TO_UPDATE = "key_instance_uri_to_update"
+        private const val KEY_SELECTED_INSTANCES = "key_selected_instances"
+    }
 }

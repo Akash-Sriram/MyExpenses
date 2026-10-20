@@ -28,7 +28,6 @@ import android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE
 import android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE
 import android.net.Uri
 import android.os.Bundle
-import android.text.TextUtils
 import androidx.annotation.VisibleForTesting
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
@@ -115,7 +114,7 @@ open class TransactionProvider : BaseTransactionProvider() {
 
         if (forCatId != null) {
           val selector = uri.transactionQuerySelector(CTE_SEARCH)
-          sel = if (TextUtils.isEmpty(sel)) selector else (if (TextUtils.isEmpty(selector)) sel else "$sel AND $selector")
+          sel = if (sel.isNullOrEmpty()) selector else (if (selector.isNullOrEmpty()) sel else "$sel AND $selector")
           proj = prepareProjectionForTransactions(proj, CTE_SEARCH, uri.getBooleanQueryParameter(QUERY_PARAMETER_SHORTEN_COMMENT, false), false)
           val sql = transactionListAsCTE(forCatId, if (forHome) homeCurrency else null) + " " + SupportSQLiteQueryBuilder.builder(CTE_SEARCH).columns(proj)
             .selection(computeWhere(sel, "$KEY_CATID IN (SELECT $KEY_ROWID FROM Tree )"), selArgs).groupBy(groupBy)
@@ -135,7 +134,7 @@ open class TransactionProvider : BaseTransactionProvider() {
           }
         }
         val selector = uri.transactionQuerySelector(table)
-        sel = if (TextUtils.isEmpty(sel)) selector else (if (TextUtils.isEmpty(selector)) sel else "$sel AND $selector")
+        sel = if (sel.isNullOrEmpty()) selector else (if (selector.isNullOrEmpty()) sel else "$sel AND $selector")
         proj = prepareProjectionForTransactions(proj, table, uri.getBooleanQueryParameter(QUERY_PARAMETER_SHORTEN_COMMENT, false), !hasSearch)
         qb = SupportSQLiteQueryBuilder.builder(tableForQueryBuilder)
         if (uri.getQueryParameter(QUERY_PARAMETER_DISTINCT) != null) {
@@ -430,7 +429,7 @@ open class TransactionProvider : BaseTransactionProvider() {
         val instanceId = uri.getQueryParameter(QUERY_PARAMETER_WITH_INSTANCE)
         if (instanceId == null) {
           val selector = uri.templateQuerySelector
-          sel = if (TextUtils.isEmpty(sel)) selector else (sel + (if (TextUtils.isEmpty(selector)) "" else " AND $selector"))
+          sel = if (sel.isNullOrEmpty()) selector else (sel + (if (selector.isNullOrEmpty()) "" else " AND $selector"))
           qb = SupportSQLiteQueryBuilder.builder(VIEW_TEMPLATES_EXTENDED)
           if (proj == null) {
             proj = templateProjection(VIEW_TEMPLATES_EXTENDED)

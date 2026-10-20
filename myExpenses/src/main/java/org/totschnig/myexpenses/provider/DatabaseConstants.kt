@@ -20,16 +20,12 @@ import org.totschnig.myexpenses.MyApplication.Companion.instance
 import org.totschnig.myexpenses.db2.localizedLabelForPaymentMethod
 import org.totschnig.myexpenses.model.CrStatus
 import org.totschnig.myexpenses.preference.PrefHandler
-import java.util.Calendar
 import java.util.Locale
 
 object DatabaseConstants {
     private var isLocalized = false
-    @JvmField
     var weekStartsOn: Int = 0
-    @JvmField
     var monthStartsOn: Int = 0
-    @JvmField
     var nextWeekEndSqlite: Int = 0
    lateinit var YEAR_OF_WEEK_START: String
    lateinit var YEAR_OF_MONTH_START: String
@@ -50,7 +46,6 @@ object DatabaseConstants {
     private lateinit var PROJECTION_BASE: Array<String>
     private lateinit var PROJECTION_EXTENDED: Array<String>
 
-    @JvmStatic
     fun buildLocalized(locale: Locale, myApplication: MyApplication) {
         val appComponent = myApplication.appComponent
         buildLocalized(
@@ -65,7 +60,7 @@ object DatabaseConstants {
         monthStartsOn = prefHandler.monthStart
         val monthDelta = monthStartsOn - 1
         val nextWeekStartsSqlite = weekStartsOn - 1 //Sqlite starts with Sunday = 0
-        nextWeekEndSqlite = if (weekStartsOn == Calendar.SUNDAY)
+        nextWeekEndSqlite = if (weekStartsOn == 1)
         /*weekStartsOn Sunday*/ 6 else/* weekStartsOn Monday or Saturday*/ weekStartsOn - 2
         YEAR_OF_WEEK_START =
             "CAST(strftime('%Y',date,'unixepoch','localtime','weekday $nextWeekEndSqlite', '-6 day') AS integer)"
@@ -187,7 +182,6 @@ object DatabaseConstants {
     const val IS_SAME_CURRENCY: String =
         "$KEY_CURRENCY = (SELECT $KEY_CURRENCY from $TABLE_ACCOUNTS WHERE $KEY_ROWID = $KEY_TRANSFER_ACCOUNT)"
 
-    @JvmStatic
     val yearOfWeekStart: String
         get() {
             ensureLocalized()
@@ -200,7 +194,6 @@ object DatabaseConstants {
             return YEAR_OF_MONTH_START
         }
 
-    @JvmStatic
     val week: String
         get() {
             ensureLocalized()
@@ -244,7 +237,6 @@ object DatabaseConstants {
             return THIS_MONTH
         }
 
-    @JvmStatic
     val weekStart: String
         get() {
             ensureLocalized()
@@ -269,14 +261,12 @@ object DatabaseConstants {
             return WEEK_MAX
         }
 
-    @JvmStatic
     val projectionBase: Array<String>
         get() {
             ensureLocalized()
             return PROJECTION_BASE
         }
 
-    @JvmStatic
     val projectionExtended: Array<String>
         get() {
             ensureLocalized()

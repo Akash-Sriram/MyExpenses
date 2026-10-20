@@ -22,8 +22,8 @@ import org.totschnig.myexpenses.model.CrStatus
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.util.epoch2LocalDate
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalDate
-import java.util.Date
 
 // Concrete implementation for testing
 class TestImportDataViewModel(
@@ -95,7 +95,7 @@ class ImportDataViewModelTest : BaseTestWithRepository() {
                 memo = "test",
                 transactions = listOf(
                     ImportTransaction(
-                        date = Date(),
+                        date = Instant.now(),
                         valueDate = null,
                         amount = BigDecimal.TEN,
                         payee = "Joe",
@@ -146,7 +146,7 @@ class ImportDataViewModelTest : BaseTestWithRepository() {
     @Test
     fun insertTransfer() {
         // Arrange
-        val date = Date()
+        val date = Instant.now()
         val importAccounts = listOf(
             ImportAccount(memo = "test2",
                 transactions = listOf(
@@ -222,7 +222,7 @@ class ImportDataViewModelTest : BaseTestWithRepository() {
                 memo = "test",
                 transactions = listOf(
                     ImportTransaction(
-                        date = Date(),
+                        date = Instant.now(),
                         valueDate = null,
                         amount = BigDecimal.TEN,
                         payee = "Joe",
@@ -237,7 +237,7 @@ class ImportDataViewModelTest : BaseTestWithRepository() {
                         tags = null,
                         splits = listOf(
                             ImportTransaction(
-                                date = Date(),
+                                date = Instant.now(),
                                 valueDate = null,
                                 amount = BigDecimal(5),
                                 payee = null,
@@ -253,7 +253,7 @@ class ImportDataViewModelTest : BaseTestWithRepository() {
                                 splits = null
                             ),
                             ImportTransaction(
-                                date = Date(),
+                                date = Instant.now(),
                                 valueDate = null,
                                 amount = BigDecimal(5),
                                 payee = null,

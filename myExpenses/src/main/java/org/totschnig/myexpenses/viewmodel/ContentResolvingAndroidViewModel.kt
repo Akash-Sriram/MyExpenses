@@ -133,6 +133,9 @@ open class ContentResolvingAndroidViewModel(application: Application) :
     lateinit var dataStore: DataStore<Preferences>
 
     @Inject
+    lateinit var preferencesHolder: org.totschnig.myexpenses.preference.PreferencesHolder
+
+    @Inject
     lateinit var licenceHandler: LicenceHandler
 
     val collate: String

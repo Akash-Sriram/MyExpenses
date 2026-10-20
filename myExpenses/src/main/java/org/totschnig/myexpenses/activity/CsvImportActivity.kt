@@ -7,8 +7,7 @@ import android.widget.AdapterView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.viewpager2.widget.ViewPager2
-import com.evernote.android.state.State
-import org.apache.commons.csv.CSVRecord
+import org.totschnig.myexpenses.util.csv.CSVRecord
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.db2.Repository
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
@@ -31,10 +30,8 @@ import javax.inject.Inject
 
 class CsvImportActivity : TabbedActivity(), ConfirmationDialogListener {
 
-    @State
     var mUsageRecorded = false
 
-    @State
     var idle = true
 
     @Inject
@@ -46,6 +43,10 @@ class CsvImportActivity : TabbedActivity(), ConfirmationDialogListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            mUsageRecorded = savedInstanceState.getBoolean(KEY_USAGE_RECORDED, false)
+            idle = savedInstanceState.getBoolean(KEY_IDLE, true)
+        }
         supportActionBar?.title = getString(R.string.pref_import_title, "CSV")
         with(injector) {
             inject(csvImportViewModel)
@@ -224,4 +225,15 @@ class CsvImportActivity : TabbedActivity(), ConfirmationDialogListener {
         get() {
             return parseFragment!!.accountType
         }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_USAGE_RECORDED, mUsageRecorded)
+        outState.putBoolean(KEY_IDLE, idle)
+    }
+
+    companion object {
+        private const val KEY_USAGE_RECORDED = "key_usage_recorded"
+        private const val KEY_IDLE = "key_idle"
+    }
 }

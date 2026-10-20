@@ -41,12 +41,10 @@ import org.totschnig.myexpenses.preference.FontSizeDialogPreference
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.ui.SpinnerHelper
 import org.totschnig.myexpenses.util.Utils
-import org.totschnig.myexpenses.util.ui.asDateTimeFormatter
 import org.totschnig.myexpenses.util.ui.setNightMode
 import org.totschnig.myexpenses.viewmodel.OnBoardingUiViewModel
 import org.totschnig.myexpenses.viewmodel.data.Tag
 import org.totschnig.myexpenses.viewmodel.data.Transaction2
-import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import javax.inject.Inject
@@ -173,7 +171,7 @@ class OnboardingUiFragment : OnboardingFragment() {
                         RenderType.Legacy -> {
                             CompactTransactionRenderer(
                                 DateTimeFormatInfo(
-                                    (Utils.ensureDateFormatWithShortYear(context) as SimpleDateFormat).asDateTimeFormatter,
+                                    Utils.ensureDateTimeFormatterWithShortYear(context),
                                     4.6f
                                 ),
                                 withCategoryIcon

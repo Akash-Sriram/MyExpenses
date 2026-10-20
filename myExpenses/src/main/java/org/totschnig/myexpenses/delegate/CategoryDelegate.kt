@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.delegate
 
 import android.os.Bundle
-import android.text.TextUtils
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_TRANSACTION
 import org.totschnig.myexpenses.databinding.DateEditBinding
@@ -74,7 +73,7 @@ class CategoryDelegate(
             categoryIcon = data.icon
             setCategoryButton()
         }
-        if (TextUtils.isEmpty(viewBinding.Comment.text.toString()) && data.comment != null) {
+        if (viewBinding.Comment.text.isNullOrEmpty() && data.comment != null) {
             viewBinding.Comment.setText(data.comment)
         }
 

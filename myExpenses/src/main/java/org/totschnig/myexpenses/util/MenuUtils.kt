@@ -5,7 +5,6 @@ import android.app.SearchManager
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
@@ -42,7 +41,7 @@ fun configureSearch(activity: Activity, menu: Menu, callback: (String) -> Boolea
 
 fun Menu.prepareSearch(filter: String?) {
     findItem(R.id.SEARCH_COMMAND)?.let { item ->
-        if (!TextUtils.isEmpty(filter)) {
+        if (!filter.isNullOrEmpty()) {
             item.expandActionView()
             (item.actionView as? SearchView)?.apply {
                 setQuery(filter, false)

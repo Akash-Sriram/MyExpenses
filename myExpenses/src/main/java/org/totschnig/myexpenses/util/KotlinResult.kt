@@ -17,3 +17,6 @@ fun localizedThrowable(
     @StringRes resId: Int,
     vararg formatArgs: Any?
 ) = Throwable(context.getString(resId, *formatArgs))
+
+inline fun <T, R> Result<T>.flatMap(transform: (T) -> Result<R>): Result<R> =
+    fold(onSuccess = transform, onFailure = { Result.failure(it) })

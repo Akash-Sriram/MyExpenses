@@ -37,7 +37,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
         private const val KEY_PROGRESS = "progress"
         private const val KEY_MAX = "max"
 
-        @JvmStatic
         fun newInstance(message: String, withButton: Boolean): ProgressDialogFragment {
             return newInstance(null, message, STYLE_SPINNER, withButton)
         }
@@ -47,7 +46,6 @@ class ProgressDialogFragment : BaseDialogFragment() {
          * @param progressStyle [STYLE_SPINNER] or [STYLE_HORIZONTAL]
          * @param withButton    if true dialog is rendered with an OK button that is initially disabled
          */
-        @JvmStatic
         fun newInstance(
             title: String?,
             message: CharSequence?,
@@ -96,7 +94,7 @@ class ProgressDialogFragment : BaseDialogFragment() {
         setProgress(progress)
         this.max = max
         mDialog.setTitle(title)
-        if (!TextUtils.isEmpty(message)) {
+        if (!message.isNullOrEmpty()) {
             mDialog.setMessage(message)
         }
         if (mTaskCompleted) {
@@ -156,7 +154,7 @@ class ProgressDialogFragment : BaseDialogFragment() {
     }
 
     fun appendToMessage(newMessage: CharSequence) {
-        this.message = if (TextUtils.isEmpty(this.message)) newMessage
+        this.message = if (this.message.isNullOrEmpty()) newMessage
         else TextUtils.concat(this.message, "\n", newMessage)
         if (::mDialog.isInitialized) {
             mDialog.setMessage(this.message)

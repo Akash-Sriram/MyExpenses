@@ -56,8 +56,6 @@ import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import com.google.android.material.snackbar.Snackbar
 import eltos.simpledialogfragment.SimpleDialog
 import org.totschnig.myexpenses.MyApplication
@@ -163,10 +161,8 @@ class TemplatesList : SortableListFragment(),
     /**
      * if we are called from the calendar app, we only need to handle display of plan once
      */
-    @State
     var expandedHandled = false
 
-    @State
     var repairTriggered = false
 
     @Inject
@@ -187,7 +183,10 @@ class TemplatesList : SortableListFragment(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        StateSaver.restoreInstanceState(this, savedInstanceState)
+        if (savedInstanceState != null) {
+            expandedHandled = savedInstanceState.getBoolean(KEY_EXPANDED_HANDLED, false)
+            repairTriggered = savedInstanceState.getBoolean(KEY_REPAIR_TRIGGERED, false)
+        }
         val appComponent = (requireActivity().application as MyApplication).appComponent
         appComponent.inject(this)
         appComponent.inject(viewModel)
@@ -202,7 +201,8 @@ class TemplatesList : SortableListFragment(),
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
+        outState.putBoolean(KEY_EXPANDED_HANDLED, expandedHandled)
+        outState.putBoolean(KEY_REPAIR_TRIGGERED, repairTriggered)
     }
 
     override fun onCreateView(
@@ -856,6 +856,8 @@ class TemplatesList : SortableListFragment(),
     }
 
     companion object {
+        private const val KEY_EXPANDED_HANDLED = "key_expanded_handled"
+        private const val KEY_REPAIR_TRIGGERED = "key_repair_triggered"
         const val PLANNER_FRAGMENT_TAG = "PLANNER_FRAGMENT"
     }
 

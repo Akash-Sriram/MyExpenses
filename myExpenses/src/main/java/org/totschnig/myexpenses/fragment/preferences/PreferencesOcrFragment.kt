@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.fragment.preferences
 
 import android.content.SharedPreferences
 import android.os.Bundle
-import android.text.TextUtils
 import androidx.annotation.Keep
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -33,10 +32,10 @@ class PreferencesOcrFragment : BasePreferenceFragment() {
 
         val ocrDatePref = requirePreference<EditTextPreference>(PrefKey.OCR_DATE_FORMATS)
         ocrDatePref.onPreferenceChangeListener = OnPreferenceChangeListener { _, newValue ->
-            if (TextUtils.isEmpty(newValue as String)) true
+            if ((newValue as? String).isNullOrEmpty()) true
             else {
                 try {
-                    for (line in newValue.lines()) {
+                    for (line in (newValue as String).lines()) {
                         LocalDate.now().format(DateTimeFormatter.ofPattern(line))
                     }
                     true
@@ -64,9 +63,9 @@ class PreferencesOcrFragment : BasePreferenceFragment() {
 
         val ocrTimePref = requirePreference<EditTextPreference>(PrefKey.OCR_TIME_FORMATS)
         ocrTimePref.onPreferenceChangeListener = OnPreferenceChangeListener { _, newValue ->
-            if (TextUtils.isEmpty(newValue as String)) true
+            if ((newValue as? String).isNullOrEmpty()) true
             else try {
-                for (line in newValue.lines()) {
+                for (line in (newValue as String).lines()) {
                     LocalTime.now().format(DateTimeFormatter.ofPattern(line))
                 }
                 true

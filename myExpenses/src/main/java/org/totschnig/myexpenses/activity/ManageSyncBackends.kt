@@ -7,8 +7,7 @@ import android.view.MenuItem
 import android.widget.ExpandableListView.ExpandableListContextMenuInfo
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
-import arrow.core.flatMap
-import com.evernote.android.state.State
+import org.totschnig.myexpenses.util.flatMap
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
 import org.totschnig.myexpenses.dialog.SetupSyncDialogFragment
@@ -24,6 +23,8 @@ import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.viewmodel.AccountSealedException
 import org.totschnig.myexpenses.viewmodel.SyncViewModel.SyncAccountData
 import java.io.Serializable
+
+private const val KEY_INCOMING_ACCOUNT_DELETED = "key_incoming_account_deleted"
 
 class ManageSyncBackends : SyncBackendSetupActivity(), ContribIFace {
 
@@ -55,9 +56,12 @@ class ManageSyncBackends : SyncBackendSetupActivity(), ContribIFace {
         }
     }
 
-    @State
     var incomingAccountDeleted = false
+
     public override fun onCreate(savedInstanceState: Bundle?) {
+        if (savedInstanceState != null) {
+            incomingAccountDeleted = savedInstanceState.getBoolean(KEY_INCOMING_ACCOUNT_DELETED, false)
+        }
         super.onCreate(savedInstanceState)
         setupWithFragment(savedInstanceState == null, false) {
             SyncBackendList()
@@ -70,6 +74,11 @@ class ManageSyncBackends : SyncBackendSetupActivity(), ContribIFace {
             }
         }
         onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_INCOMING_ACCOUNT_DELETED, incomingAccountDeleted)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

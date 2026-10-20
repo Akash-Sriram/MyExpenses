@@ -6,7 +6,6 @@ import android.database.Cursor
 import android.graphics.Typeface
 import android.text.Spannable
 import android.text.SpannableStringBuilder
-import android.text.TextUtils
 import android.text.style.StyleSpan
 import android.text.style.UnderlineSpan
 import android.view.View
@@ -91,7 +90,7 @@ class TemplateRemoteViewsFactory(
                 else "$transferAccountLabel $RIGHT_ARROW $accountLabel"
             } else cursor.getString(KEY_PATH)
         )
-        if (!TextUtils.isEmpty(comment)) {
+        if (!comment.isNullOrEmpty()) {
             if (description.isNotEmpty()) {
                 description.append(commentSeparator)
             }
@@ -102,7 +101,7 @@ class TemplateRemoteViewsFactory(
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
-        if (!TextUtils.isEmpty(payee)) {
+        if (!payee.isNullOrEmpty()) {
             if (description.isNotEmpty()) {
                 description.append(commentSeparator)
             }

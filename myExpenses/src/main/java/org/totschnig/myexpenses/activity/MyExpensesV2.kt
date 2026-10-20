@@ -75,7 +75,6 @@ import org.totschnig.myexpenses.viewmodel.data.FullAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
 import timber.log.Timber
 import java.math.RoundingMode
-import java.util.Optional
 import javax.inject.Inject
 
 enum class StartScreen {
@@ -524,16 +523,21 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
         }
     }
 
-    override suspend fun accountForNewTransaction() = Optional.ofNullable(
+    override suspend fun accountForNewTransaction(): AccountForNewTransactionResult =
         when (currentAccount) {
-            is FullAccount -> currentAccount as? FullAccount
-            is AggregateAccount -> viewModel.accountDataV2.value?.getOrNull()
-                ?.filter { it.currency == currentAccount?.currency }
-                ?.maxByOrNull { it.lastUsed }
-
-            null -> null
+            is FullAccount -> AccountForNewTransactionResult.Found(currentAccount as FullAccount)
+            is AggregateAccount -> {
+                val found = viewModel.accountDataV2.value?.getOrNull()
+                    ?.filter { it.currency == currentAccount?.currency }
+                    ?.maxByOrNull { it.lastUsed }
+                if (found != null) {
+                    AccountForNewTransactionResult.Found(found)
+                } else {
+                    AccountForNewTransactionResult.Aggregate
+                }
+            }
+            null -> AccountForNewTransactionResult.None
         }
-    )
 
     fun editTrade(transactionId: Long) {
         viewModel.loadTrade(transactionId)

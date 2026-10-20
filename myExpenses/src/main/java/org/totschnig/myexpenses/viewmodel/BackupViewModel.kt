@@ -8,7 +8,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
-import arrow.core.Either
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
@@ -19,83 +18,93 @@ import org.totschnig.myexpenses.util.crypt.EncryptionHelper
 import org.totschnig.myexpenses.util.io.displayName
 import java.io.IOException
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+
 class BackupViewModel(application: Application) : ContentResolvingAndroidViewModel(application) {
+
+    sealed interface BackupPurgeInfo {
+        data class PendingConfirmation(val files: List<DocumentFile>) : BackupPurgeInfo
+        data class AlreadyPurged(val results: List<Boolean>) : BackupPurgeInfo
+    }
+
+    data class BackupSuccessData(
+        val file: DocumentFile,
+        val path: String,
+        val purgeInfo: BackupPurgeInfo
+    )
 
     sealed class BackupState {
         class Prepared(val appDir: Result<DocumentFile>) : BackupState()
         object Running : BackupState()
-        class Completed(val result: Result<Triple<DocumentFile, String, Either<List<DocumentFile>, List<Boolean>>>>) :
-            BackupState()
+        class Completed(val result: Result<BackupSuccessData>) : BackupState()
 
         class Purged(val result: Result<Int>) : BackupState()
     }
 
-    private val backupState = MutableLiveData<BackupState>()
-
-    fun getBackupState(): LiveData<BackupState> {
-        return backupState
-    }
+    private val _backupState = MutableStateFlow<BackupState?>(null)
+    val backupState: StateFlow<BackupState?> = _backupState.asStateFlow()
 
     fun doBackup(withSync: Boolean, lenientMode: Boolean) {
         viewModelScope.launch(coroutineDispatcher) {
-            backupState.postValue(BackupState.Running)
-            backupState.postValue(
-                BackupState.Completed(
-                    doBackup(
-                        getApplication(),
-                        prefHandler,
-                        withSync,
-                        lenientMode
-                    ).mapCatching { (backupFile, oldBackups) ->
-                        val requireConfirmation =
-                            prefHandler.getBoolean(PrefKey.PURGE_BACKUP_REQUIRE_CONFIRMATION, true)
-                        val extraData = if (requireConfirmation || oldBackups.isEmpty())
-                            Either.Left(oldBackups) else
-                            Either.Right(oldBackups.map { it.delete() })
-                        Triple(
-                            backupFile,
-                            backupFile.displayName,
-                            extraData
-                        )
-                    })
+            _backupState.value = BackupState.Running
+            _backupState.value = BackupState.Completed(
+                doBackup(
+                    getApplication(),
+                    prefHandler,
+                    withSync,
+                    lenientMode
+                ).mapCatching { (backupFile, oldBackups) ->
+                    val requireConfirmation =
+                        prefHandler.getBoolean(PrefKey.PURGE_BACKUP_REQUIRE_CONFIRMATION, true)
+                    val extraData = if (requireConfirmation || oldBackups.isEmpty())
+                        BackupPurgeInfo.PendingConfirmation(oldBackups)
+                    else
+                        BackupPurgeInfo.AlreadyPurged(oldBackups.map { it.delete() })
+                    BackupSuccessData(
+                        backupFile,
+                        backupFile.displayName,
+                        extraData
+                    )
+                }
             )
         }
     }
 
-    fun isEncrypted(uri: Uri) = liveData(context = coroutineContext()) {
-        emit(
-            runCatching {
-                getApplication<MyApplication>().contentResolver.openInputStream(uri).use {
-                    if (it == null) throw IOException("Unable to open file $uri")
-                    EncryptionHelper.isEncrypted(it)
-                }
-            })
+    suspend fun checkIsEncrypted(uri: Uri): Result<Boolean> = withContext(coroutineContext()) {
+        runCatching {
+            getApplication<MyApplication>().contentResolver.openInputStream(uri).use {
+                if (it == null) throw IOException("Unable to open file $uri")
+                EncryptionHelper.isEncrypted(it)
+            }
+        }
     }
 
     fun prepare() {
         viewModelScope.launch(coroutineDispatcher) {
-            backupState.postValue(BackupState.Prepared(AppDirHelper.checkAppDir(getApplication())))
+            _backupState.value = BackupState.Prepared(AppDirHelper.checkAppDir(getApplication()))
         }
     }
 
     fun purgeBackups() {
         viewModelScope.launch(coroutineDispatcher) {
-            (backupState.value as? BackupState.Completed)?.let {
-                backupState.postValue(
-                    BackupState.Purged(
-                        runCatching {
-                            it.result.getOrThrow().third.fold(
-                                ifLeft = { list ->
-                                    list.sumOf {
-                                        if (it.delete()) 1 else 0
-                                    }
-                                },
-                                ifRight = {
-                                    throw IllegalStateException()
+            (_backupState.value as? BackupState.Completed)?.let {
+                _backupState.value = BackupState.Purged(
+                    runCatching {
+                        when (val purgeInfo = it.result.getOrThrow().purgeInfo) {
+                            is BackupPurgeInfo.PendingConfirmation -> {
+                                purgeInfo.files.sumOf { file ->
+                                    if (file.delete()) 1 else 0
                                 }
-                            )
+                            }
+                            is BackupPurgeInfo.AlreadyPurged -> {
+                                throw IllegalStateException("Already purged")
+                            }
                         }
-                    ))
+                    }
+                )
             }
         }
     }

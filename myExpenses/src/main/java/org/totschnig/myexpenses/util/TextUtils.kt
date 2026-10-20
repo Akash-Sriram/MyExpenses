@@ -20,15 +20,12 @@ object TextUtils {
     inline fun <reified E : Enum<E>> joinEnum(): String =
         enumValues<E>().joinToString(",") { "'${it.name}'" }
 
-    @JvmStatic
     fun concatResStrings(ctx: Context, vararg resIds: Int): String =
         concatResStrings(ctx, " ", *resIds)
 
-    @JvmStatic
     fun concatResStrings(ctx: Context, separator: String, vararg resIds: Int): String =
         resIds.joinToString(separator) { ctx.getString(it) }
 
-    @JvmStatic
     fun appendCurrencySymbol(context: Context, resId: Int, currency: CurrencyUnit): String {
         return appendText(context, resId, currency.symbol)
     }
@@ -38,7 +35,7 @@ object TextUtils {
     }
 
     private fun appendText(context: Context, resId: Int, symbol: String?): String {
-        return String.format(Locale.ROOT, "%s (%s)", context.getString(resId), symbol)
+        return "${context.getString(resId)} ($symbol)"
     }
 
 

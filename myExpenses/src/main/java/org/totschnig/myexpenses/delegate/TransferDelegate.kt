@@ -6,7 +6,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import androidx.core.view.isVisible
-import com.evernote.android.state.State
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.HELP_VARIANT_SPLIT_PART_TRANSFER
 import org.totschnig.myexpenses.activity.HELP_VARIANT_TEMPLATE_TRANSFER
@@ -51,19 +50,14 @@ class TransferDelegate(
     private val lastExchangeRateRelevantInputs = intArrayOf(INPUT_EXCHANGE_RATE, INPUT_AMOUNT)
     private lateinit var transferAccountsAdapter: GroupedSpinnerAdapter<AccountFlag, Account>
 
-    @State
     var transferAccountId: Long? = null
 
-    @State
     var transferPeer: Long? = null
 
-    @State
     var categoryVisible = false
 
-    @State
     var passedInTransferAmount: Long? = null
 
-    @State
     var passedInTransferAccountId: Long? = null
 
     override val helpVariant: String
@@ -329,6 +323,11 @@ class TransferDelegate(
             transferAccountId = it
         }
         super.onSaveInstanceState(outState)
+        transferAccountId?.let { outState.putLong(KEY_TRANSFER_ACCOUNT_ID, it) }
+        transferPeer?.let { outState.putLong(KEY_TRANSFER_PEER, it) }
+        outState.putBoolean(KEY_CATEGORY_VISIBLE, categoryVisible)
+        passedInTransferAmount?.let { outState.putLong(KEY_PASSED_IN_TRANSFER_AMOUNT, it) }
+        passedInTransferAccountId?.let { outState.putLong(KEY_PASSED_IN_TRANSFER_ACCOUNT_ID, it) }
     }
 
     fun invert() {
@@ -370,10 +369,31 @@ class TransferDelegate(
         viewBinding.CategoryRow.isVisible = categoryVisible
     }
 
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        if (savedInstanceState.containsKey(KEY_TRANSFER_ACCOUNT_ID)) {
+            transferAccountId = savedInstanceState.getLong(KEY_TRANSFER_ACCOUNT_ID)
+        }
+        if (savedInstanceState.containsKey(KEY_TRANSFER_PEER)) {
+            transferPeer = savedInstanceState.getLong(KEY_TRANSFER_PEER)
+        }
+        categoryVisible = savedInstanceState.getBoolean(KEY_CATEGORY_VISIBLE, false)
+        if (savedInstanceState.containsKey(KEY_PASSED_IN_TRANSFER_AMOUNT)) {
+            passedInTransferAmount = savedInstanceState.getLong(KEY_PASSED_IN_TRANSFER_AMOUNT)
+        }
+        if (savedInstanceState.containsKey(KEY_PASSED_IN_TRANSFER_ACCOUNT_ID)) {
+            passedInTransferAccountId = savedInstanceState.getLong(KEY_PASSED_IN_TRANSFER_ACCOUNT_ID)
+        }
+    }
+
     companion object {
         private const val INPUT_EXCHANGE_RATE = 1
         private const val INPUT_AMOUNT = 2
         private const val INPUT_TRANSFER_AMOUNT = 3
+        private const val KEY_TRANSFER_ACCOUNT_ID = "key_transfer_account_id"
+        private const val KEY_TRANSFER_PEER = "key_transfer_peer"
+        private const val KEY_CATEGORY_VISIBLE = "key_category_visible"
+        private const val KEY_PASSED_IN_TRANSFER_AMOUNT = "key_passed_in_transfer_amount"
+        private const val KEY_PASSED_IN_TRANSFER_ACCOUNT_ID = "key_passed_in_transfer_account_id"
     }
-
 }

@@ -12,12 +12,12 @@ import android.widget.AdapterView
 import android.widget.AutoCompleteTextView
 import android.widget.FilterQueryProvider
 import android.widget.ImageView
+import android.os.Bundle
 import android.widget.LinearLayout
 import android.widget.ListPopupWindow
 import android.widget.SimpleCursorAdapter
 import android.widget.ViewSwitcher
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
+import androidx.core.os.BundleCompat
 import com.google.android.material.chip.Chip
 import kotlinx.parcelize.Parcelize
 import org.totschnig.myexpenses.R
@@ -84,7 +84,6 @@ class PartyInput @JvmOverloads constructor(
         get() = party ?: Party.validate(autoCompleteTextView.text.toString())
             ?.let { DisplayParty(null, it) }
 
-    @State
     var party: DisplayParty? = null
         set(value) {
             field = value
@@ -100,11 +99,20 @@ class PartyInput @JvmOverloads constructor(
     private lateinit var payeeAdapter: SimpleCursorAdapter
     private lateinit var partySelectListener: PartySelectListener
 
-    override fun onSaveInstanceState() =
-        StateSaver.saveInstanceState(this, super.onSaveInstanceState())
+    override fun onSaveInstanceState(): Parcelable {
+        val bundle = Bundle()
+        bundle.putParcelable(KEY_SUPER_STATE, super.onSaveInstanceState())
+        bundle.putParcelable(KEY_PARTY, party)
+        return bundle
+    }
 
     override fun onRestoreInstanceState(state: Parcelable?) {
-        super.onRestoreInstanceState(StateSaver.restoreInstanceState(this, state))
+        if (state is Bundle) {
+            super.onRestoreInstanceState(BundleCompat.getParcelable(state, KEY_SUPER_STATE, Parcelable::class.java))
+            party = BundleCompat.getParcelable(state, KEY_PARTY, DisplayParty::class.java)
+        } else {
+            super.onRestoreInstanceState(state)
+        }
     }
 
     fun interface PartySelectListener {
@@ -225,6 +233,8 @@ class PartyInput @JvmOverloads constructor(
         }
 
     companion object {
+        private const val KEY_SUPER_STATE = "super_state"
+        private const val KEY_PARTY = "party"
         // Constants for ViewSwitcher child indices
         private const val INDEX_AUTOCOMPLETE_TEXTVIEW = 0
         private const val INDEX_CHIP_CONTAINER = 1

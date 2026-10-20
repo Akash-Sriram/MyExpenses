@@ -1,9 +1,7 @@
 package org.totschnig.myexpenses.io
 
 import android.content.Context
-import org.apache.commons.csv.CSVRecord
-import org.apache.commons.text.StringTokenizer
-import org.apache.commons.text.matcher.StringMatcherFactory
+import org.totschnig.myexpenses.util.csv.CSVRecord
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.export.CSV_INDICATOR
 import org.totschnig.myexpenses.export.CSV_PART_INDICATOR
@@ -14,8 +12,9 @@ import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.util.timeFormatter
 import java.math.BigDecimal
+import java.time.Instant
 import java.time.LocalTime
-import java.util.Calendar
+import java.time.ZoneId
 
 class CSVParser(
     private val context: Context,
@@ -26,10 +25,56 @@ class CSVParser(
     private val type: AccountType
 ) {
 
-    private val accountBuilders: MutableSet<ImportAccount.Builder> = mutableSetOf()
+    private class MutableAccount(
+        val memo: String,
+        val type: String?,
+        val transactions: MutableList<MutableTransaction> = mutableListOf()
+    ) {
+        fun toImportAccount(): ImportAccount = ImportAccount(
+            type = type,
+            memo = memo,
+            transactions = transactions.map { it.toImportTransaction() }
+        )
+    }
+
+    private class MutableTransaction(
+        var date: Instant = Instant.now(),
+        var valueDate: Instant? = null,
+        var amount: BigDecimal = BigDecimal.ZERO,
+        var payee: String? = null,
+        var memo: String? = null,
+        var category: String? = null,
+        var categoryClass: String? = null,
+        var toAccount: String? = null,
+        var toAmount: BigDecimal? = null,
+        var status: String? = null,
+        var number: String? = null,
+        var method: String? = null,
+        val tags: MutableList<String> = mutableListOf(),
+        val splits: MutableList<MutableTransaction> = mutableListOf()
+    ) {
+        fun toImportTransaction(): ImportTransaction = ImportTransaction(
+            date = date,
+            valueDate = valueDate,
+            amount = amount,
+            payee = payee,
+            memo = memo,
+            category = category,
+            categoryClass = categoryClass,
+            toAccount = toAccount,
+            toAmount = toAmount,
+            status = status,
+            number = number,
+            method = method,
+            tags = tags.takeIf { it.isNotEmpty() },
+            splits = splits.takeIf { it.isNotEmpty() }?.map { it.toImportTransaction() }
+        )
+    }
+
+    private val accountList = mutableListOf<MutableAccount>()
 
     val accounts: List<ImportAccount> by lazy {
-        accountBuilders.map { it.build() }
+        accountList.map { it.toImportAccount() }
     }
 
     val categories: MutableSet<CategoryInfo> = mutableSetOf()
@@ -37,10 +82,9 @@ class CSVParser(
     val tags: MutableSet<String> = mutableSetOf()
 
     private fun requireAccount(label: String) =
-        accountBuilders.find { it.memo == label } ?: ImportAccount.Builder().memo(label).typeInternal(type.name)
-            .also {
-                accountBuilders.add(it)
-            }
+        accountList.find { it.memo == label } ?: MutableAccount(label, type.name).also {
+            accountList.add(it)
+        }
 
     private fun saveGetFromRecord(record: CSVRecord, index: Int) =
         if (record.size() > index) record[index].trim() else ""
@@ -62,42 +106,40 @@ class CSVParser(
         val columnIndexStatus = columnToFieldMap.indexOf(R.string.status)
         val columnIndexNumber = columnToFieldMap.indexOf(R.string.reference_number)
         val columnIndexSplit = columnToFieldMap.indexOf(R.string.split_transaction)
-        val defaultAccount = ImportAccount.Builder()
+        val defaultAccount = MutableAccount(memo = "", type = null)
 
         var isSplitParent = false
         var isSplitPart = false
-        var splitParent: ImportTransaction.Builder? = null
+        var splitParent: MutableTransaction? = null
         for (record in data) {
-            val transaction = ImportTransaction.Builder()
+            val transaction = MutableTransaction()
             if (columnIndexSplit != -1) {
                 val split = saveGetFromRecord(record, columnIndexSplit)
                 isSplitPart = split == CSV_PART_INDICATOR
                 isSplitParent = split == CSV_INDICATOR
             }
 
-            transaction.amount(
-                try {
-                    if (columnIndexAmount != -1) {
-                        QifUtils.parseMoney(saveGetFromRecord(record, columnIndexAmount), currency)
-                    } else {
-                        val income = if (columnIndexIncome != -1) QifUtils.parseMoney(
-                            saveGetFromRecord(
-                                record,
-                                columnIndexIncome
-                            ), currency
-                        ).abs() else BigDecimal(0)
-                        val expense = if (columnIndexExpense != -1) QifUtils.parseMoney(
-                            saveGetFromRecord(
-                                record,
-                                columnIndexExpense
-                            ), currency
-                        ).abs() else BigDecimal(0)
-                        income.subtract(expense)
-                    }
-                } catch (_: IllegalArgumentException) {
-                    BigDecimal.ZERO
+            transaction.amount = try {
+                if (columnIndexAmount != -1) {
+                    QifUtils.parseMoney(saveGetFromRecord(record, columnIndexAmount), currency)
+                } else {
+                    val income = if (columnIndexIncome != -1) QifUtils.parseMoney(
+                        saveGetFromRecord(
+                            record,
+                            columnIndexIncome
+                        ), currency
+                    ).abs() else BigDecimal(0)
+                    val expense = if (columnIndexExpense != -1) QifUtils.parseMoney(
+                        saveGetFromRecord(
+                            record,
+                            columnIndexExpense
+                        ), currency
+                    ).abs() else BigDecimal(0)
+                    income.subtract(expense)
                 }
-            )
+            } catch (_: IllegalArgumentException) {
+                BigDecimal.ZERO
+            }
 
             if (!isSplitParent && columnIndexCategory != -1) {
                 val category: String = saveGetFromRecord(record, columnIndexCategory)
@@ -110,14 +152,14 @@ class CSVParser(
                         subCategory != "" &&
                         QifUtils.isTransferCategory(subCategory)
                     ) {
-                        transaction.toAccount(subCategory.substring(1, subCategory.length - 1))
+                        transaction.toAccount = subCategory.substring(1, subCategory.length - 1)
                     } else if (QifUtils.isTransferCategory(category)) {
-                        transaction.toAccount(category.substring(1, category.length - 1))
+                        transaction.toAccount = category.substring(1, category.length - 1)
                     } else {
                         val category1 = category +
                                 (subCategory.takeIf { it.isNotEmpty() }?.let { ":$it" } ?: "")
                         categories.add(CategoryInfo(category1))
-                        transaction.category(category1)
+                        transaction.category = category1
                     }
                 }
             }
@@ -126,87 +168,107 @@ class CSVParser(
 
             val timeRecord =
                 columnIndexTime.takeIf { it != -1 }?.let { saveGetFromRecord(record, it) }
-            if (dateRecord != null && timeRecord == null) {
-                transaction.date(
-                    QifUtils.parseDate(dateRecord, dateFormat)
-                )
-            }
+            val baseDate = dateRecord?.let { QifUtils.parseDate(it, dateFormat) } ?: Instant.now()
             if (timeRecord != null) {
-                val cal = dateRecord?.let {
-                    try {
-                        QifUtils.parseDateInternal(dateRecord, dateFormat)
-                    } catch (_: Exception) {
-                        null
-                    }
-                }
-                    ?: Calendar.getInstance()
-                try {
-                    LocalTime.parse(
-                        timeRecord,
-                        context.timeFormatter
-                    )
+                val time = try {
+                    LocalTime.parse(timeRecord, context.timeFormatter)
                 } catch (_: Exception) {
                     null
-                }?.let {
-                    cal[Calendar.HOUR_OF_DAY] = it.hour
-                    cal[Calendar.MINUTE] = it.minute
-                    cal[Calendar.SECOND] = it.second
                 }
-                transaction.date(cal.time)
+                transaction.date = if (time != null) {
+                    baseDate.atZone(ZoneId.systemDefault())
+                        .withHour(time.hour)
+                        .withMinute(time.minute)
+                        .withSecond(time.second)
+                        .toInstant()
+                } else {
+                    baseDate
+                }
+            } else if (dateRecord != null) {
+                transaction.date = baseDate
             }
             if (columnIndexValueDate != -1) {
-                transaction.valueDate(
-                    QifUtils.parseDate(
-                        saveGetFromRecord(
-                            record,
-                            columnIndexValueDate
-                        ), dateFormat
-                    )
+                transaction.valueDate = QifUtils.parseDate(
+                    saveGetFromRecord(
+                        record,
+                        columnIndexValueDate
+                    ), dateFormat
                 )
             }
             if (columnIndexPayee != -1) {
                 saveGetFromRecord(record, columnIndexPayee).takeIf { it.isNotEmpty() }?.let {
                     payees.add(it)
-                    transaction.payee(it)
+                    transaction.payee = it
                 }
             }
             if (columnIndexNotes != -1) {
-                transaction.memo(saveGetFromRecord(record, columnIndexNotes))
+                transaction.memo = saveGetFromRecord(record, columnIndexNotes)
             }
             if (columnIndexMethod != -1) {
-                transaction.method(saveGetFromRecord(record, columnIndexMethod))
+                transaction.method = saveGetFromRecord(record, columnIndexMethod)
             }
             if (columnIndexStatus != -1) {
-                transaction.status(saveGetFromRecord(record, columnIndexStatus))
+                transaction.status = saveGetFromRecord(record, columnIndexStatus)
             }
             if (columnIndexNumber != -1) {
-                transaction.number(saveGetFromRecord(record, columnIndexNumber))
+                transaction.number = saveGetFromRecord(record, columnIndexNumber)
             }
             columnToFieldMap.indexOf(R.string.tags).takeIf { it != -1 }?.let { it ->
                 saveGetFromRecord(record, it).takeIf { it.isNotEmpty() }?.let { tagList ->
-                    val tokenizer = StringTokenizer(tagList)
-                    tokenizer.quoteMatcher = StringMatcherFactory.INSTANCE.quoteMatcher()
-                    tokenizer.delimiterMatcher = StringMatcherFactory.INSTANCE.commaMatcher()
-                    with(tokenizer.tokenList.filterNotNull()) {
-                        transaction.addTags(this)
-                        tags.addAll(this)
-                    }
+                    val parsedTags = parseTagList(tagList)
+                    transaction.tags.addAll(parsedTags)
+                    tags.addAll(parsedTags)
                 }
             }
             if (isSplitParent) {
                 splitParent = transaction
             }
             if (isSplitPart) {
-                splitParent?.addSplit(transaction)
+                transaction.date = splitParent?.date ?: transaction.date
+                splitParent?.splits?.add(transaction)
             } else {
                 (if (columnIndexAccount != -1) {
                     requireAccount(saveGetFromRecord(record, columnIndexAccount))
                 } else defaultAccount)
-                    .addTransaction(transaction)
+                    .transactions.add(transaction)
             }
         }
         if (columnIndexAccount == -1) {
-            accountBuilders.add(defaultAccount)
+            accountList.add(defaultAccount)
         }
+    }
+
+    private fun parseTagList(input: String): List<String> {
+        val result = mutableListOf<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < input.length) {
+            val c = input[i]
+            when {
+                c == '"' -> {
+                    if (inQuotes && i + 1 < input.length && input[i + 1] == '"') {
+                        current.append('"')
+                        i++
+                    } else {
+                        inQuotes = !inQuotes
+                    }
+                }
+                c == ',' && !inQuotes -> {
+                    val token = current.toString().trim()
+                    if (token.isNotEmpty()) {
+                        result.add(token)
+                    }
+                    current.clear()
+                }
+                else -> current.append(c)
+            }
+            i++
+        }
+        val token = current.toString().trim()
+        if (token.isNotEmpty()) {
+            result.add(token)
+        }
+        return result
     }
 }

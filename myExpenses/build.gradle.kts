@@ -165,11 +165,7 @@ dependencies {
 
     ksp(libs.dagger.compiler)
     implementation(libs.dagger)
-    implementation(libs.android.state)
 
-    implementation(libs.itextpdf)
-    implementation(libs.commons.csv)
-    api(libs.commons.text)
     implementation(libs.mpandroidchart)
     api(libs.simpledialogfragments)
     api(libs.timber)
@@ -199,10 +195,7 @@ dependencies {
     implementation(libs.androidx.sqlite.ktx)
     implementation(libs.androidx.sqlite.framework)
 
-    api(libs.easypermissions.ktx)
-
     implementation(libs.kotlinx.html)
-    implementation(libs.arrow.core)
 
     // Lifecycle components
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -226,8 +219,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.browser)
 
-    implementation(libs.sealed.enum.runtime)
-    ksp(libs.sealed.enum.ksp)
+
 
     implementation(libs.androidx.security.crypto)
     implementation(libs.kotlinx.serialization.json)

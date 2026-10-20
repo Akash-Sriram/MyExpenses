@@ -44,7 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import myiconpack.ArrowsAlt
+import org.totschnig.myexpenses.compose.icons.ArrowsAlt
 import org.totschnig.myexpenses.R
 
 typealias Menu = List<IMenuEntry>

@@ -64,12 +64,11 @@ import org.totschnig.myexpenses.viewmodel.ExportViewModel.Companion.KEY_MERGE_P
 import org.totschnig.myexpenses.viewmodel.ExportViewModel.Companion.KEY_NOT_YET_EXPORTED_P
 import org.totschnig.myexpenses.viewmodel.ExportViewModel.Companion.KEY_TIME_FORMAT
 import java.io.Serializable
-import java.text.SimpleDateFormat
+import java.time.LocalDateTime
 import java.time.chrono.IsoChronology
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 import java.time.format.FormatStyle
-import java.util.Date
 import java.util.Locale
 
 class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
@@ -85,8 +84,7 @@ class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
         var allP = false
         var warningText: String
         val fileName: String
-        val now = SimpleDateFormat("yyyMMdd-HHmmss", Locale.US)
-            .format(Date())
+        val now = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.US).format(LocalDateTime.now())
         val builder = initBuilder {
             ExportDialogBinding.inflate(it)
         }

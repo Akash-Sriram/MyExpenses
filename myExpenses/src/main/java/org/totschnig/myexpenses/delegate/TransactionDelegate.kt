@@ -10,9 +10,8 @@ import android.widget.ArrayAdapter
 import android.widget.CompoundButton
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.core.os.BundleCompat
 import androidx.core.view.isVisible
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.ExpenseEdit
 import org.totschnig.myexpenses.activity.HELP_VARIANT_SPLIT_PART_CATEGORY
@@ -89,22 +88,16 @@ abstract class TransactionDelegate(
     val isTemplate: Boolean,
 ) : AdapterView.OnItemSelectedListener {
 
-    @State
     var label: String? = null
 
-    @State
     var categoryIcon: String? = null
 
-    @State
     var catId: Long? = null
 
-    @State
     var catType: Byte = FLAG_NEUTRAL
 
-    @State
     var isSplitPart = false
 
-    @State
     var splitParts: ArrayList<TransactionEditData> = ArrayList()
 
     @Inject
@@ -122,7 +115,6 @@ abstract class TransactionDelegate(
     @Inject
     lateinit var repository: Repository
 
-    @State
     var userSetAmount: Boolean = false
 
     val homeCurrency by lazy {
@@ -195,43 +187,30 @@ abstract class TransactionDelegate(
 
     var isProcessingLinkedAmountInputs = false
 
-    @State
     var passedInAccountId: Long? = null
 
-    @State
     var accountId: Long? = null
 
-    @State
     var passedInAmount: Long? = null
 
-    @State
     var methodId: Long? = null
 
-    @State
     var methodsLoaded: Boolean = false
 
-    @State
     var methodLabel: String? = null
 
-    @State
     var crStatus: CrStatus = CrStatus.CLEARED
 
-    @State
     var parentId: Long? = null
 
-    @State
     var rowId: Long = 0L
 
-    @State
     var planId: Long? = null
 
-    @State
     lateinit var uuid: String
 
-    @State
     var debtId: Long? = null
 
-    @State
     var lastFilledAmount: BigDecimal? = null
 
     protected var mAccounts = mutableListOf<Account>()
@@ -274,13 +253,7 @@ abstract class TransactionDelegate(
                 userSetAmount = true
             }
         } else {
-            try {
-                StateSaver.restoreInstanceState(this, savedInstanceState)
-            } catch (e: Exception) {
-                //If user rotates device before delegate was initialized, restore crashes,
-                //because AndroidState does not handle enum correctly
-                CrashHandler.report(e)
-            }
+            savedInstanceState?.let { onRestoreInstanceState(it) }
         }
         viewBinding.toolbar.OperationType.isVisible = withTypeSpinner
 
@@ -408,11 +381,11 @@ abstract class TransactionDelegate(
     private fun setLocalDateTime(transaction: TransactionEditData) {
         val localDate = transaction.date.toLocalDate()
         if (transaction.isTemplate) {
-            planButton.setDate(localDate)
+            planButton.date = localDate
         } else {
-            dateEditBinding.DateButton.setDate(localDate)
-            dateEditBinding.Date2Button.setDate(transaction.valueDate)
-            dateEditBinding.TimeButton.setTime(transaction.date.toLocalTime())
+            dateEditBinding.DateButton.date = localDate
+            dateEditBinding.Date2Button.date = transaction.valueDate
+            dateEditBinding.TimeButton.time = transaction.date.toLocalTime()
         }
     }
 
@@ -1045,7 +1018,73 @@ abstract class TransactionDelegate(
     }
 
     open fun onSaveInstanceState(outState: Bundle) {
-        StateSaver.saveInstanceState(this, outState)
+        label?.let { outState.putString(KEY_LABEL, it) }
+        categoryIcon?.let { outState.putString(KEY_CATEGORY_ICON, it) }
+        catId?.let { outState.putLong(KEY_CAT_ID, it) }
+        outState.putByte(KEY_CAT_TYPE, catType)
+        outState.putBoolean(KEY_IS_SPLIT_PART, isSplitPart)
+        outState.putParcelableArrayList(KEY_SPLIT_PARTS, splitParts)
+        outState.putBoolean(KEY_USER_SET_AMOUNT, userSetAmount)
+        passedInAccountId?.let { outState.putLong(KEY_PASSED_IN_ACCOUNT_ID, it) }
+        accountId?.let { outState.putLong(KEY_ACCOUNT_ID, it) }
+        passedInAmount?.let { outState.putLong(KEY_PASSED_IN_AMOUNT, it) }
+        methodId?.let { outState.putLong(KEY_METHOD_ID, it) }
+        outState.putBoolean(KEY_METHODS_LOADED, methodsLoaded)
+        methodLabel?.let { outState.putString(KEY_METHOD_LABEL, it) }
+        outState.putString(KEY_CR_STATUS, crStatus.name)
+        parentId?.let { outState.putLong(KEY_PARENT_ID, it) }
+        outState.putLong(KEY_ROW_ID, rowId)
+        planId?.let { outState.putLong(KEY_PLAN_ID, it) }
+        if (::uuid.isInitialized) {
+            outState.putString(KEY_UUID, uuid)
+        }
+        debtId?.let { outState.putLong(KEY_DEBT_ID, it) }
+        lastFilledAmount?.let { outState.putString(KEY_LAST_FILLED_AMOUNT, it.toString()) }
+    }
+
+    open fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        label = savedInstanceState.getString(KEY_LABEL)
+        categoryIcon = savedInstanceState.getString(KEY_CATEGORY_ICON)
+        if (savedInstanceState.containsKey(KEY_CAT_ID)) {
+            catId = savedInstanceState.getLong(KEY_CAT_ID)
+        }
+        catType = savedInstanceState.getByte(KEY_CAT_TYPE, FLAG_NEUTRAL)
+        isSplitPart = savedInstanceState.getBoolean(KEY_IS_SPLIT_PART, false)
+        BundleCompat.getParcelableArrayList(savedInstanceState, KEY_SPLIT_PARTS, TransactionEditData::class.java)?.let {
+            splitParts = it
+        }
+        userSetAmount = savedInstanceState.getBoolean(KEY_USER_SET_AMOUNT, false)
+        if (savedInstanceState.containsKey(KEY_PASSED_IN_ACCOUNT_ID)) {
+            passedInAccountId = savedInstanceState.getLong(KEY_PASSED_IN_ACCOUNT_ID)
+        }
+        if (savedInstanceState.containsKey(KEY_ACCOUNT_ID)) {
+            accountId = savedInstanceState.getLong(KEY_ACCOUNT_ID)
+        }
+        if (savedInstanceState.containsKey(KEY_PASSED_IN_AMOUNT)) {
+            passedInAmount = savedInstanceState.getLong(KEY_PASSED_IN_AMOUNT)
+        }
+        if (savedInstanceState.containsKey(KEY_METHOD_ID)) {
+            methodId = savedInstanceState.getLong(KEY_METHOD_ID)
+        }
+        methodsLoaded = savedInstanceState.getBoolean(KEY_METHODS_LOADED, false)
+        methodLabel = savedInstanceState.getString(KEY_METHOD_LABEL)
+        savedInstanceState.getString(KEY_CR_STATUS)?.let { name ->
+            runCatching { CrStatus.valueOf(name) }.getOrNull()?.let { crStatus = it }
+        }
+        if (savedInstanceState.containsKey(KEY_PARENT_ID)) {
+            parentId = savedInstanceState.getLong(KEY_PARENT_ID)
+        }
+        rowId = savedInstanceState.getLong(KEY_ROW_ID, 0L)
+        if (savedInstanceState.containsKey(KEY_PLAN_ID)) {
+            planId = savedInstanceState.getLong(KEY_PLAN_ID)
+        }
+        savedInstanceState.getString(KEY_UUID)?.let { uuid = it }
+        if (savedInstanceState.containsKey(KEY_DEBT_ID)) {
+            debtId = savedInstanceState.getLong(KEY_DEBT_ID)
+        }
+        lastFilledAmount = savedInstanceState.getString(KEY_LAST_FILLED_AMOUNT)?.let {
+            runCatching { BigDecimal(it) }.getOrNull()
+        }
     }
 
     protected fun disableAccountSpinner() {
@@ -1146,6 +1185,27 @@ abstract class TransactionDelegate(
     }
 
     companion object {
+        private const val KEY_LABEL = "key_label"
+        private const val KEY_CATEGORY_ICON = "key_category_icon"
+        private const val KEY_CAT_ID = "key_cat_id"
+        private const val KEY_CAT_TYPE = "key_cat_type"
+        private const val KEY_IS_SPLIT_PART = "key_is_split_part"
+        private const val KEY_SPLIT_PARTS = "key_split_parts"
+        private const val KEY_USER_SET_AMOUNT = "key_user_set_amount"
+        private const val KEY_PASSED_IN_ACCOUNT_ID = "key_passed_in_account_id"
+        private const val KEY_ACCOUNT_ID = "key_account_id"
+        private const val KEY_PASSED_IN_AMOUNT = "key_passed_in_amount"
+        private const val KEY_METHOD_ID = "key_method_id"
+        private const val KEY_METHODS_LOADED = "key_methods_loaded"
+        private const val KEY_METHOD_LABEL = "key_method_label"
+        private const val KEY_CR_STATUS = "key_cr_status"
+        private const val KEY_PARENT_ID = "key_parent_id"
+        private const val KEY_ROW_ID = "key_row_id"
+        private const val KEY_PLAN_ID = "key_plan_id"
+        private const val KEY_UUID = "key_uuid"
+        private const val KEY_DEBT_ID = "key_debt_id"
+        private const val KEY_LAST_FILLED_AMOUNT = "key_last_filled_amount"
+
         fun create(
             transaction: TransactionEditData,
             viewBinding: OneExpenseBinding,

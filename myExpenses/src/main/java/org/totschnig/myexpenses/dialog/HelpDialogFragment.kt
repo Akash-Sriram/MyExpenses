@@ -131,7 +131,6 @@ class HelpDialogFragment : DialogViewBinding<HelpDialogBinding>() {
             "trade_transfer" to R.drawable.ic_menu_forward
         )
 
-        @JvmStatic
         fun newInstance(extras: Bundle?) =
             HelpDialogFragment().apply { arguments = extras }
     }
@@ -157,8 +156,8 @@ class HelpDialogFragment : DialogViewBinding<HelpDialogBinding>() {
             if (variant != null) {
                 resIdString = "help_" + context + "_" + variant + "_info"
                 val variantInfo = helper.resolveStringOrArray(resIdString, true)
-                if (!TextUtils.isEmpty(variantInfo)) {
-                    screenInfo = if (!TextUtils.isEmpty(screenInfo)) {
+                if (!variantInfo.isNullOrEmpty()) {
+                    screenInfo = if (!screenInfo.isNullOrEmpty()) {
                         TextUtils.concat(
                             screenInfo,
                             "\n",
@@ -169,7 +168,7 @@ class HelpDialogFragment : DialogViewBinding<HelpDialogBinding>() {
                     }
                 }
             }
-            if (TextUtils.isEmpty(screenInfo)) {
+            if (screenInfo.isNullOrEmpty()) {
                 binding.screenInfo.visibility = View.GONE
             } else {
                 binding.screenInfo.text = screenInfo

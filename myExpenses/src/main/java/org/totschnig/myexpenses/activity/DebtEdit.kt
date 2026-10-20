@@ -77,7 +77,7 @@ class DebtEdit : EditActivity(), ButtonWithDialog.Host {
                             binding.Description.setText(debt.description)
                             setSelectedCurrency(debt.currency)
                             binding.Amount.setAmount(Money(debt.currency, debt.amount).amountMajor)
-                            binding.DateButton.setDate(epoch2ZonedDateTime(debt.date).toLocalDate())
+                            binding.DateButton.date = epoch2ZonedDateTime(debt.date).toLocalDate()
                             debt.equivalentAmount?.let {
                                 binding.EquivalentAmount.setAmount(
                                     Money(homeCurrency, it).amountMajor
@@ -99,7 +99,7 @@ class DebtEdit : EditActivity(), ButtonWithDialog.Host {
     }
         if (savedInstanceState == null) {
             if (debtId == 0L) {
-                binding.DateButton.setDate(LocalDate.now())
+                binding.DateButton.date = LocalDate.now()
                 setTitle(false)
             }
         }

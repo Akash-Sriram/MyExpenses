@@ -8,7 +8,6 @@ import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.os.Bundle
 import android.provider.CalendarContract
-import android.text.TextUtils
 import androidx.core.os.BundleCompat
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
@@ -156,7 +155,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                 }
                 val isEncrypted = EncryptionHelper.isEncrypted(inputStream)
                 if (isEncrypted) {
-                    if (TextUtils.isEmpty(password)) {
+                    if (password.isNullOrEmpty()) {
                         failureResult(R.string.backup_is_encrypted)
                         return@launch
                     }

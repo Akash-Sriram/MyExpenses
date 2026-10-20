@@ -32,7 +32,6 @@ import org.totschnig.myexpenses.db2.getGrouping
 import org.totschnig.myexpenses.db2.preDefinedName
 import org.totschnig.myexpenses.db2.updatePlan
 import org.totschnig.myexpenses.dialog.MenuItem
-import org.totschnig.myexpenses.dialog.name
 import org.totschnig.myexpenses.model.AccountGrouping
 import org.totschnig.myexpenses.model.CrStatus
 import org.totschnig.myexpenses.model.CurrencyEnum

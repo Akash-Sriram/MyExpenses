@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.fragment
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.text.TextUtils
 import android.view.ContextMenu
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -19,6 +18,9 @@ import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -145,9 +147,13 @@ class TagList : Fragment(), OnDialogResultListener {
         adapter = Adapter()
         registerForContextMenu(binding.recyclerView)
         binding.recyclerView.adapter = adapter
-        viewModel.tags.observe(viewLifecycleOwner) {
-            adapter.submitList(it)
-            binding.emptyView.isVisible = it.isEmpty() && allowModifications
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.tags.collect {
+                    adapter.submitList(it)
+                    binding.emptyView.isVisible = it.isEmpty() && allowModifications
+                }
+            }
         }
 
         selected?.let { viewModel.selectedTagIds = it.toHashSet() }
@@ -201,7 +207,7 @@ class TagList : Fragment(), OnDialogResultListener {
 
     private fun addTag(commit: Boolean = false) {
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
-        binding.tagEdit.text.toString().trim().takeIf { !TextUtils.isEmpty(it) }?.let { label ->
+        binding.tagEdit.text.toString().trim().takeIf { it.isNotEmpty() }?.let { label ->
             val position = adapter.getPosition(label)
             if (position > -1) {
                 (activity as? ProtectedFragmentActivity)?.showSnackBar(
@@ -211,9 +217,10 @@ class TagList : Fragment(), OnDialogResultListener {
                     )
                 )
             } else {
-                viewModel.addTagAndPersist(label).observe(viewLifecycleOwner) {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val tag = viewModel.addTagAndPersist(label)
                     if (commit) {
-                        commit(it)
+                        commit(tag)
                     }
                 }
             }

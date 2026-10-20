@@ -16,11 +16,9 @@
 
 package org.totschnig.myexpenses.calendar
 
-import android.text.TextUtils
 import android.util.Log
 import java.time.DayOfWeek
 import java.time.ZonedDateTime
-import java.util.Calendar
 import java.util.HashMap
 import java.util.Locale
 
@@ -104,7 +102,6 @@ class EventRecurrence {
         private const val VALIDATE_UNTIL = false
         private const val ONLY_ONE_UNTIL_COUNT = false
 
-        @JvmStatic
         fun dayOfWeek2Day(day: DayOfWeek): Int {
             return when (day) {
                 DayOfWeek.SUNDAY -> SU
@@ -118,21 +115,19 @@ class EventRecurrence {
         }
 
 
-        @JvmStatic
-        fun day2CalendarDay(day: Int): Int {
+        fun day2DayOfWeek(day: Int): DayOfWeek {
             return when (day) {
-                SU -> Calendar.SUNDAY
-                MO -> Calendar.MONDAY
-                TU -> Calendar.TUESDAY
-                WE -> Calendar.WEDNESDAY
-                TH -> Calendar.THURSDAY
-                FR -> Calendar.FRIDAY
-                SA -> Calendar.SATURDAY
-                else -> throw RuntimeException("bad day of week: $day")
+                SU -> DayOfWeek.SUNDAY
+                MO -> DayOfWeek.MONDAY
+                TU -> DayOfWeek.TUESDAY
+                WE -> DayOfWeek.WEDNESDAY
+                TH -> DayOfWeek.THURSDAY
+                FR -> DayOfWeek.FRIDAY
+                SA -> DayOfWeek.SATURDAY
+                else -> throw IllegalArgumentException("bad day of week: $day")
             }
         }
 
-        @JvmStatic
         fun day2String(day: Int): String {
             return when (day) {
                 SU -> "SU"
@@ -169,38 +164,34 @@ class EventRecurrence {
         }
     }
 
-    @JvmField var startDate: ZonedDateTime? = null
-    @JvmField var freq: Int = 0
-    @JvmField var until: String? = null
-    @JvmField var count: Int = 0
-    @JvmField var interval: Int = 0
-    @JvmField var wkst: Int = 0
+    var startDate: ZonedDateTime? = null
+    var freq: Int = 0
+    var until: String? = null
+    var count: Int = 0
+    var interval: Int = 0
+    var wkst: Int = 0
 
-    @JvmField var bysecond: IntArray? = null
-    @JvmField var bysecondCount: Int = 0
-    @JvmField var byminute: IntArray? = null
-    @JvmField var byminuteCount: Int = 0
-    @JvmField var byhour: IntArray? = null
-    @JvmField var byhourCount: Int = 0
-    @JvmField var byday: IntArray? = null
-    @JvmField var bydayNum: IntArray? = null
-    @JvmField var bydayCount: Int = 0
-    @JvmField var bymonthday: IntArray? = null
-    @JvmField var bymonthdayCount: Int = 0
-    @JvmField var byyearday: IntArray? = null
-    @JvmField var byyeardayCount: Int = 0
-    @JvmField var byweekno: IntArray? = null
-    @JvmField var byweeknoCount: Int = 0
-    @JvmField var bymonth: IntArray? = null
-    @JvmField var bymonthCount: Int = 0
-    @JvmField var bysetpos: IntArray? = null
-    @JvmField var bysetposCount: Int = 0
+    var bysecond: IntArray? = null
+    var bysecondCount: Int = 0
+    var byminute: IntArray? = null
+    var byminuteCount: Int = 0
+    var byhour: IntArray? = null
+    var byhourCount: Int = 0
+    var byday: IntArray? = null
+    var bydayNum: IntArray? = null
+    var bydayCount: Int = 0
+    var bymonthday: IntArray? = null
+    var bymonthdayCount: Int = 0
+    var byyearday: IntArray? = null
+    var byyeardayCount: Int = 0
+    var byweekno: IntArray? = null
+    var byweeknoCount: Int = 0
+    var bymonth: IntArray? = null
+    var bymonthCount: Int = 0
+    var bysetpos: IntArray? = null
+    var bysetposCount: Int = 0
 
     class InvalidFormatException(s: String) : RuntimeException(s)
-
-    fun setStartDate(date: ZonedDateTime?) {
-        startDate = date
-    }
 
     private fun appendByDay(s: StringBuilder, i: Int) {
         val n = bydayNum!![i]
@@ -224,7 +215,7 @@ class EventRecurrence {
             YEARLY -> s.append("YEARLY")
         }
 
-        if (!TextUtils.isEmpty(until)) {
+        if (!until.isNullOrEmpty()) {
             s.append(";UNTIL=")
             s.append(until)
         }
@@ -338,7 +329,7 @@ class EventRecurrence {
         }
 
         for (part in parts) {
-            if (TextUtils.isEmpty(part)) continue
+            if (part.isNullOrEmpty()) continue
             val equalIndex = part.indexOf('=')
             if (equalIndex <= 0) {
                 throw InvalidFormatException("Missing LHS in $part")
@@ -383,7 +374,6 @@ class EventRecurrence {
         abstract fun parsePart(value: String, er: EventRecurrence): Int
 
         companion object {
-            @JvmStatic
             fun parseIntRange(str: String, minVal: Int, maxVal: Int, allowZero: Boolean): Int {
                 var s = str
                 try {
@@ -400,7 +390,6 @@ class EventRecurrence {
                 }
             }
 
-            @JvmStatic
             fun parseNumberList(
                 listStr: String, minVal: Int, maxVal: Int, allowZero: Boolean
             ): IntArray {

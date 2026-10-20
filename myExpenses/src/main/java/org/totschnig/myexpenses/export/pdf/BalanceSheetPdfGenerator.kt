@@ -1,28 +1,14 @@
 package org.totschnig.myexpenses.export.pdf
 
-// Import BaseColor for colors
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import com.itextpdf.text.Chunk
-import com.itextpdf.text.Document
-import com.itextpdf.text.Element
-import com.itextpdf.text.Paragraph
-import com.itextpdf.text.Rectangle
-import com.itextpdf.text.pdf.PdfPCell
-import com.itextpdf.text.pdf.PdfPTable
-import com.itextpdf.text.pdf.PdfWriter
-import com.itextpdf.text.pdf.draw.LineSeparator
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.export.createFileFailure
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
-import org.totschnig.myexpenses.myApplication
-import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.util.AppDirHelper.timeStampedFile
-import org.totschnig.myexpenses.util.LazyFontSelector.FontType
-import org.totschnig.myexpenses.util.PdfHelper
 import org.totschnig.myexpenses.util.formatMoney
 import org.totschnig.myexpenses.util.io.displayName
 import org.totschnig.myexpenses.viewmodel.data.BalanceData
@@ -32,17 +18,11 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.abs
 
-
 class BalanceSheetPdfGenerator(private val context: Context) {
 
-    val currencyFormatter = context.injector.currencyFormatter()
-    val homeCurrencyUnit = context.injector.currencyContext().homeCurrencyUnit
-    val prefHandler = context.injector.prefHandler()
-    val baseFontSize = prefHandler.getFloat(PrefKey.PRINT_FONT_SIZE, 12f)
-    val helper = PdfHelper(
-        baseFontSize,
-        context.myApplication.memoryClass
-    )
+    private val currencyFormatter = context.injector.currencyFormatter()
+    private val homeCurrencyUnit = context.injector.currencyContext().homeCurrencyUnit
+    private val prefHandler = context.injector.prefHandler()
 
     fun generatePdf(
         destDir: DocumentFile,
@@ -50,7 +30,6 @@ class BalanceSheetPdfGenerator(private val context: Context) {
         debts: Long,
         date: LocalDate
     ): Pair<Uri, String> {
-
         val fileName = "BalanceSheet"
         val outputFile = timeStampedFile(
             destDir,
@@ -59,177 +38,168 @@ class BalanceSheetPdfGenerator(private val context: Context) {
         ) ?: throw createFileFailure(context, destDir, fileName)
 
         val (assets, totalAssets, liabilities, totalLiabilities) = data
-
-        val document = PdfPrinter.getDocument(context, prefHandler)
-
-        PdfWriter.getInstance(
-            document, context.contentResolver.openOutputStream(outputFile.uri)
-        ).pageEvent = helper.getPageEventHelper(context, prefHandler)
-        document.open()
+        val writer = PdfDocumentWriter(context, prefHandler)
 
         try {
-            addTitleAndDate(document, date)
+            writer.drawParagraph(
+                context.getString(R.string.balance_sheet),
+                FontType.TITLE,
+                CellAlignment.CENTER,
+                spacingAfter = 4f
+            )
 
-            val table = PdfPTable(2)
-            table.setWidthPercentage(100f)
-            table.setWidths(floatArrayOf(3f, 1f))
+            val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
+            writer.drawParagraph(
+                date.format(formatter),
+                FontType.NORMAL,
+                CellAlignment.CENTER,
+                spacingAfter = 12f
+            )
+
+            val columnWeights = floatArrayOf(3f, 1f)
+            val rows = mutableListOf<PdfRow>()
+
+            fun addLine(
+                label: String?,
+                amount: Long,
+                isAbsolute: Boolean = true,
+                labelFontType: FontType = FontType.NORMAL,
+                expenseFontType: FontType = FontType.EXPENSE,
+                incomeFontType: FontType = FontType.INCOME,
+                paddingTop: Float = 4f,
+                paddingBottom: Float = 4f
+            ) {
+                val formattedAmount = formatCurrency(if (isAbsolute) abs(amount) else amount)
+                val font = if (amount < 0) expenseFontType else incomeFontType
+                rows.add(
+                    PdfRow(
+                        listOf(
+                            PdfCell(
+                                text = label ?: "",
+                                fontType = labelFontType,
+                                alignment = CellAlignment.LEFT,
+                                paddingTop = paddingTop,
+                                paddingBottom = paddingBottom
+                            ),
+                            PdfCell(
+                                text = formattedAmount,
+                                fontType = font,
+                                alignment = CellAlignment.RIGHT,
+                                paddingTop = paddingTop,
+                                paddingBottom = paddingBottom
+                            )
+                        )
+                    )
+                )
+            }
+
+            fun addSeparator() {
+                rows.add(
+                    PdfRow(
+                        listOf(
+                            PdfCell(
+                                text = "",
+                                borderBottom = true,
+                                colSpan = 2,
+                                paddingTop = 2f,
+                                paddingBottom = 2f
+                            )
+                        )
+                    )
+                )
+            }
+
+            fun addAccountTypeSection(section: BalanceSection) {
+                addLine(
+                    label = section.type.title(context),
+                    amount = section.total,
+                    isAbsolute = true,
+                    labelFontType = FontType.BALANCE_SECTION,
+                    paddingTop = 4f,
+                    paddingBottom = 4f
+                )
+                for (account in section.accounts) {
+                    addLine(
+                        label = account.label,
+                        amount = account.currentBalance,
+                        isAbsolute = true,
+                        paddingTop = 1f,
+                        paddingBottom = 2f
+                    )
+                }
+            }
 
             addLine(
-                table,
-                context.getString(R.string.balance_sheet_section_assets),
-                totalAssets
+                label = context.getString(R.string.balance_sheet_section_assets),
+                amount = totalAssets,
+                labelFontType = FontType.BALANCE_CHAPTER,
+                expenseFontType = FontType.EXPENSE_BOLD,
+                incomeFontType = FontType.INCOME_BOLD,
+                paddingTop = 8f,
+                paddingBottom = 6f
             )
             for (section in assets) {
-                addAccountTypeSectionToPdf(table, section)
+                addAccountTypeSection(section)
             }
 
-            addLineSeparator(table)
+            addSeparator()
 
             addLine(
-                table,
-                context.getString(R.string.balance_sheet_section_liabilities),
-                totalLiabilities
+                label = context.getString(R.string.balance_sheet_section_liabilities),
+                amount = totalLiabilities,
+                labelFontType = FontType.BALANCE_CHAPTER,
+                expenseFontType = FontType.EXPENSE_BOLD,
+                incomeFontType = FontType.INCOME_BOLD,
+                paddingTop = 8f,
+                paddingBottom = 6f
             )
             for (section in liabilities) {
-                addAccountTypeSectionToPdf(table, section)
+                addAccountTypeSection(section)
             }
 
-            addLineSeparator(table)
+            addSeparator()
 
             if (debts != 0L) {
                 addLine(
-                    table,
-                    context.getString(R.string.debts),
-                    debts,
+                    label = context.getString(R.string.debts),
+                    amount = debts,
                     isAbsolute = false,
-                    paddingBottom = 0f
-                )
-                addLineSeparator(table)
-            }
-
-            addLine(
-                table,
-                context.getString(R.string.balance_sheet_net_worth),
-                totalAssets + totalLiabilities + debts,
-                isAbsolute = false,
-                paddingBottom = 0f
-            )
-            document.add(table)
-            helper.reportMissingCharacters()
-        } finally {
-            document.close()
-        }
-        return outputFile.uri to outputFile.displayName
-    }
-
-    private fun addLineSeparator(table: PdfPTable) {
-        table.addCell(PdfPCell().apply {
-            colspan = 2
-            paddingTop = 0f
-            paddingBottom = 0f
-            paddingLeft = 0f
-            paddingRight = 0f
-            border = Rectangle.NO_BORDER
-            addElement(Chunk(LineSeparator()))
-        })
-    }
-
-    private fun addTitleAndDate(document: Document, date: LocalDate) {
-        var paragraph =
-            Paragraph(helper.print(context.getString(R.string.balance_sheet), FontType.TITLE))
-        paragraph.alignment = Element.ALIGN_CENTER
-        document.add(paragraph)
-
-        val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
-        paragraph = Paragraph(helper.print(date.format(formatter), FontType.NORMAL))
-        paragraph.alignment = Element.ALIGN_CENTER
-        paragraph.spacingAfter = 10f
-        document.add(paragraph)
-    }
-
-    private fun addAccountTypeSectionToPdf(
-        table: PdfPTable,
-        section: BalanceSection
-    ) {
-        addLine(
-            table = table,
-            label = section.type.title(context),
-            amount = section.total,
-            isAbsolute = true,
-            labelFontType = FontType.BALANCE_SECTION
-        )
-
-        for (account in section.accounts) {
-            val printreal =
-                account.currencyUnit.code != homeCurrencyUnit.code && account.currentBalance != 0L
-            addLine(
-                table = table,
-                label = account.label,
-                amount = account.equivalentCurrentBalance,
-                isAbsolute = true,
-                labelFontType = FontType.NORMAL,
-                expenseFontType = FontType.EXPENSE,
-                incomeFontType = FontType.INCOME,
-                paddingTop = 4f,
-                paddingBottom = if (printreal) 1f else 4f
-            )
-
-            if (printreal) {
-                addLine(
-                    table = table,
-                    label = null,
-                    amount = account.currentBalance,
-                    currency = account.currencyUnit,
-                    isAbsolute = true,
-                    labelFontType = FontType.NORMAL,
-                    expenseFontType = FontType.EXPENSE_SMALL,
-                    incomeFontType = FontType.INCOME_SMALL,
-                    paddingTop = 1f,
+                    labelFontType = FontType.BALANCE_CHAPTER,
+                    expenseFontType = FontType.EXPENSE_BOLD,
+                    incomeFontType = FontType.INCOME_BOLD,
+                    paddingTop = 6f,
                     paddingBottom = 4f
                 )
+                addSeparator()
             }
+
+            addLine(
+                label = context.getString(R.string.balance_sheet_net_worth),
+                amount = totalAssets + totalLiabilities + debts,
+                isAbsolute = false,
+                labelFontType = FontType.BALANCE_CHAPTER,
+                expenseFontType = FontType.EXPENSE_BOLD,
+                incomeFontType = FontType.INCOME_BOLD,
+                paddingTop = 8f,
+                paddingBottom = 8f
+            )
+
+            writer.drawTable(columnWeights, rows)
+
+            context.contentResolver.openOutputStream(outputFile.uri)?.use { out ->
+                writer.writeTo(out)
+            }
+        } finally {
+            writer.close()
         }
-    }
 
-    private fun addLine(
-        table: PdfPTable,
-        label: String?,
-        amount: Long,
-        currency: CurrencyUnit = homeCurrencyUnit,
-        isAbsolute: Boolean = true,
-        labelFontType: FontType = FontType.BALANCE_CHAPTER,
-        expenseFontType: FontType = FontType.EXPENSE_BOLD,
-        incomeFontType: FontType = FontType.INCOME_BOLD,
-        paddingTop: Float = 10f,
-        paddingBottom: Float = 10f
-    ) {
-
-        var cell = if (label == null) helper.emptyCell() else
-            helper.printToCell(text = label, font = labelFontType, withPadding = false)
-        cell.horizontalAlignment = Element.ALIGN_LEFT
-        cell.border = Rectangle.NO_BORDER
-        cell.paddingTop = paddingTop
-        cell.paddingBottom = paddingBottom
-        table.addCell(cell)
-
-        cell = helper.printToCell(
-            text = formatCurrency(amount, isAbsolute, currency),
-            font = if (amount < 0) expenseFontType else incomeFontType,
-            withPadding = false,
-        )
-        cell.horizontalAlignment = Element.ALIGN_RIGHT
-        cell.border = Rectangle.NO_BORDER
-        cell.paddingTop = paddingTop
-        cell.paddingBottom = paddingBottom
-        table.addCell(cell)
+        return outputFile.uri to outputFile.displayName
     }
 
     private fun formatCurrency(
         amount: Long,
-        absolute: Boolean,
         currency: CurrencyUnit = homeCurrencyUnit
     ): String {
-        val value = if (absolute) abs(amount) else amount
-        return currencyFormatter.formatMoney(Money(currency, value))
+        return currencyFormatter.formatMoney(Money(currency, amount))
     }
 }

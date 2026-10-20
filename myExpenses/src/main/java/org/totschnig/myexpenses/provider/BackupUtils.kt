@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.provider
 import android.content.ContentResolver
 import android.content.Context
 import android.os.Bundle
-import android.text.TextUtils
 import androidx.documentfile.provider.DocumentFile
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.preference.PrefHandler
@@ -15,8 +14,8 @@ import org.totschnig.myexpenses.util.ZipUtils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.localizedThrowable
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 const val BACKUP_DB_FILE_NAME = "BACKUP"
@@ -33,7 +32,7 @@ fun doBackup(
     val password = prefHandler.getString(PrefKey.EXPORT_PASSWORD, null)
     val cloudStorage = if (withSync) prefHandler.cloudStorage else null
     return AppDirHelper.checkAppDir(context).mapCatching { appDir ->
-        val encrypted = !TextUtils.isEmpty(password)
+        val encrypted = !password.isNullOrEmpty()
         val backupFile =
             requireBackupFile(appDir, prefHandler.backupFilePrefix, encrypted)
                 ?: throw localizedThrowable(context, R.string.io_error_backupdir_null)
@@ -81,8 +80,7 @@ private fun sync(contentResolver: ContentResolver, backend: String?, backupFile:
         var backupFileName = backupFile.name
         if (backupFileName == null) {
             CrashHandler.report(Exception("Could not get name from uri ${backupFile.uri}"))
-            backupFileName = "backup-" + SimpleDateFormat("yyyMMdd", Locale.US)
-                .format(Date())
+            backupFileName = "backup-" + DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US).format(LocalDate.now())
         }
         DbUtils.storeSetting(
             contentResolver,

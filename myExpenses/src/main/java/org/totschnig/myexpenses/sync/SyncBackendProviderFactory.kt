@@ -3,7 +3,7 @@ package org.totschnig.myexpenses.sync
 import android.accounts.Account
 import android.accounts.AccountManager
 import android.content.Context
-import arrow.core.flatMap
+import org.totschnig.myexpenses.util.flatMap
 import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
 import org.totschnig.myexpenses.sync.GenericAccountService.Companion.loadPassword
 import org.totschnig.myexpenses.sync.SyncBackendProvider.SyncParseException

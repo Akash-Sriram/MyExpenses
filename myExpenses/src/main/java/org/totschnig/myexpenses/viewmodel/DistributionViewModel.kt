@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import arrow.core.Tuple4
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -160,7 +159,7 @@ class DistributionViewModel(application: Application, savedStateHandle: SavedSta
         groupingInfoFlow.filterNotNull(),
         _whereFilter
     ) { accountInfo, aggregateNeutral, grouping, whereFilter ->
-        Tuple4(accountInfo, aggregateNeutral, grouping, whereFilter)
+        DistributionCriteria(accountInfo, aggregateNeutral, grouping, whereFilter)
     }.flatMapLatest { (accountInfo, aggregateNeutral, grouping, whereFilter) ->
         categoryTreeWithSum(
             accountInfo = accountInfo,

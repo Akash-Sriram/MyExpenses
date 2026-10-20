@@ -154,6 +154,8 @@ interface AppComponent {
 
     fun preferencesDataStore(): DataStore<Preferences>
 
+    fun preferencesHolder(): org.totschnig.myexpenses.preference.PreferencesHolder
+
     fun configurator(): Configurator
 
     fun exchangeRateHandler(): ExchangeRateHandler

@@ -13,8 +13,8 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.io.displayName
 import java.io.File
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.Boolean
 import kotlin.Exception
@@ -127,15 +127,14 @@ object AppDirHelper {
      * @return creates a file object in parentDir, with a timestamp appended to
      * prefix as name
      */
-    @JvmStatic
     fun timeStampedFile(
         parentDir: DocumentFile,
         prefix: String,
         mimeType: String,
         extension: String
     ): DocumentFile? {
-        val now = SimpleDateFormat("yyyMMdd-HHmmss", Locale.US)
-            .format(Date())
+        val now = DateTimeFormatter.ofPattern("uuuuMMdd-HHmmss", Locale.US)
+            .format(LocalDateTime.now())
         val name = "$prefix-$now.$extension"
         return buildFile(
             parentDir, name, mimeType,

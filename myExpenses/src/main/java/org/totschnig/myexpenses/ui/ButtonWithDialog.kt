@@ -8,18 +8,17 @@ import android.view.View
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
+import android.os.Bundle
+import androidx.core.os.BundleCompat
 import com.google.android.material.button.MaterialButton
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.ui.getActivity
 
-abstract class ButtonWithDialog<T: DialogFragment> @JvmOverloads constructor(
+abstract class ButtonWithDialog<T: DialogFragment> constructor(
         context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) : MaterialButton(context, attrs, defStyleAttr) {
 
     abstract val fragmentTag: String
 
-    @State
     var dialogShown = false
 
     private fun showDialog() {
@@ -32,16 +31,29 @@ abstract class ButtonWithDialog<T: DialogFragment> @JvmOverloads constructor(
     abstract fun buildDialog(): T
 
     override fun onSaveInstanceState(): Parcelable {
-        return StateSaver.saveInstanceState(this, super.onSaveInstanceState())
+        val bundle = Bundle()
+        bundle.putParcelable(KEY_SUPER_STATE, super.onSaveInstanceState())
+        bundle.putBoolean(KEY_DIALOG_SHOWN, dialogShown)
+        onSaveCustomState(bundle)
+        return bundle
     }
 
     override fun onRestoreInstanceState(state: Parcelable?) {
-        super.onRestoreInstanceState(StateSaver.restoreInstanceState(this, state))
+        if (state is Bundle) {
+            super.onRestoreInstanceState(BundleCompat.getParcelable(state, KEY_SUPER_STATE, Parcelable::class.java))
+            dialogShown = state.getBoolean(KEY_DIALOG_SHOWN, false)
+            onRestoreCustomState(state)
+        } else {
+            super.onRestoreInstanceState(state)
+        }
         update()
         if (dialogShown) {
             reAttachListener((context.getActivity() as FragmentActivity).supportFragmentManager)
         }
     }
+
+    protected open fun onSaveCustomState(bundle: Bundle) {}
+    protected open fun onRestoreCustomState(bundle: Bundle) {}
 
     abstract fun update()
 
@@ -82,5 +94,10 @@ abstract class ButtonWithDialog<T: DialogFragment> @JvmOverloads constructor(
 
     init {
         setOnClickListener { onClick() }
+    }
+
+    companion object {
+        private const val KEY_SUPER_STATE = "super_state"
+        private const val KEY_DIALOG_SHOWN = "dialog_shown"
     }
 }

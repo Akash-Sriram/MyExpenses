@@ -5,13 +5,13 @@ import android.os.Parcelable
 import java.math.BigDecimal
 
 class AmountInput : FormElement<AmountInput, AmountInputViewHolder> {
-    @JvmField var fractionDigits: Int = 0
-    @JvmField var amount: BigDecimal? = null
-    @JvmField var max: BigDecimal? = null
-    @JvmField var maxExceededError: String? = null
-    @JvmField var min: BigDecimal? = null
-    @JvmField var underMinError: String? = null
-    @JvmField var withTypeSwitch: Boolean? = null
+    var fractionDigits: Int = 0
+    var amount: BigDecimal? = null
+    var max: BigDecimal? = null
+    var maxExceededError: String? = null
+    var min: BigDecimal? = null
+    var underMinError: String? = null
+    var withTypeSwitch: Boolean? = null
 
     protected constructor(resultKey: String) : super(resultKey)
 
@@ -72,7 +72,6 @@ class AmountInput : FormElement<AmountInput, AmountInputViewHolder> {
     override fun describeContents(): Int = 0
 
     companion object {
-        @JvmStatic
         fun plain(resultKey: String): AmountInput = AmountInput(resultKey)
 
         @JvmField

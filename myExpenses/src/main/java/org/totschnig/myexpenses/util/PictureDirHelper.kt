@@ -9,8 +9,8 @@ import org.totschnig.myexpenses.util.AppDirHelper.getContentUriForFile
 import org.totschnig.myexpenses.util.AppDirHelper.getFileProviderAuthority
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler.Companion.report
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object PictureDirHelper {
@@ -69,11 +69,8 @@ object PictureDirHelper {
     }
 
     val defaultFileName: String
-        get() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        get() = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.US).format(LocalDateTime.now())
 
-
-    @JvmOverloads
-    @JvmStatic
     fun getOutputMediaUri(
         temp: Boolean,
         application: MyApplication,

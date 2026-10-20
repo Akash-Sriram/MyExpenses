@@ -7,6 +7,7 @@ import android.content.pm.ShortcutManager
 import android.os.Build
 import android.os.Bundle
 import androidx.annotation.Keep
+import timber.log.Timber
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.layout.Column
@@ -53,9 +54,8 @@ import org.totschnig.myexpenses.util.ShortcutHelper
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.getLocale
-import timber.log.Timber
-import java.text.DateFormatSymbols
-import java.util.Calendar
+import java.time.DayOfWeek
+import java.time.format.TextStyle
 import java.util.Locale
 
 @Keep
@@ -177,19 +177,10 @@ class PreferenceUiFragment : BasePreferenceFragment() {
 
         with(requirePreference<ListPreference>(PrefKey.GROUP_WEEK_STARTS)) {
             val locale = preferenceActivity.getLocale()
-            val dfs = DateFormatSymbols(locale)
-            val entries = arrayOfNulls<String>(7)
-            System.arraycopy(dfs.weekdays, 1, entries, 0, 7)
-            this.entries = entries
-            entryValues = arrayOf(
-                (Calendar.SUNDAY).toString(),
-                (Calendar.MONDAY).toString(),
-                (Calendar.TUESDAY).toString(),
-                (Calendar.WEDNESDAY).toString(),
-                (Calendar.THURSDAY).toString(),
-                (Calendar.FRIDAY).toString(),
-                (Calendar.SATURDAY).toString()
-            )
+            this.entries = Array(7) { i ->
+                DayOfWeek.SUNDAY.plus(i.toLong()).getDisplayName(TextStyle.FULL, locale)
+            }
+            entryValues = arrayOf("1", "2", "3", "4", "5", "6", "7")
             if (!prefHandler.isSet(PrefKey.GROUP_WEEK_STARTS)) {
                 value = Utils.getFirstDayOfWeek(locale).toString()
             }

@@ -18,7 +18,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.livefront.sealedenum.GenSealedEnum
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import org.totschnig.myexpenses.R
@@ -38,6 +37,7 @@ sealed class MenuItem(
     val isEnabledByDefault: Boolean = true,
 ) : Parcelable {
 
+    val name: String get() = this::class.java.simpleName
     val testTag: String get() = this::class.java.simpleName
 
     open fun getLabel(context: Context) = context.getString(labelRes)
@@ -260,8 +260,36 @@ sealed class MenuItem(
         }
     }
 
-    @GenSealedEnum
     companion object {
+
+        val values: List<MenuItem> = listOf(
+            Search,
+            Templates,
+            Budget,
+            Loans,
+            Distribution,
+            History,
+            Parties,
+            ScanMode,
+            Reset,
+            Sync,
+            ShowStatusHandle,
+            Balance,
+            Sort,
+            Grouping,
+            Print,
+            Archive,
+            Settings,
+            Help,
+            Backup,
+            ImportTrades,
+            Restore,
+            Tune
+        )
+
+        fun valueOf(name: String): MenuItem =
+            values.firstOrNull { it.name == name }
+                ?: throw IllegalArgumentException("No MenuItem found for name $name")
 
         val mapper = object : Mapper<List<MenuItem>, String> {
             override fun toPreference(userValue: List<MenuItem>): String =

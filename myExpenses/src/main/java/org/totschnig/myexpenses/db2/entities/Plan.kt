@@ -8,14 +8,14 @@ import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.util.toEpochMillis
-import java.text.DateFormat
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.temporal.ChronoField
-import java.util.Date
 import java.util.Locale
 
 data class Plan(
@@ -97,9 +97,9 @@ fun prettyTimeInfo(ctx: Context, rRule: String?, start: Long): String {
             return e.safeMessage
         }
         val date = Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault())
-        eventRecurrence.setStartDate(date)
+        eventRecurrence.startDate = date
         EventRecurrenceFormatter.getRepeatString(ctx, ctx.resources, eventRecurrence, true)
-    } ?:  DateFormat
-        .getDateInstance(DateFormat.FULL)
-        .format(Date(start))
+    } ?: DateTimeFormatter
+        .ofLocalizedDate(FormatStyle.FULL)
+        .format(Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()))
 }

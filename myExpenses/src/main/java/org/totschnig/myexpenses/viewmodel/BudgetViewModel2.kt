@@ -11,7 +11,6 @@ import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
 import app.cash.copper.flow.mapToOne
 import app.cash.copper.flow.observeQuery
-import arrow.core.Tuple5
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -181,26 +180,33 @@ class BudgetViewModel2(application: Application, savedStateHandle: SavedStateHan
             groupingInfoFlow.filterNotNull(),
             _whereFilter
         ) { accountInfo, aggregateNeutral, allocatedOnly, grouping, whereFilter ->
-            Tuple5(
+            BudgetCriteria(
                 accountInfo,
                 aggregateNeutral,
                 allocatedOnly,
                 grouping,
                 whereFilter
             )
-        }.combine(budgetFlow) { tuple, budget -> tuple to budget }
-            .flatMapLatest { (tuple, budget) ->
-                val (accountInfo, aggregateNeutral, allocatedOnly, grouping, whereFilter) = tuple
+        }.combine(budgetFlow) { criteria, budget -> criteria to budget }
+            .flatMapLatest { (criteria, budget) ->
                 categoryTreeWithSum(
-                    accountInfo = accountInfo,
+                    accountInfo = criteria.accountInfo,
                     isIncome = false,
-                    aggregateNeutral = aggregateNeutral,
-                    groupingInfo = grouping,
-                    whereFilter = whereFilter,
-                    keepCriterion = if (allocatedOnly) { { !(it.budget == BudgetAllocation.EMPTY && it.sum == 0L) } } else null
+                    aggregateNeutral = criteria.aggregateNeutral,
+                    groupingInfo = criteria.grouping,
+                    whereFilter = criteria.whereFilter,
+                    keepCriterion = if (criteria.allocatedOnly) { { !(it.budget == BudgetAllocation.EMPTY && it.sum == 0L) } } else null
                 ).map { it.copy(budget = budget) }
             }
     }
+
+    private data class BudgetCriteria(
+        val accountInfo: Budget,
+        val aggregateNeutral: Boolean,
+        val allocatedOnly: Boolean,
+        val grouping: GroupingInfo,
+        val whereFilter: org.totschnig.myexpenses.provider.filter.Criterion?
+    )
 
     override fun dateFilterClause(groupingInfo: GroupingInfo): String? {
         return if (groupingInfo.grouping == Grouping.NONE) accountInfo.value?.durationAsSqlFilter() else

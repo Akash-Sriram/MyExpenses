@@ -64,7 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import kotlinx.coroutines.launch
-import myiconpack.IcActionTemplateAdd
+import org.totschnig.myexpenses.compose.icons.IcActionTemplateAdd
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.BaseActivity
 import org.totschnig.myexpenses.compose.DonutInABox

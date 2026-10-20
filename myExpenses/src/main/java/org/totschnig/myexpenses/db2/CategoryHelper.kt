@@ -1,11 +1,18 @@
 package org.totschnig.myexpenses.db2
 
-import org.apache.commons.text.translate.UnicodeUnescaper
 import org.totschnig.myexpenses.model2.Category
 
 object CategoryHelper {
-    private val unicodeUnescaper = UnicodeUnescaper()
+    private val UNICODE_REGEX = Regex("""\\u+([0-9a-fA-F]{4})""")
     private var countInserted = 0
+
+    private fun unescapeUnicode(input: String): String {
+        if (!input.contains("\\u")) return input
+        return UNICODE_REGEX.replace(input) { matchResult ->
+            val hex = matchResult.groupValues[1]
+            hex.toInt(16).toChar().toString()
+        }
+    }
 
     /**
      * inserts the category to the database if needed
@@ -70,7 +77,7 @@ object CategoryHelper {
         parentId: Long?,
         typeFlags: Byte = FLAG_NEUTRAL
     ): Long {
-        val unescaped = unicodeUnescaper.translate(name)
+        val unescaped = unescapeUnicode(name)
         var id = repository.findCategory(unescaped, parentId)
         if (id == -1L) {
             id = repository.saveCategory(

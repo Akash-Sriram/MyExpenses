@@ -30,11 +30,9 @@ import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.util.ICurrencyFormatter
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.convAmount
-import org.totschnig.myexpenses.util.ui.asDateTimeFormatter
 import org.totschnig.myexpenses.viewmodel.KEY_LOADING_INFO
 import org.totschnig.myexpenses.viewmodel.TransactionListViewModel
 import org.totschnig.myexpenses.viewmodel.data.IIconInfo
-import java.text.SimpleDateFormat
 import javax.inject.Inject
 
 class TransactionListComposeDialogFragment : ComposeBaseDialogFragment(),
@@ -84,7 +82,7 @@ class TransactionListComposeDialogFragment : ComposeBaseDialogFragment(),
         val data = viewModel.transactions.collectAsState(initial = emptyList())
         val renderer = CompactTransactionRenderer(
             dateTimeFormatInfo = DateTimeFormatInfo(
-                (Utils.ensureDateFormatWithShortYear(context) as SimpleDateFormat).asDateTimeFormatter,
+                Utils.ensureDateTimeFormatterWithShortYear(context),
                 4.6f
             ),
             withCategoryIcon = false,

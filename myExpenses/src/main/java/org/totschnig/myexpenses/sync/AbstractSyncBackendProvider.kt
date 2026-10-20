@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import android.provider.Settings
-import android.text.TextUtils
 import android.util.Base64
 import androidx.annotation.CallSuper
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -522,7 +521,7 @@ abstract class AbstractSyncBackendProvider<Res>(protected val context: Context) 
     override fun lock() {
         val existingLockToken = getLockToken()
         log().i("ExistingLockToken: %s", existingLockToken)
-        if (TextUtils.isEmpty(existingLockToken) || shouldOverrideLock(existingLockToken)) {
+        if (existingLockToken.isNullOrEmpty() || shouldOverrideLock(existingLockToken)) {
             val newLockToken = generateUuid()
             setLockToken(newLockToken)
             saveLockTokenToPreferences(newLockToken, System.currentTimeMillis(), true)

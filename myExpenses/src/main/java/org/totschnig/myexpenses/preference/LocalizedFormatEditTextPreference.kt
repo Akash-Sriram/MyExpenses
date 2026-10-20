@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.preference
 
 import android.content.Context
-import android.text.TextUtils
 import android.util.AttributeSet
 import androidx.preference.EditTextPreference
 import androidx.core.content.edit
@@ -20,7 +19,7 @@ abstract class LocalizedFormatEditTextPreference(context: Context, attrs: Attrib
     }
 
     override fun getText(): String? {
-        return super.getText().takeIf { !TextUtils.isEmpty(it) } ?: getDefaultValue()
+        return super.getText().takeIf { !it.isNullOrEmpty() } ?: getDefaultValue()
     }
 
     abstract fun getDefaultValue(): String?
@@ -29,7 +28,7 @@ abstract class LocalizedFormatEditTextPreference(context: Context, attrs: Attrib
 
     override fun persistString(value: String?) = when {
         !shouldPersist() -> false
-        value == getDefaultValue() || TextUtils.isEmpty(value) -> {
+        value == getDefaultValue() || value.isNullOrEmpty() -> {
             voidValue()
             false
         }
@@ -43,7 +42,7 @@ abstract class LocalizedFormatEditTextPreference(context: Context, attrs: Attrib
     }
 
     override fun callChangeListener(newValue: Any?) = (newValue as? String)
-            ?.takeIf { !TextUtils.isEmpty(it) }
+            ?.takeIf { !it.isNullOrEmpty() }
             ?.let { validate(it) }
             ?.let {
                 onValidationErrorListener?.onValidationError(it)

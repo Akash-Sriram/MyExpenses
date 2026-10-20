@@ -5,7 +5,6 @@ import android.content.Context
 import androidx.annotation.StringRes
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import com.livefront.sealedenum.GenSealedEnum
 import kotlinx.coroutines.flow.first
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
@@ -55,9 +54,12 @@ sealed class Feature(vararg val requiredModules: Module) {
         datastore: DataStore<Preferences>
     ) = false
 
-    @GenSealedEnum
     companion object {
-        fun dependentFeatures(moduleName: String) = Feature.values
+        val values: List<Feature> by lazy {
+            listOf(OCR, TESSERACT, MLKIT, DEVA, LATN, SQLCRYPT)
+        }
+
+        fun dependentFeatures(moduleName: String) = values
             .filter {
                 it.requiredModules.contains(Module.from(moduleName))
             }

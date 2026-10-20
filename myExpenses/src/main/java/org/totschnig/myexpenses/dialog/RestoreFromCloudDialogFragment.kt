@@ -4,7 +4,6 @@ import android.app.Dialog
 import android.content.DialogInterface
 import android.os.Bundle
 import android.text.Editable
-import android.text.TextUtils
 import android.text.TextWatcher
 import android.view.View
 import android.widget.AbsListView
@@ -120,9 +119,8 @@ class RestoreFromCloudDialogFragment : DialogViewBinding<RestoreFromCloudBinding
             val activeContent = activeContent
             val activeList = findListView(activeContent)
             if (activeContent.id == R.id.backup_list_container) {
-                if (binding.passwordLayout.passwordLayout.visibility == View.VISIBLE && TextUtils.isEmpty(
-                        binding.passwordLayout.passwordEdit.text.toString()
-                    )
+                if (binding.passwordLayout.passwordLayout.visibility == View.VISIBLE &&
+                    binding.passwordLayout.passwordEdit.text.isNullOrEmpty()
                 ) {
                     return false
                 }

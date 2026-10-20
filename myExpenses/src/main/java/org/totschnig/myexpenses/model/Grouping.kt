@@ -10,10 +10,8 @@ import org.totschnig.myexpenses.util.TextUtils.joinEnum
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.safeMessage
-import org.totschnig.myexpenses.util.ui.asDateTimeFormatter
 import org.totschnig.myexpenses.viewmodel.data.DateInfo
 import org.totschnig.myexpenses.viewmodel.data.Transaction2
-import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -85,11 +83,9 @@ enum class Grouping(@param:StringRes val label: Int) {
                 }
 
                 WEEK -> {
-                    val formatter =
-                        (Utils.localizedYearLessDateFormat(ctx) as? SimpleDateFormat)?.asDateTimeFormatter
+                    val formatter = Utils.localizedYearLessDateTimeFormatter(ctx)
                     val weekEnd = getWeekEndFromStart(weekStart!!)
-                    fun format(localDate: LocalDate) =
-                        formatter?.format(localDate) ?: localDate.toString()
+                    fun format(localDate: LocalDate) = formatter.format(localDate)
 
                     val weekRange = "${format(weekStart)} - ${format(weekEnd)}"
 

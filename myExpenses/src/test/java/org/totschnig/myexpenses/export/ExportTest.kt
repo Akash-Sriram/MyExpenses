@@ -20,7 +20,6 @@ import androidx.documentfile.provider.DocumentFile
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Expect
 import kotlinx.serialization.json.Json
-import org.apache.commons.text.translate.UnicodeEscaper
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test

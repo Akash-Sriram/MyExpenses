@@ -2,7 +2,6 @@ package org.totschnig.myexpenses.viewmodel
 
 import android.app.Application
 import android.net.Uri
-import android.text.TextUtils
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import org.totschnig.myexpenses.MyApplication
@@ -64,7 +63,7 @@ abstract class ImportDataViewModel(application: Application) :
         var importCount = 0
         for (account: ImportAccount in accounts) {
             val dbAccountId =
-                if (TextUtils.isEmpty(account.memo)) null else repository.findAnyOpenByLabel(account.memo)
+                if (account.memo.isEmpty()) null else repository.findAnyOpenByLabel(account.memo)
             val dbAccount = if (dbAccountId != null) {
                 repository.loadAccount(dbAccountId) ?: throw Exception(
                     "Exception during import. Did not get instance from DB for id " +
@@ -128,7 +127,7 @@ abstract class ImportDataViewModel(application: Application) :
     ): RepositoryTransaction {
         val transferAccount = if (isTransfer) findToAccount() else null
         val payeeId = payee?.let { payeeToId[it] }
-        val date = date.time / 1000
+        val date = date.epochSecond
         val uuid = generateUuid()
         return RepositoryTransaction(
             data = Transaction(

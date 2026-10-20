@@ -148,31 +148,23 @@ class GenericAccountService : Service() {
         /**
          * @return true if sync was requested, false if account is not syncable (deactivated)
          */
+        @Suppress("DEPRECATION")
         fun requestSync(
             accountName: String,
             manual: Boolean = true,
             expedited: Boolean = true,
             uuid: String? = null,
-            extras: Bundle = Bundle()
+            extras: Bundle = Bundle(),
+            context: Context = org.totschnig.myexpenses.MyApplication.instance
         ): Boolean {
-            val account = getAccount(accountName)
-            return if (ContentResolver.getIsSyncable(account, TransactionProvider.AUTHORITY) > 0) {
-                ContentResolver.requestSync(
-                    account,
-                    TransactionProvider.AUTHORITY, extras.apply {
-                        if (manual) {
-                            putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true)
-                        }
-                        if (expedited) {
-                            putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true)
-                        }
-                        if (uuid != null) {
-                            putString(KEY_UUID, uuid)
-                        }
-                    }
-                )
-                true
-            } else false
+            SyncWorker.enqueueOneTimeSync(
+                context = context,
+                accountName = accountName,
+                uuid = uuid,
+                autoBackupOnly = extras.getBoolean(SyncAdapter.KEY_AUTO_BACKUP_ONLY, false),
+                expedited = expedited
+            )
+            return true
         }
 
         /**
@@ -273,44 +265,26 @@ class GenericAccountService : Service() {
         }
 
         private fun activateSync(account: Account, prefHandler: PrefHandler) {
-            ContentResolver.setIsSyncable(account, TransactionProvider.AUTHORITY, 1)
             configureAutomaticAndPeriod(account, prefHandler)
         }
 
-        fun configureAutomaticAndPeriod(account: Account, prefHandler: PrefHandler) {
-            val pollFrequency = getSyncFrequency(prefHandler)
-            ContentResolver.setSyncAutomatically(account, TransactionProvider.AUTHORITY, pollFrequency > 0)
-            if (pollFrequency > 0) {
-                ContentResolver.addPeriodicSync(
-                    account, TransactionProvider.AUTHORITY, Bundle.EMPTY,
-                    pollFrequency
-                )
-            } else {
-                ContentResolver.removePeriodicSync(
-                    account,
-                    TransactionProvider.AUTHORITY,
-                    Bundle.EMPTY
-                )
-            }
+        @Suppress("DEPRECATION")
+        fun configureAutomaticAndPeriod(
+            account: Account,
+            prefHandler: PrefHandler,
+            context: Context = org.totschnig.myexpenses.MyApplication.instance
+        ) {
+            val pollFrequencyHours = prefHandler.getInt(PrefKey.SYNC_FREQUCENCY, DEFAULT_SYNC_FREQUENCY_HOURS).toLong()
+            val wifiOnly = prefHandler.getBoolean(PrefKey.SYNC_WIFI_ONLY, false)
+            SyncWorker.enqueuePeriodicSync(context, account.name, pollFrequencyHours, wifiOnly)
         }
 
-        private fun getSyncFrequency(prefHandler: PrefHandler) =
-            prefHandler.getInt(
-                PrefKey.SYNC_FREQUCENCY,
-                DEFAULT_SYNC_FREQUENCY_HOURS
-            ) * HOUR_IN_SECONDS
-
-        fun deactivateSync(account: Account) {
-            if (ContentResolver.getIsSyncable(account, TransactionProvider.AUTHORITY) > 0) {
-                ContentResolver.cancelSync(account, TransactionProvider.AUTHORITY)
-                ContentResolver.setSyncAutomatically(account, TransactionProvider.AUTHORITY, false)
-                ContentResolver.removePeriodicSync(
-                    account,
-                    TransactionProvider.AUTHORITY,
-                    Bundle.EMPTY
-                )
-                ContentResolver.setIsSyncable(account, TransactionProvider.AUTHORITY, 0)
-            }
+        @Suppress("DEPRECATION")
+        fun deactivateSync(
+            account: Account,
+            context: Context = org.totschnig.myexpenses.MyApplication.instance
+        ) {
+            SyncWorker.cancelSync(context, account.name)
         }
     }
 }

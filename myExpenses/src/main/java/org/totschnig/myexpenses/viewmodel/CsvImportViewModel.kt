@@ -10,8 +10,8 @@ import androidx.lifecycle.liveData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import org.apache.commons.csv.CSVFormat
-import org.apache.commons.csv.CSVRecord
+import org.totschnig.myexpenses.util.csv.CSVFormat
+import org.totschnig.myexpenses.util.csv.CSVRecord
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.db2.extractTagIds
 import org.totschnig.myexpenses.db2.loadAccount

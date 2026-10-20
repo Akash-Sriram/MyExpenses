@@ -6,7 +6,6 @@ import android.database.Cursor
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.core.content.res.ResourcesCompat
-import arrow.core.Tuple4
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.compose.accounts.SIGMA
 import org.totschnig.myexpenses.model.AccountFlag
@@ -445,6 +444,13 @@ data class PageAccount(
         get() = if (id != 0L) id
         else accountGrouping to accountGrouping?.getGroupKey(this)
 
+    data class QueryKey(
+        val stableId: Any,
+        val sortBy: String,
+        val sortDirection: SortDirection,
+        val grouping: Grouping
+    )
+
     val queryKey: Any
-        get() = Tuple4(stableId, sortBy, sortDirection, grouping)
+        get() = QueryKey(stableId, sortBy, sortDirection, grouping)
 }

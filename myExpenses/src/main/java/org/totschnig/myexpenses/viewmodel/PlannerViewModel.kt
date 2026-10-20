@@ -31,7 +31,12 @@ import org.totschnig.myexpenses.provider.getLongOrNull
 import org.totschnig.myexpenses.util.ExchangeRateHandler
 import org.totschnig.myexpenses.util.getDateTimeFormatter
 import org.totschnig.myexpenses.util.toEpochMillis
-import org.totschnig.myexpenses.viewmodel.data.Event
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.totschnig.myexpenses.viewmodel.data.PlanInstance
 import org.totschnig.myexpenses.viewmodel.data.PlanInstanceState
 import org.totschnig.myexpenses.viewmodel.data.PlanInstanceUpdate
@@ -99,14 +104,17 @@ class PlannerViewModel(application: Application) : ContentResolvingAndroidViewMo
         formatter = getDateTimeFormatter(application)
     }
 
-    private val instances = MutableLiveData<Event<Pair<Boolean, List<PlanInstance>>>>()
-    private val title = MutableLiveData<CharSequence>()
-    private val updates = MutableLiveData<PlanInstanceUpdate>()
-    private val bulkCompleted = MutableLiveData<Event<List<PlanInstance>>>()
-    fun getInstances(): LiveData<Event<Pair<Boolean, List<PlanInstance>>>> = instances
-    fun getTitle(): LiveData<CharSequence> = title
-    fun getUpdates(): LiveData<PlanInstanceUpdate> = updates
-    fun getBulkCompleted(): LiveData<Event<List<PlanInstance>>> = bulkCompleted
+    private val _instances = MutableSharedFlow<Pair<Boolean, List<PlanInstance>>>(replay = 0, extraBufferCapacity = 1)
+    val instances: SharedFlow<Pair<Boolean, List<PlanInstance>>> = _instances.asSharedFlow()
+
+    private val _title = MutableStateFlow<CharSequence>("")
+    val title: StateFlow<CharSequence> = _title.asStateFlow()
+
+    private val _updates = MutableSharedFlow<PlanInstanceUpdate>(replay = 0, extraBufferCapacity = 10)
+    val updates: SharedFlow<PlanInstanceUpdate> = _updates.asSharedFlow()
+
+    private val _bulkCompleted = MutableSharedFlow<List<PlanInstance>>(replay = 0, extraBufferCapacity = 1)
+    val bulkCompleted: SharedFlow<List<PlanInstance>> = _bulkCompleted.asSharedFlow()
     fun loadInstances(later: Boolean? = null) {
         // Construct the query with the desired date range.
         val startMonth: Month
@@ -150,8 +158,8 @@ class PlannerViewModel(application: Application) : ContentResolvingAndroidViewMo
                         end.length,
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                     )
-                    title.postValue(TextUtils.concat(start, " - ", end))
-                    instances.postValue(Event(Pair(later == true, it.filterNotNull())))
+                    _title.value = TextUtils.concat(start, " - ", end)
+                    _instances.tryEmit(Pair(later == true, it.filterNotNull()))
                 }
         }
     }
@@ -186,7 +194,7 @@ class PlannerViewModel(application: Application) : ContentResolvingAndroidViewMo
                 ).also { flow ->
                     viewModelScope.launch {
                         flow.collect {
-                            updates.value = it
+                            _updates.tryEmit(it)
                         }
                     }
                 }
@@ -209,7 +217,7 @@ class PlannerViewModel(application: Application) : ContentResolvingAndroidViewMo
                     )
                 }
             }
-            bulkCompleted.postValue(Event(selectedInstances))
+            _bulkCompleted.tryEmit(selectedInstances)
         }
     }
 }

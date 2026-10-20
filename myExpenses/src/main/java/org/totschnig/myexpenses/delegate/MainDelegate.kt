@@ -10,7 +10,6 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.core.text.bold
 import androidx.core.view.isVisible
 import androidx.fragment.app.FragmentActivity
-import com.evernote.android.state.State
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.databinding.DateEditBinding
 import org.totschnig.myexpenses.databinding.MethodRowBinding
@@ -58,10 +57,8 @@ abstract class MainDelegate(
     isTemplate
 ) {
 
-    @State
     var originalAmountVisible = false
 
-    @State
     var originalCurrencyCode: String? = null
 
     val userSetExchangeRate: BigDecimal?
@@ -263,6 +260,8 @@ abstract class MainDelegate(
             originalCurrencyCode = originalInputSelectedCurrency.code
         }
         super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_ORIGINAL_AMOUNT_VISIBLE, originalAmountVisible)
+        originalCurrencyCode?.let { outState.putString(KEY_ORIGINAL_CURRENCY_CODE, it) }
     }
 
     open fun buildMainTransaction(account: Account): TransactionEditData =
@@ -552,5 +551,16 @@ abstract class MainDelegate(
         if (viewBinding.EquivalentAmountRow.isVisible) {
             viewBinding.EquivalentAmount.loadExchangeRate()
         }
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        originalAmountVisible = savedInstanceState.getBoolean(KEY_ORIGINAL_AMOUNT_VISIBLE, false)
+        originalCurrencyCode = savedInstanceState.getString(KEY_ORIGINAL_CURRENCY_CODE)
+    }
+
+    companion object {
+        private const val KEY_ORIGINAL_AMOUNT_VISIBLE = "key_original_amount_visible"
+        private const val KEY_ORIGINAL_CURRENCY_CODE = "key_original_currency_code"
     }
 }

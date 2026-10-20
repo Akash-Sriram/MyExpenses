@@ -155,14 +155,11 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
         checkAppReplacingState()
         AppCompatDelegate.setCompatVectorFromResourcesEnabled(true)
         setNightMode(prefHandler, this)
-        val syncService = isSyncService
-        crashHandler.initProcess(this, syncService)
+        crashHandler.initProcess(this, false)
         setupLogging()
-        if (!syncService) {
-            ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-            prefHandler.sharedPreferences.registerOnSharedPreferenceChangeListener(this)
-            register(this)
-        }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+        prefHandler.sharedPreferences.registerOnSharedPreferenceChangeListener(this)
+        register(this)
         licenceHandler.init()
         currencyContext.preload()
         NotificationBuilderWrapper.createChannels(this)
@@ -185,12 +182,6 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
             Process.killProcess(Process.myPid())
         }
     }
-
-    private val isSyncService: Boolean
-        get() {
-            val processName = currentProcessName
-            return processName != null && processName.endsWith(":sync")
-        }
 
     override fun attachBaseContext(base: Context) {
         instance = this

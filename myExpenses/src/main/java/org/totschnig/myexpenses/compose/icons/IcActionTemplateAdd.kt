@@ -1,4 +1,4 @@
-package myiconpack
+package org.totschnig.myexpenses.compose.icons
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType.Companion.NonZero

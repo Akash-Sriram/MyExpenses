@@ -55,11 +55,11 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.io.getMimeType
 import org.totschnig.myexpenses.util.readPrimaryTextColor
 import org.totschnig.myexpenses.util.ui.UiUtils.DateMode
+import org.totschnig.myexpenses.util.timeFormatter
 import org.totschnig.myexpenses.viewmodel.ContentResolvingAndroidViewModel.Companion.lazyMap
 import org.totschnig.myexpenses.viewmodel.data.AttachmentInfo
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
-import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -151,17 +151,14 @@ fun getDateMode(accountType: AccountType?, prefHandler: PrefHandler) = when {
     else -> DateMode.DATE
 }
 
-private fun timeFormatter(accountType: AccountType?, prefHandler: PrefHandler, context: Context) =
+private fun timeFormatter(accountType: AccountType?, prefHandler: PrefHandler, context: Context): DateTimeFormatter? =
     if (getDateMode(accountType, prefHandler) == DateMode.DATE_TIME) {
-        DateFormat.getTimeFormat(context) as SimpleDateFormat
+        context.timeFormatter
     } else null
 
-val SimpleDateFormat.asDateTimeFormatter: DateTimeFormatter
-    get() = DateTimeFormatter.ofPattern(this.toPattern())
-
-fun dateTimeFormatter(account: PageAccount, prefHandler: PrefHandler, context: Context) =
+fun dateTimeFormatter(account: PageAccount, prefHandler: PrefHandler, context: Context): DateTimeFormatter? =
     when (account.grouping) {
-        Grouping.DAY -> timeFormatter(account.type, prefHandler, context)?.asDateTimeFormatter
+        Grouping.DAY -> timeFormatter(account.type, prefHandler, context)
         else -> DateTimeFormatter.ofLocalizedDate(getNewDateFormatStyle(prefHandler))
     }
 
@@ -172,7 +169,7 @@ private fun getNewDateFormatStyle(prefHandler: PrefHandler) = when (prefHandler.
     else -> FormatStyle.MEDIUM
 }
 
-fun dateTimeFormatterLegacy(account: PageAccount, prefHandler: PrefHandler, context: Context) =
+fun dateTimeFormatterLegacy(account: PageAccount, prefHandler: PrefHandler, context: Context): Pair<DateTimeFormatter, Float>? =
     when (account.grouping) {
         Grouping.DAY -> {
             timeFormatter(account.type, prefHandler, context)?.let {
@@ -183,14 +180,14 @@ fun dateTimeFormatterLegacy(account: PageAccount, prefHandler: PrefHandler, cont
 
         Grouping.MONTH ->
             if (prefHandler.monthStart == 1) {
-                SimpleDateFormat("dd", Utils.localeFromContext(context)) to 2f
+                DateTimeFormatter.ofPattern("dd", Utils.localeFromContext(context)) to 2f
             } else {
-                Utils.localizedYearLessDateFormat(context) to 3f
+                Utils.localizedYearLessDateTimeFormatter(context) to 3f
             }
 
-        Grouping.WEEK -> SimpleDateFormat("EEE", Utils.localeFromContext(context)) to 2f
-        Grouping.YEAR -> Utils.localizedYearLessDateFormat(context) to 3f
-        Grouping.NONE -> Utils.ensureDateFormatWithShortYear(context) to 4.6f
+        Grouping.WEEK -> DateTimeFormatter.ofPattern("EEE", Utils.localeFromContext(context)) to 2f
+        Grouping.YEAR -> Utils.localizedYearLessDateTimeFormatter(context) to 3f
+        Grouping.NONE -> Utils.ensureDateTimeFormatterWithShortYear(context) to 4.6f
     }
 
 fun Spinner.checkNewAccountLimitation(prefHandler: PrefHandler, context: Context) {

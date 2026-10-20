@@ -33,7 +33,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.launch
-import org.apache.commons.csv.CSVRecord
+import org.totschnig.myexpenses.util.csv.CSVRecord
 import org.json.JSONException
 import org.json.JSONObject
 import org.totschnig.myexpenses.MyApplication

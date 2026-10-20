@@ -6,7 +6,7 @@ import androidx.compose.material.icons.filled.ChangeHistory
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Functions
-import myiconpack.Equal
+import org.totschnig.myexpenses.compose.icons.Equal
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.BalanceType
 import org.totschnig.myexpenses.viewmodel.data.AggregateAccount

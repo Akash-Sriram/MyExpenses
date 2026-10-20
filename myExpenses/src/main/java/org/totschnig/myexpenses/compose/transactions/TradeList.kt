@@ -53,11 +53,9 @@ import org.totschnig.myexpenses.compose.emToDp
 import org.totschnig.myexpenses.compose.size
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.formatMoney
-import org.totschnig.myexpenses.util.ui.asDateTimeFormatter
 import org.totschnig.myexpenses.viewmodel.data.Trade
 import org.totschnig.myexpenses.viewmodel.data.TradeType
 import org.totschnig.myexpenses.viewmodel.data.getIndicatorCharForLabel
-import java.text.SimpleDateFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -126,7 +124,7 @@ fun TradeRow(
         if (renderType == RenderType.Legacy) {
             val context = LocalContext.current
             val dateFormatter = remember(context) {
-                (Utils.ensureDateFormatWithShortYear(context) as SimpleDateFormat).asDateTimeFormatter
+                Utils.ensureDateTimeFormatterWithShortYear(context)
             }
             Text(
                 modifier = Modifier.width(emToDp(4f)),

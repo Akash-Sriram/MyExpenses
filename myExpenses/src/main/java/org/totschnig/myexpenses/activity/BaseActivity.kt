@@ -10,6 +10,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.content.SharedPreferences
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.res.Configuration
@@ -61,8 +62,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.color.DynamicColorsOptions
 import com.google.android.material.color.HarmonizedColors
@@ -72,8 +71,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.snackbar.Snackbar
 import com.theartofdev.edmodo.cropper.CropImage
 import com.theartofdev.edmodo.cropper.CropImageView
-import com.vmadalin.easypermissions.EasyPermissions
-import com.vmadalin.easypermissions.dialogs.SettingsDialog
 import androidx.fragment.app.DialogFragment
 import eltos.simpledialogfragment.SimpleDialog
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
@@ -109,7 +106,6 @@ import org.totschnig.myexpenses.feature.OcrHost
 import org.totschnig.myexpenses.feature.OcrResult
 import org.totschnig.myexpenses.feature.OcrResultFlat
 import org.totschnig.myexpenses.feature.Payee
-import org.totschnig.myexpenses.feature.values
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.model.CurrencyContext
@@ -152,7 +148,6 @@ import org.totschnig.myexpenses.util.ui.setBackgroundTintList
 import org.totschnig.myexpenses.viewmodel.BaseFunctionalityViewModel
 import org.totschnig.myexpenses.viewmodel.FeatureViewModel
 import org.totschnig.myexpenses.viewmodel.OcrViewModel
-import org.totschnig.myexpenses.viewmodel.data.EventObserver
 import org.totschnig.myexpenses.widget.EXTRA_START_FROM_WIDGET_DATA_ENTRY
 import java.io.Serializable
 import java.math.BigDecimal
@@ -163,7 +158,7 @@ import javax.inject.Inject
 import kotlin.math.sign
 
 abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.MessageDialogListener,
-    ConfirmationDialogListener, EasyPermissions.PermissionCallbacks, AmountInput.Host, ContribIFace,
+    ConfirmationDialogListener, AmountInput.Host, ContribIFace,
     OnDialogResultListener, OnSharedPreferenceChangeListener, OcrHost {
     private var snackBar: Snackbar? = null
     private var pwDialog: AlertDialog? = null
@@ -280,7 +275,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         }
     }
 
-    override fun onPermissionsGranted(requestCode: Int, perms: List<String>) {
+    open fun onPermissionsGranted(requestCode: Int, perms: List<String>) {
         when (requestCode) {
             PermissionHelper.PERMISSIONS_REQUEST_WRITE_CALENDAR -> enqueuePlanner(true)
         }
@@ -362,10 +357,8 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         downloadPending = null
     }
 
-    @State
     var downloadPending: String? = null
 
-    @State
     var color = 0
 
     @Inject
@@ -450,7 +443,10 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             inject(baseViewModel)
         }
 
-        StateSaver.restoreInstanceState(this, savedInstanceState)
+        if (savedInstanceState != null) {
+            downloadPending = savedInstanceState.getString(KEY_DOWNLOAD_PENDING)
+            color = savedInstanceState.getInt(KEY_COLOR, 0)
+        }
         DynamicColors.applyToActivityIfAvailable(
             this,
             DynamicColorsOptions.Builder().apply {
@@ -464,59 +460,63 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                 .build()
         )
 
-        featureViewModel.getFeatureState().observe(this, EventObserver { featureState ->
-            when (featureState) {
-                is FeatureViewModel.FeatureState.FeatureLoading -> showSnackBar(
-                    getString(
-                        R.string.feature_download_requested,
-                        getString(featureState.feature.labelResId)
-                    )
-                )
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                featureViewModel.featureState.collect { featureState ->
+                    when (featureState) {
+                        is FeatureViewModel.FeatureState.FeatureLoading -> showSnackBar(
+                            getString(
+                                R.string.feature_download_requested,
+                                getString(featureState.feature.labelResId)
+                            )
+                        )
 
-                is FeatureViewModel.FeatureState.FeatureAvailable -> {
-                    showSnackBar(
-                        featureState.modules.map { Module.print(this, it) }
-                            .joinToString(" ") {
-                                getString(R.string.feature_downloaded, it)
-                            }
-                    )
-                    Feature.values.find { featureState.modules.contains(it.mainModule.moduleName) }
-                        ?.also {
-                            //after the dynamic feature module has been installed, we need to check if data needed by the module (e.g. Tesseract) has been downloaded
-                            if (!featureViewModel.isFeatureAvailable(this, it)) {
-                                featureViewModel.requestFeature(this, it)
-                            } else {
-                                onFeatureAvailable(it)
+                        is FeatureViewModel.FeatureState.FeatureAvailable -> {
+                            showSnackBar(
+                                featureState.modules.map { Module.print(this@BaseActivity, it) }
+                                    .joinToString(" ") {
+                                        getString(R.string.feature_downloaded, it)
+                                    }
+                            )
+                            Feature.values.find { featureState.modules.contains(it.mainModule.moduleName) }
+                                ?.also {
+                                    //after the dynamic feature module has been installed, we need to check if data needed by the module (e.g. Tesseract) has been downloaded
+                                    if (!featureViewModel.isFeatureAvailable(this@BaseActivity, it)) {
+                                        featureViewModel.requestFeature(this@BaseActivity, it)
+                                    } else {
+                                        onFeatureAvailable(it)
+                                    }
+                                }
+                                ?: run {
+                                    //This should be an exceptional case, for example user has installed Dropbox # Jackson, then uninstalls Jackson.
+                                    //when later we need to install Jackson again, we no longer know for which feature to call onFeatureAvailable
+                                    report(Throwable("No feature found for ${featureState.modules.joinToString()}"))
+                                }
+
+                        }
+
+                        is FeatureViewModel.FeatureState.Error -> {
+                            with(featureState.throwable) {
+                                report(this)
+                                message?.let { showSnackBar(it) }
                             }
                         }
-                        ?: run {
-                            //This should be an exceptional case, for example user has installed Dropbox # Jackson, then uninstalls Jackson.
-                            //when later we need to install Jackson again, we no longer know for which feature to call onFeatureAvailable
-                            report(Throwable("No feature found for ${featureState.modules.joinToString()}"))
+
+                        is FeatureViewModel.FeatureState.LanguageLoading -> showSnackBar(
+                            getString(
+                                R.string.language_download_requested,
+                                featureState.language
+                            )
+                        )
+
+                        is FeatureViewModel.FeatureState.LanguageAvailable -> {
+                            setLanguage(featureState.language)
+                            recreate()
                         }
-
-                }
-
-                is FeatureViewModel.FeatureState.Error -> {
-                    with(featureState.throwable) {
-                        report(this)
-                        message?.let { showSnackBar(it) }
                     }
                 }
-
-                is FeatureViewModel.FeatureState.LanguageLoading -> showSnackBar(
-                    getString(
-                        R.string.language_download_requested,
-                        featureState.language
-                    )
-                )
-
-                is FeatureViewModel.FeatureState.LanguageAvailable -> {
-                    setLanguage(featureState.language)
-                    recreate()
-                }
             }
-        })
+        }
         super.onCreate(savedInstanceState)
         tracker.init(this, licenceHandler.licenceStatus)
         lifecycleScope.launch {
@@ -550,7 +550,8 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
+        downloadPending?.let { outState.putString(KEY_DOWNLOAD_PENDING, it) }
+        outState.putInt(KEY_COLOR, color)
     }
 
     override fun onPostCreate(savedInstanceState: Bundle?) {
@@ -836,7 +837,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                     if (licenceStatus != null) {
                         append(licenceStatus.name)
                     }
-                    licenceHandler.purchaseExtraInfo.takeIf { !TextUtils.isEmpty(it) }?.let {
+                    licenceHandler.purchaseExtraInfo.takeIf { !it.isNullOrEmpty() }?.let {
                         append(" ($it)")
                     }
                 }.takeIf { it.isNotEmpty() }?.let {
@@ -858,7 +859,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                         ANDROID_VERSION:${Build.VERSION.RELEASE}
                         BRAND:${Build.BRAND}
                         MODEL:${Build.MODEL}
-                        CONFIGURATION:${ConfigurationHelper.configToJson(resources.configuration)}
+                        CONFIGURATION:${resources.configuration}
                         ${licenceInfo ?: ""}
                         ${crashHandlerInfo ?: ""}
 
@@ -1169,7 +1170,22 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         if (hasFloatingActionButton) {
             floatingActionButton.isEnabled = true
         }
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
+        val granted = mutableListOf<String>()
+        val denied = mutableListOf<String>()
+        for (i in permissions.indices) {
+            val perm = permissions[i]
+            if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                granted.add(perm)
+            } else {
+                denied.add(perm)
+            }
+        }
+        if (granted.isNotEmpty()) {
+            onPermissionsGranted(requestCode, granted)
+        }
+        if (denied.isNotEmpty()) {
+            onPermissionsDenied(requestCode, denied)
+        }
     }
 
     open fun contribFeatureRequested(feature: ContribFeature, tag: Serializable? = null) {
@@ -1276,25 +1292,19 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     }
 
     open fun requestPermission(requestCode: Int, vararg permissionGroup: PermissionGroup) {
-        EasyPermissions.requestPermissions(
-            host = this,
-            rationale = PermissionHelper.getRationale(this, requestCode, *permissionGroup),
-            requestCode = requestCode,
-            perms = permissionGroup.flatMap { it.androidPermissions }.toTypedArray()
-        )
+        val perms = permissionGroup.flatMap { it.androidPermissions }.toTypedArray()
+        androidx.core.app.ActivityCompat.requestPermissions(this, perms, requestCode)
     }
 
-    override fun onPermissionsDenied(requestCode: Int, perms: List<String>) {
-        if (EasyPermissions.somePermissionPermanentlyDenied(this, perms)) {
-            SettingsDialog.Builder(this)
-                .title(R.string.permissions_label)
-                .rationale(
-                    PermissionHelper.getRationale(
-                        this, requestCode,
-                        *perms.map { PermissionGroup.fromPermission(it) }.distinct().toTypedArray()
-                    )
+    open fun onPermissionsDenied(requestCode: Int, perms: List<String>) {
+        if (PermissionHelper.somePermissionPermanentlyDenied(this, perms)) {
+            PermissionHelper.showSettingsDialog(
+                this,
+                PermissionHelper.getRationale(
+                    this, requestCode,
+                    *perms.map { PermissionGroup.fromPermission(it) }.distinct().toTypedArray()
                 )
-                .build().show()
+            )
         } else {
             showSnackBar(
                 PermissionHelper.getRationale(
@@ -1760,6 +1770,8 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
 
 
     companion object {
+        private const val KEY_DOWNLOAD_PENDING = "key_download_pending"
+        private const val KEY_COLOR = "key_color"
         const val DIALOG_TAG_OCR_DISAMBIGUATE = "DISAMBIGUATE"
         const val ASYNC_TAG = "ASYNC_TASK"
         const val PROGRESS_TAG = "PROGRESS"

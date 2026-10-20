@@ -7,9 +7,11 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.res.ResourcesCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import androidx.preference.*
-import com.evernote.android.state.State
-import com.evernote.android.state.StateSaver
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
 import org.totschnig.myexpenses.dialog.MoreInfoDialogFragment
@@ -49,7 +51,6 @@ class MainPreferenceFragment : BasePreferenceFragment(),
             }
         }
 
-    @State
     var highlightedKey: String? = null
 
     fun onLoadPreference(key: String) {
@@ -65,18 +66,24 @@ class MainPreferenceFragment : BasePreferenceFragment(),
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         savedInstanceState?.let {
-            StateSaver.restoreInstanceState(this, it)
+            highlightedKey = it.getString(KEY_HIGHLIGHTED_KEY)
         }
-        viewModel.appDirInfo.observe(this) { result ->
-            val pref = requirePreference<Preference>(PrefKey.APP_DIR)
-            result.onSuccess { appDirInfo ->
-                pref.summary = if (appDirInfo.isWriteable) {
-                    appDirInfo.displayName
-                } else {
-                    getString(R.string.app_dir_not_accessible, appDirInfo.documentFile.uri)
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.appDirInfo.collect { result ->
+                    result?.let {
+                        val pref = requirePreference<Preference>(PrefKey.APP_DIR)
+                        it.onSuccess { appDirInfo ->
+                            pref.summary = if (appDirInfo.isWriteable) {
+                                appDirInfo.displayName
+                            } else {
+                                getString(R.string.app_dir_not_accessible, appDirInfo.documentFile.uri)
+                            }
+                        }.onFailure {
+                            pref.setSummary(R.string.io_error_appdir_null)
+                        }
+                    }
                 }
-            }.onFailure {
-                pref.setSummary(R.string.io_error_appdir_null)
             }
         }
     }
@@ -89,7 +96,7 @@ class MainPreferenceFragment : BasePreferenceFragment(),
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        StateSaver.saveInstanceState(this, outState)
+        outState.putString(KEY_HIGHLIGHTED_KEY, highlightedKey)
     }
 
     override val preferencesResId = R.xml.preference_headers
@@ -103,14 +110,18 @@ class MainPreferenceFragment : BasePreferenceFragment(),
             summary = "FinTS (${Locale.GERMANY.displayCountry})"
         }
 
-        viewModel.appData.observe(this) {
-            with(requirePreference<MultiSelectListPreference>(PrefKey.MANAGE_APP_DIR_FILES)) {
-                if (it.isEmpty()) {
-                    isVisible = false
-                } else {
-                    isVisible = true
-                    entries = it.map { it.format(requireContext()) }.toTypedArray()
-                    entryValues = it.map { it.name }.toTypedArray()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.appData.collect {
+                    with(requirePreference<MultiSelectListPreference>(PrefKey.MANAGE_APP_DIR_FILES)) {
+                        if (it.isEmpty()) {
+                            isVisible = false
+                        } else {
+                            isVisible = true
+                            entries = it.map { fileInfo -> fileInfo.format(requireContext()) }.toTypedArray()
+                            entryValues = it.map { fileInfo -> fileInfo.name }.toTypedArray()
+                        }
+                    }
                 }
             }
         }
@@ -252,5 +263,9 @@ class MainPreferenceFragment : BasePreferenceFragment(),
                 "Could not open directory picker. This feature may not be supported on your device.",
             )
         }
+    }
+
+    companion object {
+        private const val KEY_HIGHLIGHTED_KEY = "key_highlighted_key"
     }
 }

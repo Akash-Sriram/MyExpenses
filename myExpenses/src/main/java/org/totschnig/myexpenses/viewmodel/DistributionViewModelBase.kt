@@ -11,7 +11,6 @@ import androidx.lifecycle.asFlow
 import androidx.lifecycle.viewModelScope
 import app.cash.copper.flow.mapToOne
 import app.cash.copper.flow.observeQuery
-import arrow.core.Tuple4
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -263,7 +262,7 @@ abstract class DistributionViewModelBase<T : DistributionAccountInfo>(
             _whereFilter
         ) { accountInfo, aggregateNeutral, grouping, whereFilter ->
             grouping?.let {
-                Tuple4(
+                DistributionCriteria(
                     accountInfo,
                     aggregateNeutral,
                     grouping,
@@ -306,3 +305,10 @@ abstract class DistributionViewModelBase<T : DistributionAccountInfo>(
         }
     }
 }
+
+data class DistributionCriteria<T : DistributionAccountInfo>(
+    val accountInfo: T,
+    val aggregateNeutral: Boolean,
+    val grouping: GroupingInfo,
+    val whereFilter: Criterion?
+)

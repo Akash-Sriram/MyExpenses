@@ -1,23 +1,24 @@
 package org.totschnig.myexpenses.io
 
 import com.google.common.truth.Truth.assertThat
-import org.apache.commons.csv.CSVFormat
+import org.totschnig.myexpenses.util.csv.CSVFormat
 import org.junit.Test
 import org.mockito.kotlin.mock
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.export.qif.QifDateFormat
 import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.model.CurrencyUnit
-import org.totschnig.myexpenses.util.DateTime
 import java.io.ByteArrayInputStream
 import java.io.InputStreamReader
 import java.nio.charset.StandardCharsets
-import java.util.Date
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 class CsvParserTest {
     
-    private val referenceDate: Date
-        get() = DateTime.date(2023, 9, 6).atMidnight().asDate()
+    private val referenceDate: Instant
+        get() = LocalDate.of(2023, 9, 6).atStartOfDay(ZoneId.systemDefault()).toInstant()
 
     @Test
     fun shouldParseSimple() {

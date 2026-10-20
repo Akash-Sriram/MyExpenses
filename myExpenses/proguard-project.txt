@@ -3,9 +3,6 @@
 # otherwise the stack traces are pretty useless
 -keepattributes SourceFile, LineNumberTable, InnerClasses
 
--keep class com.itextpdf.** { *; }
--dontwarn org.bouncycastle.**
--dontwarn com.itextpdf.**
 
 #Guava
 -dontwarn javax.annotation.**

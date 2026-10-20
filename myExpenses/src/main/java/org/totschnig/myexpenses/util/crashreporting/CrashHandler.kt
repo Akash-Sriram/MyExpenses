@@ -22,13 +22,10 @@ interface CrashHandler {
     fun  getInfo(): Pair<String, String>? = null
 
     companion object {
-        @JvmStatic
         fun reportWithDbSchema(contentResolver: ContentResolver, e: Throwable) {
             report(e, DbUtils.getSchemaDetails(contentResolver))
         }
 
-        @JvmStatic
-        @JvmOverloads
         fun report(e: Throwable, customData: Map<String, String>, tag: String? = null) {
             for ((key, value) in customData) {
                 tag?.let { Timber.tag(it) }
@@ -37,16 +34,12 @@ interface CrashHandler {
             report(e, tag)
         }
 
-        @JvmStatic
-        @JvmOverloads
         fun report(e: Throwable, key: String, data: String, tag: String? = null) {
             tag?.let { Timber.tag(it) }
             Timber.w("%s: %s", key, data)
             report(e, tag)
         }
 
-        @JvmStatic
-        @JvmOverloads
         fun throwOrReport(message: String, tag: String? = null) {
             throwOrReport(IllegalStateException(message), tag)
         }
@@ -59,8 +52,6 @@ interface CrashHandler {
             }
         }
 
-        @JvmStatic
-        @JvmOverloads
         fun report(e: Throwable, tag: String? = null) {
             tag?.let { Timber.tag(it) }
             Timber.e(e)

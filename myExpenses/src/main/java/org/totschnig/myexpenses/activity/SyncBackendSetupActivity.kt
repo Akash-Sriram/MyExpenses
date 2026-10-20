@@ -9,7 +9,6 @@ import android.view.Menu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.app.NotificationManagerCompat
-import com.evernote.android.state.State
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
 import eltos.simpledialogfragment.form.Input
 import eltos.simpledialogfragment.form.SimpleFormDialog
@@ -25,6 +24,8 @@ import org.totschnig.myexpenses.util.PermissionHelper
 import org.totschnig.myexpenses.util.safeMessage
 import org.totschnig.myexpenses.viewmodel.SyncViewModel
 
+private const val KEY_SELECTED_FACTORY_ID = "key_selected_factory_id"
+
 abstract class SyncBackendSetupActivity : RestoreActivity(),
     OnDialogResultListener {
 
@@ -32,13 +33,20 @@ abstract class SyncBackendSetupActivity : RestoreActivity(),
     protected val syncViewModel: SyncViewModel by viewModels()
     private var isResumed = false
 
-    @State
     var selectedFactoryId = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState != null) {
+            selectedFactoryId = savedInstanceState.getInt(KEY_SELECTED_FACTORY_ID, 0)
+        }
         backendProviders = BackendService.allAvailable(this)
         injector.inject(syncViewModel)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_SELECTED_FACTORY_ID, selectedFactoryId)
     }
 
     override fun onResume() {

@@ -1,7 +1,6 @@
 package org.totschnig.myexpenses.util
 
 import android.content.Context
-import android.text.TextUtils
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import org.totschnig.myexpenses.provider.KEY_ROWID
@@ -38,7 +37,7 @@ object ZipUtils {
         val resolver = context.contentResolver
         val out = resolver.openOutputStream(destZipFile.uri)
         val zip = ZipOutputStream(
-            if (TextUtils.isEmpty(password)) out else EncryptionHelper.encrypt(
+            if (password.isNullOrEmpty()) out else EncryptionHelper.encrypt(
                 out!!, password
             )
         )
@@ -112,7 +111,7 @@ object ZipUtils {
     @Throws(IOException::class, GeneralSecurityException::class)
     fun unzip(fileIn: InputStream?, dirOut: File, password: String?) {
         val zin = ZipInputStream(
-            if (TextUtils.isEmpty(password)) fileIn else EncryptionHelper.decrypt(
+            if (password.isNullOrEmpty()) fileIn else EncryptionHelper.decrypt(
                 fileIn,
                 password
             )

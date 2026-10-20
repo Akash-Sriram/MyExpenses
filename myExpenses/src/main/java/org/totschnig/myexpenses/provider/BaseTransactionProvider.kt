@@ -26,9 +26,6 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.SupportSQLiteQueryBuilder
-import arrow.core.Tuple6
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.injector
@@ -164,6 +161,9 @@ abstract class BaseTransactionProvider : ContentProvider() {
 
     @Inject
     lateinit var dataStore: DataStore<Preferences>
+
+    @Inject
+    lateinit var preferencesHolder: org.totschnig.myexpenses.preference.PreferencesHolder
 
     @Inject
     lateinit var openHelperProvider: Provider<SupportSQLiteOpenHelper>
@@ -625,8 +625,10 @@ abstract class BaseTransactionProvider : ContentProvider() {
         get() = typeWithFallBack(prefHandler)
 
     val dynamicExchangeRatesDefault: String
-        get() = runBlocking {
-            dataStore.dynamicExchangeRates.first()
+        get() = when (preferencesHolder[org.totschnig.myexpenses.preference.dynamicExchangeRatesDefaultKey]) {
+            "DYNAMIC" -> "1"
+            "STATIC" -> "0"
+            else -> KEY_DYNAMIC
         }
 
     fun buildAccountQuery(
@@ -640,15 +642,14 @@ abstract class BaseTransactionProvider : ContentProvider() {
         val aggregateFunction = this.aggregateFunction
 
         val cte = if (minimal) "" else {
-            val endOfDay = if (date == "now") runBlocking {
+            val endOfDay = if (date == "now") {
                 enumValueOrDefault(
-                    dataStore.data.first()[prefHandler.getStringPreferencesKey(PrefKey.CRITERION_FUTURE)],
+                    preferencesHolder[prefHandler.getStringPreferencesKey(PrefKey.CRITERION_FUTURE)],
                     FutureCriterion.EndOfDay
-                )
-            } != FutureCriterion.Current else true
-            val aggregateInvisible = runBlocking {
-                dataStore.data.first()[prefHandler.getBooleanPreferencesKey(PrefKey.INVISIBLE_ACCOUNTS_ARE_AGGREGATED)] != false
-            }
+                ) != FutureCriterion.Current
+            } else true
+            val aggregateInvisible =
+                preferencesHolder[prefHandler.getBooleanPreferencesKey(PrefKey.INVISIBLE_ACCOUNTS_ARE_AGGREGATED)] != false
             if (mergeAggregate == null)
                 accountQueryCTE(
                     homeCurrency = homeCurrency,
@@ -917,11 +918,10 @@ abstract class BaseTransactionProvider : ContentProvider() {
                         .create().sql
                 )
             }
-            val accountGrouping = runBlocking {
-                dataStore.data.first()[prefHandler.getStringPreferencesKey(PrefKey.ACCOUNT_GROUPING)]?.let {
+            val accountGrouping =
+                preferencesHolder[prefHandler.getStringPreferencesKey(PrefKey.ACCOUNT_GROUPING)]?.let {
                     AccountGrouping.valueOf(it).takeIf { it != AccountGrouping.FLAG }
                 } ?: AccountGrouping.DEFAULT
-            }
 
             val sortOrderForGrouping =
                 if (accountGrouping == AccountGrouping.TYPE) "$KEY_IS_ASSET DESC,$KEY_TYPE_SORT_KEY DESC," else ""
@@ -935,9 +935,7 @@ abstract class BaseTransactionProvider : ContentProvider() {
     }
 
     val sortByFlag: String
-        get() = if (runBlocking {
-                dataStore.data.first()[prefHandler.getBooleanPreferencesKey(PrefKey.SORT_ACCOUNT_LIST_BY_FLAG_FIRST)] != false
-            }) "$KEY_FLAG_SORT_KEY DESC," else ""
+        get() = if (preferencesHolder[prefHandler.getBooleanPreferencesKey(PrefKey.SORT_ACCOUNT_LIST_BY_FLAG_FIRST)] != false) "$KEY_FLAG_SORT_KEY DESC," else ""
 
     @Synchronized
     fun backup(context: Context, backupDir: File, lenientMode: Boolean): Result<Unit> {
@@ -1778,6 +1776,15 @@ abstract class BaseTransactionProvider : ContentProvider() {
      *
      * @return pair of category id and boolean that is true if a new category has been created
      */
+    private data class CategoryRow(
+        val id: Long,
+        val label: String,
+        val parentId: Long?,
+        val icon: String?,
+        val color: Int?,
+        val type: Int
+    )
+
     private fun ensureCategoryInternal(
         db: SupportSQLiteDatabase,
         categoryInfo: ICategoryInfo,
@@ -1802,13 +1809,13 @@ abstract class BaseTransactionProvider : ContentProvider() {
             null
         ).use {
             if (it.moveToFirst()) {
-                Tuple6(
-                    it.getLong(0),
-                    it.getString(1),
-                    it.getLongOrNull(2),
-                    it.getStringOrNull(3),
-                    it.getIntOrNull(4),
-                    it.getInt(5)
+                CategoryRow(
+                    id = it.getLong(0),
+                    label = it.getString(1),
+                    parentId = it.getLongOrNull(2),
+                    icon = it.getStringOrNull(3),
+                    color = it.getIntOrNull(4),
+                    type = it.getInt(5)
                 )
             } else null
         }
@@ -1832,22 +1839,22 @@ abstract class BaseTransactionProvider : ContentProvider() {
         }
 
         if (sourceBasedOnUuid != null) {
-            if (target == null || target.first == sourceBasedOnUuid.first) {
-                val categoryId = sourceBasedOnUuid.first
+            if (target == null || target.first == sourceBasedOnUuid.id) {
+                val categoryId = sourceBasedOnUuid.id
                 val contentValues = ContentValues().apply {
-                    if (sourceBasedOnUuid.second != categoryInfo.label) {
+                    if (sourceBasedOnUuid.label != categoryInfo.label) {
                         put(KEY_LABEL, categoryInfo.label)
                     }
-                    if (sourceBasedOnUuid.third != parentId) {
+                    if (sourceBasedOnUuid.parentId != parentId) {
                         put(KEY_PARENTID, parentId)
                     }
-                    if (sourceBasedOnUuid.fourth != categoryInfo.icon) {
+                    if (sourceBasedOnUuid.icon != categoryInfo.icon) {
                         put(KEY_ICON, categoryInfo.icon)
                     }
-                    if (sourceBasedOnUuid.fifth != categoryInfo.color) {
+                    if (sourceBasedOnUuid.color != categoryInfo.color) {
                         put(KEY_COLOR, categoryInfo.color)
                     }
-                    if (parentId == null && categoryInfo.type != null && sourceBasedOnUuid.sixth != categoryInfo.type) {
+                    if (parentId == null && categoryInfo.type != null && sourceBasedOnUuid.type != categoryInfo.type) {
                         put(KEY_TYPE, categoryInfo.type)
                     }
                 }
@@ -1864,12 +1871,12 @@ abstract class BaseTransactionProvider : ContentProvider() {
                     put(KEY_CATID, target.first)
                 }
                 val selection = "$KEY_CATID = ?"
-                val selectionArgs = arrayOf<Any>(sourceBasedOnUuid.first)
+                val selectionArgs = arrayOf<Any>(sourceBasedOnUuid.id)
                 db.update(TABLE_TRANSACTIONS, contentValues, selection, selectionArgs)
                 db.update(TABLE_TEMPLATES, contentValues, selection, selectionArgs)
                 db.update(TABLE_CHANGES, contentValues, selection, selectionArgs)
                 db.update(TABLE_BUDGET_ALLOCATIONS, contentValues, selection, selectionArgs)
-                db.delete(TABLE_CATEGORIES, "$KEY_ROWID = ?", arrayOf(sourceBasedOnUuid.first))
+                db.delete(TABLE_CATEGORIES, "$KEY_ROWID = ?", arrayOf(sourceBasedOnUuid.id))
                 //Ideally, we would also need to update filters
             }
         }

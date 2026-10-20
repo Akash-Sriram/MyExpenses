@@ -13,7 +13,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.Preference
-import com.evernote.android.state.State
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.MyApplication
@@ -39,7 +38,7 @@ import org.totschnig.myexpenses.provider.TransactionProvider.Companion.DYNAMIC_C
 import org.totschnig.myexpenses.provider.TransactionProvider.Companion.TRANSACTIONS_URI
 import org.totschnig.myexpenses.service.AutoBackupWorker
 import org.totschnig.myexpenses.sync.GenericAccountService
-import org.totschnig.myexpenses.util.LazyFontSelector
+import org.totschnig.myexpenses.export.pdf.FontType
 import org.totschnig.myexpenses.util.PermissionHelper
 import org.totschnig.myexpenses.util.TextUtils
 import org.totschnig.myexpenses.util.config.Configurator
@@ -59,10 +58,11 @@ import org.totschnig.myexpenses.widget.updateWidgets
 import timber.log.Timber
 import java.io.Serializable
 
+private const val KEY_RESULT_CODE = "key_result_code"
+
 class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
     SortUtilityDialogFragment.OnConfirmListener {
 
-    @State
     var resultCode: Int = RESULT_OK
 
     val viewModel: SettingsViewModel?
@@ -91,6 +91,9 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
             Timber.i("Using DECOR_PADDING_WORKAROUND")
             window.decorView
         }
+        if (savedInstanceState != null) {
+            resultCode = savedInstanceState.getInt(KEY_RESULT_CODE, RESULT_OK)
+        }
         super.onCreate(savedInstanceState)
         injector.inject(priceCalculationViewModel)
         setupWithFragment(savedInstanceState == null, false) {
@@ -102,6 +105,11 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
             // Get the Application instance and call the method
             (applicationContext as? MyApplication)?.signalInitialLaunchForSystemPreferences()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_RESULT_CODE, resultCode)
     }
 
     override fun injectDependencies() {
@@ -292,7 +300,7 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
                 contentResolver.notifyChange(ACCOUNTS_URI, null)
             }
 
-            getKey(PrefKey.PRINT_FONT_SIZE) -> LazyFontSelector.FontType.clearCache()
+            getKey(PrefKey.PRINT_FONT_SIZE) -> FontType.clearCache()
         }
     }
 

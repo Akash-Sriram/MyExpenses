@@ -6,11 +6,12 @@ import android.content.pm.PackageManager
 import androidx.annotation.RequiresPermission
 import androidx.core.app.ActivityCompat
 import androidx.documentfile.provider.DocumentFile
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import app.cash.copper.flow.mapToOne
 import app.cash.copper.flow.observeQuery
 import kotlinx.coroutines.delay
@@ -55,11 +56,11 @@ class SettingsViewModel(
         val isDefault: Boolean
     )
 
-    private val _appDirInfo: MutableLiveData<Result<AppDirInfo>> = MutableLiveData()
-    val appDirInfo: LiveData<Result<AppDirInfo>> = _appDirInfo
+    private val _appDirInfo = MutableStateFlow<Result<AppDirInfo>?>(null)
+    val appDirInfo: StateFlow<Result<AppDirInfo>?> = _appDirInfo.asStateFlow()
 
-    private val _appData: MutableLiveData<List<FileInfo>> = MutableLiveData()
-    val appData: LiveData<List<FileInfo>> = _appData
+    private val _appData = MutableStateFlow<List<FileInfo>>(emptyList())
+    val appData: StateFlow<List<FileInfo>> = _appData.asStateFlow()
 
     val hasStaleImages: Flow<Boolean>
         get() = contentResolver.observeQuery(
@@ -88,7 +89,7 @@ class SettingsViewModel(
     fun loadAppData() {
         viewModelScope.launch(coroutineContext()) {
             AppDirHelper.getAppDirFiles(getApplication()).onSuccess { list ->
-                _appData.postValue(list)
+                _appData.value = list
             }
         }
     }
@@ -137,7 +138,7 @@ class SettingsViewModel(
                         "(${it.getString(3)}): " +
                                 Utils.convDateTime(
                                     it.getLong(0),
-                                    Utils.ensureDateFormatWithShortYear(getApplication())
+                                    Utils.ensureDateTimeFormatterWithShortYear(getApplication())
                                 ) + " " + currencyFormatter.convAmount(
                             it.getLong(1),
                             currencyContext[it.getString(2)]
@@ -149,7 +150,7 @@ class SettingsViewModel(
 
     fun loadAppDirInfo() {
         viewModelScope.launch(context = coroutineContext()) {
-            _appDirInfo.postValue(
+            _appDirInfo.value =
                 AppDirHelper.getAppDirWithDefault(getApplication())
                     .map { (documentFile, isDefault) ->
                         AppDirInfo(
@@ -158,7 +159,7 @@ class SettingsViewModel(
                             AppDirHelper.isWritableDirectory(documentFile),
                             isDefault
                         )
-                    })
+                    }
         }
     }
 

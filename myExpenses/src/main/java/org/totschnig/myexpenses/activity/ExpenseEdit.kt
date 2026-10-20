@@ -52,7 +52,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.evernote.android.state.State
 import com.google.android.material.snackbar.Snackbar
 import com.theartofdev.edmodo.cropper.CropImage
 import kotlinx.coroutines.Dispatchers
@@ -176,6 +175,17 @@ const val HELP_VARIANT_TEMPLATE_SPLIT = "templateSplit"
 const val HELP_VARIANT_SPLIT_PART_CATEGORY = "splitPartCategory"
 const val HELP_VARIANT_SPLIT_PART_TRANSFER = "splitPartTransfer"
 
+private const val KEY_EXPENSE_PARENT_ID = "key_expense_parent_id"
+private const val KEY_EXPENSE_OPERATION_TYPE = "key_expense_operation_type"
+private const val KEY_EXPENSE_CREATE_NEW = "key_expense_create_new"
+private const val KEY_EXPENSE_CREATE_TEMPLATE_STATE = "key_expense_create_template_state"
+private const val KEY_EXPENSE_IS_TEMPLATE = "key_expense_is_template"
+private const val KEY_EXPENSE_SHOULD_SHOW_CREATE_TEMPLATE = "key_expense_should_show_create_template"
+private const val KEY_EXPENSE_ARE_DATES_LINKED = "key_expense_are_dates_linked"
+private const val KEY_EXPENSE_WITH_TYPE_SPINNER = "key_expense_with_type_spinner"
+private const val KEY_EXPENSE_IS_SPLIT_PART = "key_expense_is_split_part"
+private const val KEY_EXPENSE_SPLIT_PARTS_RESULT_LIST = "key_expense_split_parts_result_list"
+
 /**
  * Activity for editing a transaction
  *
@@ -201,7 +211,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
     override val exchangeRateEdit: ExchangeRateEdit
         get() = rootBinding.ERR.ExchangeRate
 
-    @State
     var parentId = 0L
 
     val accountId: Long
@@ -210,31 +219,22 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
     /**
      * transaction, transfer or split
      */
-    @State
     var operationType = 0
 
-    @State
     var createNew = false
 
-    @State
     var createTemplate = false
 
-    @State
     var isTemplate = false
 
-    @State
     var shouldShowCreateTemplate = false
 
-    @State
     var areDatesLinked = false
 
-    @State
     var withTypeSpinner = false
 
-    @State
     var isSplitPart: Boolean = false
 
-    @State
     var splitPartsResultList: ArrayList<TransactionEditData> = arrayListOf()
 
     private var mIsResumed = false
@@ -411,6 +411,16 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
 
         isManualRecreate = intent.getBooleanExtra(KEY_IS_MANUAL_RECREATE, false)
         if (savedInstanceState != null) {
+            parentId = savedInstanceState.getLong(KEY_EXPENSE_PARENT_ID, 0L)
+            operationType = savedInstanceState.getInt(KEY_EXPENSE_OPERATION_TYPE, 0)
+            createNew = savedInstanceState.getBoolean(KEY_EXPENSE_CREATE_NEW, false)
+            createTemplate = savedInstanceState.getBoolean(KEY_EXPENSE_CREATE_TEMPLATE_STATE, false)
+            isTemplate = savedInstanceState.getBoolean(KEY_EXPENSE_IS_TEMPLATE, false)
+            shouldShowCreateTemplate = savedInstanceState.getBoolean(KEY_EXPENSE_SHOULD_SHOW_CREATE_TEMPLATE, false)
+            areDatesLinked = savedInstanceState.getBoolean(KEY_EXPENSE_ARE_DATES_LINKED, false)
+            withTypeSpinner = savedInstanceState.getBoolean(KEY_EXPENSE_WITH_TYPE_SPINNER, false)
+            isSplitPart = savedInstanceState.getBoolean(KEY_EXPENSE_IS_SPLIT_PART, false)
+            splitPartsResultList = BundleCompat.getParcelableArrayList(savedInstanceState, KEY_EXPENSE_SPLIT_PARTS_RESULT_LIST, TransactionEditData::class.java) ?: arrayListOf()
             delegate = TransactionDelegate.create(
                 operationType,
                 isTemplate,
@@ -762,9 +772,9 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             delegate.configureType()
         }
         data.dateTime?.let { dt ->
-            dateEditBinding.DateButton.setDate(dt.toLocalDate())
-            dateEditBinding.TimeButton.setTime(dt.toLocalTime())
-            dateEditBinding.Date2Button.setDate(dt.toLocalDate())
+            dateEditBinding.DateButton.date = dt.toLocalDate()
+            dateEditBinding.TimeButton.time = dt.toLocalTime()
+            dateEditBinding.Date2Button.date = dt.toLocalDate()
             dateEditBinding.TimeButton.visibility = View.VISIBLE
         }
         data.payeeName?.let { name ->
@@ -979,8 +989,8 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             } else {
                 ocrResultFlat.amount?.let { amountInput.setRaw(it) }
                 ocrResultFlat.date?.let { pair ->
-                    dateEditBinding.DateButton.setDate(pair.first)
-                    pair.second?.let { dateEditBinding.TimeButton.setTime(it) }
+                    dateEditBinding.DateButton.date = pair.first
+                    pair.second?.let { dateEditBinding.TimeButton.time = it }
                 }
                 ocrResultFlat.payee?.let {
                     rootBinding.Payee.party = DisplayParty(it.id, it.name)
@@ -1068,7 +1078,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     R.id.Date2Button -> dateEditBinding.DateButton
                     R.id.DateButton -> dateEditBinding.Date2Button
                     else -> null
-                }?.setDate(date)
+                }?.date = date
             }
             if (::delegate.isInitialized) {
                 delegate.configureLastDayButton()
@@ -1451,6 +1461,16 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putLong(KEY_EXPENSE_PARENT_ID, parentId)
+        outState.putInt(KEY_EXPENSE_OPERATION_TYPE, operationType)
+        outState.putBoolean(KEY_EXPENSE_CREATE_NEW, createNew)
+        outState.putBoolean(KEY_EXPENSE_CREATE_TEMPLATE_STATE, createTemplate)
+        outState.putBoolean(KEY_EXPENSE_IS_TEMPLATE, isTemplate)
+        outState.putBoolean(KEY_EXPENSE_SHOULD_SHOW_CREATE_TEMPLATE, shouldShowCreateTemplate)
+        outState.putBoolean(KEY_EXPENSE_ARE_DATES_LINKED, areDatesLinked)
+        outState.putBoolean(KEY_EXPENSE_WITH_TYPE_SPINNER, withTypeSpinner)
+        outState.putBoolean(KEY_EXPENSE_IS_SPLIT_PART, isSplitPart)
+        outState.putParcelableArrayList(KEY_EXPENSE_SPLIT_PARTS_RESULT_LIST, splitPartsResultList)
         if (::delegate.isInitialized) {
             delegate.onSaveInstanceState(outState)
         }

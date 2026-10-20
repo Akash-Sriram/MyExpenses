@@ -1,16 +1,18 @@
 package org.totschnig.myexpenses.util
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Binder
 import androidx.annotation.IntDef
-import com.vmadalin.easypermissions.EasyPermissions
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.totschnig.myexpenses.R
 import java.io.File
-
 
 object PermissionHelper {
     @IntDef(PERMISSIONS_REQUEST_WRITE_CALENDAR, PERMISSIONS_REQUEST_NOTIFICATIONS_WEBUI,
@@ -27,10 +29,8 @@ object PermissionHelper {
     const val PERMISSIONS_REQUEST_NOTIFICATIONS_AUTO_BACKUP = 5
     const val PERMISSIONS_REQUEST_STORAGE = 6
 
-    @JvmStatic
     fun hasCalendarPermission(context: Context) = PermissionGroup.CALENDAR.hasPermission(context)
 
-    @JvmStatic
     fun canReadUri(uri: Uri, context: Context): Boolean {
         if ("file" == uri.scheme) {
             uri.path?.let {
@@ -81,10 +81,12 @@ object PermissionHelper {
         ;
 
         /**
-         * @return true if all of our [.androidPermissions] are granted
+         * @return true if all of our [androidPermissions] are granted
          */
         fun hasPermission(context: Context): Boolean {
-            return EasyPermissions.hasPermissions(context, *androidPermissions.toTypedArray())
+            return androidPermissions.all {
+                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+            }
         }
 
         companion object {
@@ -92,5 +94,26 @@ object PermissionHelper {
                 return PermissionGroup.entries.first { it.androidPermissions.contains(permission) }
             }
         }
+    }
+
+    fun somePermissionPermanentlyDenied(activity: Activity, perms: List<String>): Boolean =
+        perms.any {
+            ContextCompat.checkSelfPermission(activity, it) != PackageManager.PERMISSION_GRANTED &&
+                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, it)
+        }
+
+    fun showSettingsDialog(activity: Activity, rationale: String) {
+        MaterialAlertDialogBuilder(activity)
+            .setTitle(R.string.permissions_label)
+            .setMessage(rationale)
+            .setPositiveButton(R.string.settings_label) { _, _ ->
+                val intent = Intent(
+                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", activity.packageName, null)
+                )
+                activity.startActivity(intent)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }

@@ -16,11 +16,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.preference.PrefKey
-import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
-import java.util.Calendar
-import java.util.Date
-import java.util.GregorianCalendar
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import java.util.Random
 import java.util.TimeZone
@@ -51,7 +52,7 @@ class DateCalculationTest {
                 val random = Random()
                 val hour = random.nextInt(24)
                 val minute = random.nextInt(60)
-                v.put(KEY_DATE, GregorianCalendar(year, month, day, hour, minute).time.time / 1000)
+                v.put(KEY_DATE, LocalDateTime.of(year, month + 1, day, hour, minute).atZone(ZoneId.systemDefault()).toEpochSecond())
                 mDb!!.insertOrThrow(TABLE, null, v)
                 day++
                 if (day == 32) {
@@ -72,7 +73,7 @@ class DateCalculationTest {
     fun testDateCalculationsForWeekGroupsWithAllWeekDays() {
         val timeZone = TimeZone.getDefault().displayName
         println(timeZone)
-        for (j in Calendar.SUNDAY..Calendar.SATURDAY) {
+        for (j in 1..7) {
             doTheTest(timeZone, j)
         }
     }
@@ -101,7 +102,7 @@ class DateCalculationTest {
             val weekStart = c.getString(2)
             val dayOfYearOfWeekStart = getDayOfYearFromDate(weekStart)
             val unixTimeStamp = c.getLong(3)
-            val date = SimpleDateFormat.getDateInstance().format(Date(unixTimeStamp * 1000))
+            val date = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(Instant.ofEpochSecond(unixTimeStamp).atZone(ZoneId.systemDefault()))
             val weekStartFromGroupSqlExpression = DbUtils.weekStartFromGroupSqlExpression(year, week)
             val check = mDb!!.query(
                 TABLE,
