@@ -146,7 +146,7 @@ abstract class ImportSourceDialogFragment : BaseDialogFragment(),
         setButtonState()
     }
 
-    //we cannot persist document Uris because we use ACTION_GET_CONTENT instead of ACTION_OPEN_DOCUMENT
+    // Persist document Uri permissions when supported
     protected fun maybePersistUri() {
         ImportFileResultHandler.maybePersistUri(this, prefHandler)
     }

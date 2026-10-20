@@ -58,7 +58,6 @@ class BalanceDialogFragment : DialogViewBinding<BalanceBinding>(), DialogInterfa
     }
 
     companion object {
-        @JvmStatic
         fun newInstance(bundle: Bundle?): BalanceDialogFragment {
             val dialogFragment = BalanceDialogFragment()
             dialogFragment.arguments = bundle

@@ -143,7 +143,6 @@ abstract class BaseUiTest<A : ProtectedFragmentActivity> {
         }.toTypedArray()
     )
 
-    @JvmOverloads
     fun buildAccount(
         label: String,
         openingBalance: Long = 0L,
@@ -297,7 +296,6 @@ abstract class BaseUiTest<A : ProtectedFragmentActivity> {
         assertFinishing(Activity.RESULT_CANCELED)
     }
 
-    @JvmOverloads
     fun assertFinishing(resultCode: Int = Activity.RESULT_OK) {
         assertThat(testScenario.result.resultCode).isEqualTo(resultCode)
     }

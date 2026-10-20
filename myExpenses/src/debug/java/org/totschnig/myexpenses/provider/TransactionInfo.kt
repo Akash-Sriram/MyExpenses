@@ -6,7 +6,7 @@ import org.totschnig.myexpenses.model.generateUuid
 import org.totschnig.myexpenses.util.toEpoch
 import java.time.LocalDateTime
 
-data class TransactionInfo @JvmOverloads constructor(
+data class TransactionInfo(
     val accountId: Long,
     val amount: Long,
     val date: LocalDateTime = LocalDateTime.now(),

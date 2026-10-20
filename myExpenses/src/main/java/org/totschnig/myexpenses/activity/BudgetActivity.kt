@@ -52,7 +52,7 @@ import com.github.mikephil.charting.formatter.IAxisValueFormatter
 import com.google.android.material.snackbar.Snackbar
 import eltos.simpledialogfragment.SimpleDialog
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
-import eltos.simpledialogfragment.form.AmountInputHostDialog
+import org.totschnig.myexpenses.dialog.form.AmountInputHostDialog
 import eltos.simpledialogfragment.form.Check
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first

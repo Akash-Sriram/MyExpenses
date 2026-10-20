@@ -41,7 +41,7 @@ class SyncWorker(
 
         Timber.i("SyncWorker executing for account: %s, uuid: %s, autoBackupOnly: %b", accountName, uuid, autoBackupOnly)
 
-        val syncAdapter = SyncAdapter(applicationContext, true).also {
+        val syncAdapter = SyncAdapter(applicationContext).also {
             applicationContext.myApplication.appComponent.inject(it)
         }
 

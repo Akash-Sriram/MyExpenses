@@ -73,7 +73,6 @@ class SortUtilityDialogFragment : BaseDialogFragment(), OnStartDragListener,
 
     companion object {
         private const val KEY_ITEMS = "items"
-        @JvmStatic
         fun newInstance(items: ArrayList<SortableItem>): SortUtilityDialogFragment {
             val fragment = SortUtilityDialogFragment()
             val args = Bundle(1)

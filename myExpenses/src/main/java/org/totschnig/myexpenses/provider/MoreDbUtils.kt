@@ -581,7 +581,6 @@ fun cacheEventData(context: Context, prefHandler: PrefHandler) {
     }
 }
 
-@JvmOverloads
 fun SupportSQLiteDatabase.update(
     table: String,
     values: ContentValues,

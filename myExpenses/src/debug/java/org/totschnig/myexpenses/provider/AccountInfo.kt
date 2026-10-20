@@ -6,7 +6,7 @@ import org.totschnig.myexpenses.model.generateUuid
 /**
  * A utility for converting account data to a ContentValues map.
  */
-data class AccountInfo @JvmOverloads constructor(
+data class AccountInfo(
     val label: String,
     val type: Long,
     val openingBalance: Long,

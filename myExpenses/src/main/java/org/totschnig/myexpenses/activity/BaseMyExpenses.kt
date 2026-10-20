@@ -30,8 +30,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.google.android.material.snackbar.Snackbar
-import eltos.simpledialogfragment.form.AmountInput
-import eltos.simpledialogfragment.form.AmountInputHostDialog
+import org.totschnig.myexpenses.dialog.form.AmountInput
+import org.totschnig.myexpenses.dialog.form.AmountInputHostDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch

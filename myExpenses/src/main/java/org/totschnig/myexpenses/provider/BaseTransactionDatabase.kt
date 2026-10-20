@@ -506,7 +506,6 @@ fun SupportSQLiteDatabase.linkedTableTrigger(
 fun triggerName(operation: String, table: String) =
     "${operation.lowercase()}_change_log_${table.substringAfter('_')}"
 
-@JvmOverloads
 fun shouldWriteChangeTemplate(reference: String, table: String = TABLE_TRANSACTIONS) =
     """EXISTS (SELECT 1 FROM $TABLE_ACCOUNTS WHERE $KEY_ROWID = ${
         referenceForTable(reference, table, KEY_ACCOUNTID)
@@ -518,13 +517,11 @@ private fun referenceForTable(reference: String, table: String, column: String) 
     else -> throw IllegalArgumentException()
 }
 
-@JvmOverloads
 fun sequenceNumberSelect(reference: String, table: String = TABLE_TRANSACTIONS) =
     "(SELECT $KEY_SYNC_SEQUENCE_LOCAL FROM $TABLE_ACCOUNTS WHERE $KEY_ROWID = ${
         referenceForTable(reference, table, KEY_ACCOUNTID)
     })"
 
-@JvmOverloads
 fun parentUuidExpression(reference: String, table: String = TABLE_TRANSACTIONS) =
     """CASE
         WHEN ${referenceForTable(reference, table, KEY_PARENTID)} IS NULL

@@ -6,7 +6,6 @@ import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.AbstractThreadedSyncAdapter
 import android.content.ContentProviderClient
 import android.content.ContentProviderOperation
 import android.content.ContentResolver
@@ -88,11 +87,9 @@ import javax.inject.Inject
 import javax.inject.Provider
 import androidx.core.net.toUri
 
-class SyncAdapter @JvmOverloads constructor(
-    context: Context,
-    autoInitialize: Boolean,
-    allowParallelSyncs: Boolean = false,
-) : AbstractThreadedSyncAdapter(context, autoInitialize, allowParallelSyncs) {
+class SyncAdapter(
+    val context: Context,
+) {
     private var shouldNotify = true
 
     private var lastSynStart = LocalTime.now()
@@ -118,7 +115,7 @@ class SyncAdapter @JvmOverloads constructor(
     ): String = accountManager.getUserData(account, key) ?: defaultValue
 
     @SuppressLint("MissingPermission")
-    override fun onPerformSync(
+    fun onPerformSync(
         account: Account, extras: Bundle, authority: String,
         provider: ContentProviderClient, syncResult: SyncResult,
     ) {
@@ -953,7 +950,7 @@ class SyncAdapter @JvmOverloads constructor(
         }
     }
 
-    override fun onSyncCanceled() {
+    fun onSyncCanceled() {
         if (BuildConfig.DEBUG) {
             notifyUser("Debug", "Sync canceled")
             log().w(
@@ -962,7 +959,6 @@ class SyncAdapter @JvmOverloads constructor(
                 lastSynStart
             )
         }
-        super.onSyncCanceled()
     }
 
     companion object {
@@ -976,12 +972,10 @@ class SyncAdapter @JvmOverloads constructor(
         val IO_LOCK_DELAY_MILLIS = TimeUnit.MINUTES.toMillis(LOCK_TIMEOUT_MINUTES)
         const val TAG = "SyncAdapter"
 
-        @JvmStatic
         fun KEY_LAST_SYNCED_REMOTE(accountId: Long): String {
             return "last_synced_remote_$accountId"
         }
 
-        @JvmStatic
         fun KEY_LAST_SYNCED_LOCAL(accountId: Long): String {
             return "last_synced_local_$accountId"
         }

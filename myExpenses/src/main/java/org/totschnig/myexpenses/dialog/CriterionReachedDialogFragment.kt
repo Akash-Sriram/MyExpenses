@@ -68,8 +68,8 @@ import app.futured.donut.compose.DonutProgress
 import app.futured.donut.compose.data.DonutConfig
 import app.futured.donut.compose.data.DonutModel
 import eltos.simpledialogfragment.SimpleDialog.OnDialogResultListener
-import eltos.simpledialogfragment.form.AmountInput
-import eltos.simpledialogfragment.form.AmountInputHostDialog
+import org.totschnig.myexpenses.dialog.form.AmountInput
+import org.totschnig.myexpenses.dialog.form.AmountInputHostDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

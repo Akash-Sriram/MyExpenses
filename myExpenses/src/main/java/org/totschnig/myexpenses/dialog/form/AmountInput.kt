@@ -1,7 +1,9 @@
-package eltos.simpledialogfragment.form
+package org.totschnig.myexpenses.dialog.form
 
+import android.content.Context
 import android.os.Parcel
 import android.os.Parcelable
+import eltos.simpledialogfragment.form.FormElement
 import java.math.BigDecimal
 
 class AmountInput : FormElement<AmountInput, AmountInputViewHolder> {
@@ -12,6 +14,11 @@ class AmountInput : FormElement<AmountInput, AmountInputViewHolder> {
     var min: BigDecimal? = null
     var underMinError: String? = null
     var withTypeSwitch: Boolean? = null
+
+    val isRequired: Boolean
+        get() = required
+
+    fun getLabel(context: Context): String? = getText(context)
 
     protected constructor(resultKey: String) : super(resultKey)
 

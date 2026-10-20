@@ -14,7 +14,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.fragment.app.viewModels
 import androidx.preference.ListPreference
-import androidx.preference.MultiSelectListPreferenceDialogFragment2
+import org.totschnig.myexpenses.preference.MultiSelectListPreferenceDialogFragment2
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.recyclerview.widget.RecyclerView

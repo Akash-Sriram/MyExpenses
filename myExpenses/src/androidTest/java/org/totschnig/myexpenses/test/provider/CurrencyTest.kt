@@ -14,7 +14,7 @@ class CurrencyTest : BaseDbTest() {
 
     fun testShouldNotDeleteFrameworkCurrency() {
         try {
-            getMockContentResolver().delete(
+            mockContentResolver.delete(
                 TransactionProvider.CURRENCIES_URI.buildUpon().appendPath("EUR").build(), null, null
             )
             fail("Expected deletion of framework currency to fail")
@@ -29,7 +29,7 @@ class CurrencyTest : BaseDbTest() {
                 TABLE_CURRENCIES,
                 testCurrency.contentValues
             )
-        val result = getMockContentResolver().delete(
+        val result = mockContentResolver.delete(
             TransactionProvider.CURRENCIES_URI.buildUpon().appendPath(testCurrency.code).build(),
             null,
             null
@@ -50,7 +50,7 @@ class CurrencyTest : BaseDbTest() {
                 TABLE_ACCOUNTS,
                 testAccount.contentValues
             )
-        val result = getMockContentResolver().delete(
+        val result = mockContentResolver.delete(
             TransactionProvider.CURRENCIES_URI.buildUpon().appendPath(testCurrency.code).build(),
             null,
             null

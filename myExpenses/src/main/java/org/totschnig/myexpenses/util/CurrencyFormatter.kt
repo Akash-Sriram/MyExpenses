@@ -35,7 +35,6 @@ object DebugCurrencyFormatter : ICurrencyFormatter {
  * formats an amount with a currency
  * @return formatted string
  */
-@JvmOverloads
 fun ICurrencyFormatter.formatMoney(
     money: Money,
     configure: ((DecimalFormat) -> Unit)? = null,

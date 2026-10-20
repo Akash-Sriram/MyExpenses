@@ -10,11 +10,5 @@ import javax.inject.Singleton
 open class ConfigurationModule {
     @Provides
     @Singleton
-    open fun providesConfigurator(prefHandler: PrefHandler): Configurator =
-        try {
-            Class.forName("org.totschnig.myexpenses.util.config.FirebaseRemoteConfigurator")
-                .getConstructor().newInstance() as Configurator
-        } catch (e: Exception) {
-            Configurator.NO_OP
-        }
+    open fun providesConfigurator(prefHandler: PrefHandler): Configurator = Configurator.NO_OP
 }

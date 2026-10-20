@@ -326,7 +326,6 @@ fun maybeEscapeLabel(categorySeparator: String?, tableName: String) =
 
 const val CATEGORY_SEPARATOR = '>'
 
-@JvmOverloads
 fun getCategoryTreeForView(
     rootExpression: String = "$KEY_PARENTID IS NULL",
     withRootLabel: Boolean = true,
@@ -720,7 +719,6 @@ WITH now as (
 const val accountWithTypeAndFlag =
     "$TABLE_ACCOUNTS LEFT JOIN $TABLE_ACCOUNT_TYPES ON $KEY_TYPE = $TABLE_ACCOUNT_TYPES.$KEY_ROWID LEFT JOIN $TABLE_ACCOUNT_FLAGS ON $KEY_FLAG = $TABLE_ACCOUNT_FLAGS.$KEY_ROWID"
 
-@JvmOverloads
 fun exchangeRateJoin(
     table: String,
     colum: String,
@@ -729,7 +727,6 @@ fun exchangeRateJoin(
 ) =
     " $table LEFT JOIN $TABLE_ACCOUNT_EXCHANGE_RATES ON $joinTable.$colum = $TABLE_ACCOUNT_EXCHANGE_RATES.$KEY_ACCOUNTID AND $KEY_CURRENCY_SELF = $joinTable.$KEY_CURRENCY AND $KEY_CURRENCY_OTHER = '$homeCurrency'"
 
-@JvmOverloads
 fun equivalentAmountJoin(
     homeCurrency: String,
     idColumn: String = KEY_ROWID,

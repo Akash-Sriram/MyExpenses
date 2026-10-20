@@ -42,7 +42,6 @@ import org.totschnig.myexpenses.export.pdf.FontType
 import org.totschnig.myexpenses.util.PermissionHelper
 import org.totschnig.myexpenses.util.TextUtils
 import org.totschnig.myexpenses.util.config.Configurator
-import org.totschnig.myexpenses.util.config.Configurator.Configuration.USE_SET_DECOR_PADDING_WORKAROUND
 import org.totschnig.myexpenses.util.config.get
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.ui.setNightMode
@@ -87,10 +86,6 @@ class PreferenceActivity : SyncBackendSetupActivity(), ContribIFace,
         get() = intent.action == Intent.ACTION_APPLICATION_PREFERENCES
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        if (configurator[USE_SET_DECOR_PADDING_WORKAROUND, false]) {
-            Timber.i("Using DECOR_PADDING_WORKAROUND")
-            window.decorView
-        }
         if (savedInstanceState != null) {
             resultCode = savedInstanceState.getInt(KEY_RESULT_CODE, RESULT_OK)
         }

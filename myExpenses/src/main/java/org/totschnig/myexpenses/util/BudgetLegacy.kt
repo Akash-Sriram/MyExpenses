@@ -1,7 +1,7 @@
 package org.totschnig.myexpenses.util
 
 import android.content.Context
-import eltos.simpledialogfragment.form.AmountInput
+import org.totschnig.myexpenses.dialog.form.AmountInput
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.provider.KEY_AMOUNT

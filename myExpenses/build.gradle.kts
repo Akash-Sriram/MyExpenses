@@ -31,9 +31,7 @@ fun getDate(): String {
 
 android {
     compileSdk = (rootProject.extra["compileSdkVersion"] as Int)
-    useLibrary("android.test.runner")
     useLibrary("android.test.mock")
-    useLibrary("android.test.base")
 
     defaultConfig {
         applicationId = "org.totschnig.myexpenses"
@@ -117,7 +115,7 @@ android {
     lint {
         abortOnError = true
         checkDependencies = true
-        disable += listOf("InvalidPackage", "MissingQuantity", "MissingTranslation", "ImpliedQuantity", "Instantiatable")
+        disable += listOf("MissingQuantity", "MissingTranslation", "ImpliedQuantity", "Instantiatable")
     }
 
     bundle {

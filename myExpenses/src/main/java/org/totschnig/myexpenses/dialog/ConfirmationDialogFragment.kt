@@ -157,7 +157,6 @@ class ConfirmationDialogFragment : BaseDialogFragment(), DialogInterface.OnClick
         const val KEY_NEUTRAL_BUTTON_LABEL = "neutralButtonLabel"
         const val KEY_ICON = "icon"
 
-        @JvmStatic
         fun newInstance(args: Bundle): ConfirmationDialogFragment {
             val dialogFragment = ConfirmationDialogFragment()
             dialogFragment.arguments = args

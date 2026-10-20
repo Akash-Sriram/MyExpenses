@@ -39,16 +39,12 @@ class MessageDialogFragment : BaseDialogFragment(), OnClickListener {
         private const val KEY_NEGATIVE = "negative"
         private const val KEY_ICON = "icon"
 
-        @JvmStatic
         fun noButton(): Button = nullButton(android.R.string.cancel)
 
-        @JvmStatic
         fun okButton(): Button = nullButton(android.R.string.ok)
 
-        @JvmStatic
         fun nullButton(label: Int): Button = Button(label, R.id.NO_COMMAND, null)
 
-        @JvmStatic
         fun newInstance(
             title: CharSequence?,
             message: CharSequence,
@@ -57,7 +53,6 @@ class MessageDialogFragment : BaseDialogFragment(), OnClickListener {
             negative: Button?
         ): MessageDialogFragment = newInstance(title, message, positive, neutral, negative, 0)
 
-        @JvmStatic
         fun newInstance(
             title: CharSequence?,
             message: CharSequence,

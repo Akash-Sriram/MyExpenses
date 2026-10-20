@@ -247,7 +247,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     @DrawableRes
     open val fabIcon: Int? = null
 
-    @JvmOverloads
     protected open fun setupToolbar(withHome: Boolean = true, homeAsUpIndicator: Int? = null) {
         toolbar = ActivityCompat.requireViewById<Toolbar>(this, R.id.toolbar).also {
             setSupportActionBar(it)
@@ -434,9 +433,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         else 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        if (uiConfigIsSafe) {
-            enableEdgeToEdge()
-        }
+        enableEdgeToEdge()
         with(injector) {
             inject(ocrViewModel)
             inject(featureViewModel)
@@ -932,12 +929,10 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             true
         } else false
 
-    @JvmOverloads
     fun showDismissibleSnackBar(message: Int, callback: Snackbar.Callback? = null) {
         showDismissibleSnackBar(getText(message), callback)
     }
 
-    @JvmOverloads
     fun showDismissibleSnackBar(
         message: CharSequence,
         callback: Snackbar.Callback? = null,
@@ -953,7 +948,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         showSnackBar(message, Snackbar.LENGTH_INDEFINITE)
     }
 
-    @JvmOverloads
     fun showSnackBar(message: Int, duration: Int = Snackbar.LENGTH_LONG) {
         showSnackBar(getText(message), duration)
     }
@@ -1017,7 +1011,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         }
     }
 
-    @JvmOverloads
     fun showSnackBar(
         message: CharSequence,
         duration: Int = Snackbar.LENGTH_LONG,
@@ -1093,7 +1086,6 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
         }
     }
 
-    @JvmOverloads
     open fun showMessage(
         message: CharSequence,
         title: CharSequence? = null,

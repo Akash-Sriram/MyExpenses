@@ -25,6 +25,7 @@ import org.totschnig.myexpenses.provider.DatabaseVersionPeekHelper
 import org.totschnig.myexpenses.provider.TransactionDatabase
 import org.totschnig.myexpenses.util.ExchangeRateHandler
 import timber.log.Timber
+import org.totschnig.myexpenses.util.io.FileCopyUtils
 import java.io.File
 import javax.inject.Named
 import javax.inject.Singleton
@@ -39,8 +40,16 @@ interface SqlCryptProvider {
 open class DataModule() {
     companion object {
         val cryptProvider: SqlCryptProvider by lazy {
-            Class.forName("org.totschnig.sqlcrypt.SQLiteOpenHelperFactory")
-                .getDeclaredConstructor().newInstance() as SqlCryptProvider
+            object : SqlCryptProvider {
+                override fun provideEncryptedDatabase(context: Context): SupportSQLiteOpenHelper.Factory =
+                    FrameworkSQLiteOpenHelperFactory()
+                override fun decrypt(context: Context, encrypted: File, backupDb: File) {
+                    FileCopyUtils.copy(encrypted, backupDb)
+                }
+                override fun encrypt(context: Context, backupFile: File, currentDb: File) {
+                    FileCopyUtils.copy(backupFile, currentDb)
+                }
+            }
         }
     }
 

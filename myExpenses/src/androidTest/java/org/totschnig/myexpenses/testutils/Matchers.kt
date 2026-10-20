@@ -277,28 +277,7 @@ fun withCategoryIcon(icon: String): TypeSafeMatcher<View> {
                 return false
             }
 
-            // --- 3. Use reflection to access the private 'fontCode' field ---
-            return try {
-                // Get the class of the drawable
-                val fontDrawableClass = startIcon.javaClass
-
-                // Get the private field named "fontCode"
-                val fontCodeField = fontDrawableClass.getDeclaredField("fontCode")
-
-                // Make the private field temporarily accessible
-                fontCodeField.isAccessible = true
-
-                // Get the actual font code value from the specific 'startIcon' instance
-                val actualFontCode = fontCodeField.get(startIcon) as? Char
-
-                // 4. Perform the comparison with the expected FontAwesome icon's unicode
-                actualFontCode == FontAwesomeIcons[icon]?.unicode
-            } catch (e: Exception) {
-                // If reflection fails for any reason (e.g., field name changes in a future library update),
-                // the match should fail gracefully.
-                e.printStackTrace()
-                false
-            }
+            return startIcon.fontCode == FontAwesomeIcons[icon]?.unicode
         }
     }
 }

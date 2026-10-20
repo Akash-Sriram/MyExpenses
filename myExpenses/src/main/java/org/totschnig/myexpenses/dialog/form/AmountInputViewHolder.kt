@@ -1,10 +1,11 @@
-package eltos.simpledialogfragment.form
+package org.totschnig.myexpenses.dialog.form
 
 import android.content.Context
 import android.os.Bundle
 import android.text.Editable
 import android.view.View
 import com.google.android.material.textfield.TextInputLayout
+import eltos.simpledialogfragment.form.FormElementViewHolder
 import eltos.simpledialogfragment.form.SimpleFormDialog.DialogActions
 import eltos.simpledialogfragment.form.SimpleFormDialog.FocusActions
 import org.totschnig.myexpenses.R
@@ -14,6 +15,7 @@ import org.totschnig.myexpenses.ui.MyTextWatcher
 class AmountInputViewHolder(field: AmountInput) : FormElementViewHolder<AmountInput>(field) {
     private lateinit var inputLayout: TextInputLayout
     private lateinit var amountInput: org.totschnig.myexpenses.ui.AmountInput
+
     override fun getContentViewLayout(): Int {
         return R.layout.simpledialogfragment_form_item_amount
     }
@@ -26,9 +28,9 @@ class AmountInputViewHolder(field: AmountInput) : FormElementViewHolder<AmountIn
     ) {
         inputLayout = view.findViewById(R.id.inputLayout)
         amountInput = view.findViewById(R.id.amount)
-        inputLayout.hint = field.getText(context)
+        inputLayout.hint = field.getLabel(context)
         amountInput.setFractionDigits(field.fractionDigits)
-        field.getText(context)?.let {
+        field.getLabel(context)?.let {
             amountInput.contentDescription = it
         }
         field.withTypeSwitch?.also {
@@ -51,6 +53,7 @@ class AmountInputViewHolder(field: AmountInput) : FormElementViewHolder<AmountIn
     }
 
     override fun saveState(outState: Bundle) {}
+
     override fun putResults(results: Bundle, key: String) {
         results.putSerializable(key, amountInput.typedValue)
     }
@@ -60,7 +63,7 @@ class AmountInputViewHolder(field: AmountInput) : FormElementViewHolder<AmountIn
     }
 
     override fun posButtonEnabled(context: Context): Boolean {
-        return if (!field.required) true else amountInput.getUntypedValue(false).getOrNull() != null
+        return if (!field.isRequired) true else amountInput.getUntypedValue(false).getOrNull() != null
     }
 
     override fun validate(context: Context): Boolean {

@@ -1850,25 +1850,21 @@ open class TransactionProvider : BaseTransactionProvider() {
       addURI(AUTHORITY, "accountFlags/#", ACCOUNT_FLAG_ID)
     }
 
-    @JvmStatic
     fun resumeChangeTrigger(): ContentProviderOperation =
       ContentProviderOperation.newDelete(
         DUAL_URI.buildUpon()
           .appendQueryParameter(QUERY_PARAMETER_SYNC_END, "1").build()
       ).build()
 
-    @JvmStatic
     fun resumeChangeTrigger(db: SupportSQLiteDatabase): Int =
       db.delete(TABLE_SYNC_STATE, null, null)
 
-    @JvmStatic
     fun pauseChangeTrigger(): ContentProviderOperation =
       ContentProviderOperation.newInsert(
         DUAL_URI.buildUpon()
           .appendQueryParameter(QUERY_PARAMETER_SYNC_BEGIN, "1").build()
       ).build()
 
-    @JvmStatic
     fun pauseChangeTrigger(db: SupportSQLiteDatabase): Long {
       val values = ContentValues(1)
       values.put(KEY_STATUS, "1")

@@ -5,7 +5,6 @@ import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.provider.PlannerUtils
 import org.totschnig.myexpenses.util.PermissionHelper
 
-@SuppressLint("CustomSplashScreen")
 abstract class LaunchActivity : ProtectedFragmentActivity() {
 
     private val plannerUtils: PlannerUtils get() = injector.plannerUtils()

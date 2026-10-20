@@ -31,17 +31,12 @@ open class UiModule {
 
     @Provides
     @Singleton
-    open fun provideReviewManager(prefHandler: PrefHandler): ReviewManager = try {
-        Class.forName("org.totschnig.myexpenses.util.distrib.PlatformReviewManager")
-            .getConstructor(PrefHandler::class.java)
-            .newInstance(prefHandler) as ReviewManager
-    } catch (_: Exception) {
+    open fun provideReviewManager(prefHandler: PrefHandler): ReviewManager =
         object : ReviewManager {
             override fun onEditTransactionResult(activity: FragmentActivity) {
                 RemindRateDialogFragment.maybeShow(prefHandler, activity)
             }
         }
-    }
 
     @Provides
     @Singleton

@@ -42,13 +42,7 @@ open class AppModule {
 
     @Provides
     @Singleton
-    open fun provideTracker(): Tracker = try {
-        Class.forName(
-            "org.totschnig.myexpenses.util.tracking.PlatformTracker"
-        ).getDeclaredConstructor().newInstance() as Tracker
-    } catch (_: Exception) {
-        NoOpTracker
-    }
+    open fun provideTracker(): Tracker = NoOpTracker
 
     @Provides
     @Singleton

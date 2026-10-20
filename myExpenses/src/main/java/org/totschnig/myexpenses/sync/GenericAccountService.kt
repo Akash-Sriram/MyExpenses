@@ -148,7 +148,6 @@ class GenericAccountService : Service() {
         /**
          * @return true if sync was requested, false if account is not syncable (deactivated)
          */
-        @Suppress("DEPRECATION")
         fun requestSync(
             accountName: String,
             manual: Boolean = true,
@@ -173,7 +172,6 @@ class GenericAccountService : Service() {
          * @return Handle to application's account (not guaranteed to resolve unless CreateSyncAccount()
          * has been called)
          */
-        @JvmStatic
         fun getAccount(accountName: String): Account {
             // Note: Normally the account name is set to the user's identity (username or email
             // address). However, since we aren't actually using any user accounts, it makes more sense
@@ -248,7 +246,6 @@ class GenericAccountService : Service() {
                 }
         }
 
-        @JvmStatic
         fun getAccounts(context: Context): Array<Account> = try {
             AccountManager.get(context).getAccountsByType(ACCOUNT_TYPE)
         } catch (e: SecurityException) {
@@ -256,7 +253,6 @@ class GenericAccountService : Service() {
             emptyArray()
         }
 
-        @JvmStatic
         fun getAccountNames(context: Context): Array<String> =
             getAccounts(context).map { it.name }.toTypedArray()
 
@@ -268,7 +264,6 @@ class GenericAccountService : Service() {
             configureAutomaticAndPeriod(account, prefHandler)
         }
 
-        @Suppress("DEPRECATION")
         fun configureAutomaticAndPeriod(
             account: Account,
             prefHandler: PrefHandler,
@@ -279,7 +274,6 @@ class GenericAccountService : Service() {
             SyncWorker.enqueuePeriodicSync(context, account.name, pollFrequencyHours, wifiOnly)
         }
 
-        @Suppress("DEPRECATION")
         fun deactivateSync(
             account: Account,
             context: Context = org.totschnig.myexpenses.MyApplication.instance

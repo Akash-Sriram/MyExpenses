@@ -1,8 +1,8 @@
-@file:Suppress("DEPRECATION")
-
 package org.totschnig.myexpenses.testutils
 
 import androidx.sqlite.db.SupportSQLiteDatabase
+import org.junit.After
+import org.junit.Before
 import org.totschnig.myexpenses.provider.AccountInfo
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.SPLIT_CATID
@@ -18,7 +18,7 @@ open class BaseDbTest : BaseProviderTest() {
     // Contains an SQLite database, used as test data
     lateinit var mDb: SupportSQLiteDatabase
 
-    @Deprecated("Deprecated in Java")
+    @Before
     @Throws(Exception::class)
     override fun setUp() {
         super.setUp()
@@ -30,7 +30,7 @@ open class BaseDbTest : BaseProviderTest() {
         AccountInfo("Test account", cashAccount.id, 0).contentValues
     )
 
-    @Deprecated("Deprecated in Java")
+    @After
     @Throws(Exception::class)
     override fun tearDown() {
         super.tearDown()
