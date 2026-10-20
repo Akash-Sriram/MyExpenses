@@ -59,6 +59,7 @@ playServicesMlkitTextRecognitionCommon = "19.1.0"
 recyclerview = "1.4.0"
 robolectricVersion = "4.17"
 runner = "1.7.0"
+saxon = "10.5"
 screengrab = "2.1.1"
 securityCrypto = "1.1.0"
 simpledialogfragments = "d1e6d27700"
@@ -172,6 +173,7 @@ okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okHttpVersion"
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 play-services-mlkit-text-recognition-common = { module = "com.google.android.gms:play-services-mlkit-text-recognition-common", version.ref = "playServicesMlkitTextRecognitionCommon" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectricVersion" }
+saxon-he = { module = "net.sf.saxon:Saxon-HE", version.ref = "saxon" }
 screengrab = { module = "tools.fastlane:screengrab", version.ref = "screengrab" }
 simpledialogfragments = { module = "com.github.mtotschnig:SimpleDialogFragments", version.ref = "simpledialogfragments" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4jApi" }

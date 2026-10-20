@@ -13,5 +13,5 @@ application {
 }
 
 dependencies {
-    implementation("net.sf.saxon:Saxon-HE:10.5")
+    implementation(libs.saxon.he)
 }
