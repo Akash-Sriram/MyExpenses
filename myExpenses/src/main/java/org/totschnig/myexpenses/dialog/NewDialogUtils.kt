@@ -20,6 +20,7 @@ import org.totschnig.myexpenses.model.AccountFlag
 import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.enumValueOrDefault
+import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_SHORT_NAME
@@ -107,7 +108,12 @@ fun GroupedSpinnerAdapter<AccountFlag, Account>.addAllAccounts(data: List<Accoun
     addAll(data.groupBy { it.flag }.toList().sortedByDescending { it.first.sortKey })
 }
 
-fun buildPartyEditDialog(partyId: Long?, name:String?, shortName:String?): SimpleFormDialog = SimpleFormDialog.build()
+fun buildPartyEditDialog(
+    partyId: Long?,
+    name: String?,
+    shortName: String?,
+    iban: String? = null
+): SimpleFormDialog = SimpleFormDialog.build()
     .fields(
         Input.name(KEY_PAYEE_NAME)
             .inputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
@@ -117,7 +123,11 @@ fun buildPartyEditDialog(partyId: Long?, name:String?, shortName:String?): Simpl
         Input.name(KEY_SHORT_NAME)
             .hint(R.string.nickname)
             .text(shortName)
-            .inputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
+            .inputType(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES),
+        Input.name(KEY_IBAN)
+            .hint("UPI ID / Phone (e.g. name@upi)")
+            .text(iban)
+            .inputType(InputType.TYPE_CLASS_TEXT)
     )
     .title(if (partyId == null) R.string.menu_create_party else R.string.menu_edit_party)
     .cancelable(false)

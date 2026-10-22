@@ -68,16 +68,7 @@
         android:title="@string/security_settings_title" />
 
     <Preference
-        android:fragment="org.totschnig.myexpenses.fragment.preferences.PreferencesFeedbackFragment"
-        android:key="feedback"
-        android:title="@string/help_and_feedback" />
-
-    <Preference
         android:fragment="org.totschnig.myexpenses.fragment.preferences.PreferencesAdvancedFragment"
         android:key="advanced"
         android:title="@string/expand_button_title" />
-
-    <Preference
-        android:key="@string/pref_more_info_dialog_key"
-        android:title="@string/pref_more_info_dialog_title" />
 </PreferenceScreen>

@@ -328,10 +328,11 @@ sealed class MenuItem(
 
             MenuContext.V2Navigation -> listOf(
                 Loans,
-                Budget,
+                Distribution,
+                History,
                 Parties,
+                Budget,
                 Settings,
-                Help,
                 Backup,
                 Restore
             )

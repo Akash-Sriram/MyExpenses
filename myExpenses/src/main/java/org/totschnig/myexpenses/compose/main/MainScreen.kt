@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -521,25 +522,54 @@ fun MainScreenAdaptive(
             sheetState = sheetState,
             contentWindowInsets = { WindowInsets.navigationBars }
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.more),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
 
-            overflowItems
-                .forEach {
-                    ListItem(
-                        modifier = Modifier
-                            .testTag(it.testTag)
-                            .clickable {
-                                showBottomSheet = false
-                                it.onMenuItemClicked()
-                            },
-                        headlineContent = { Text(it.getLabel(LocalContext.current)) },
-                        leadingContent = {
-                            Icon(
-                                it.painter,
-                                contentDescription = null
+                val reports = overflowItems.filter { it is MenuItem.Distribution || it is MenuItem.History || it is MenuItem.Budget }
+                val manage = overflowItems.filter { it is MenuItem.Parties || it is MenuItem.Loans || it is MenuItem.Templates }
+                val system = overflowItems.filter { it !in reports && it !in manage }
+
+                val renderSection = @Composable { title: String, items: List<MenuItem> ->
+                    if (items.isNotEmpty()) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 4.dp)
+                        )
+                        items.forEach { item ->
+                            ListItem(
+                                modifier = Modifier
+                                    .testTag(item.testTag)
+                                    .clickable {
+                                        showBottomSheet = false
+                                        item.onMenuItemClicked()
+                                    },
+                                headlineContent = { Text(item.getLabel(LocalContext.current)) },
+                                leadingContent = {
+                                    Icon(
+                                        item.painter,
+                                        contentDescription = null
+                                    )
+                                },
                             )
-                        },
-                    )
+                        }
+                    }
                 }
+
+                renderSection("Reports & Insights", reports)
+                renderSection("People & Commitments", manage)
+                renderSection("Tools & System", system)
+            }
         }
     }
 }

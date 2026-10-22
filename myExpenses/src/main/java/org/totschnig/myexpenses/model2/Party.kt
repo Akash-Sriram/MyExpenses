@@ -7,6 +7,8 @@ import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME_NORMALIZED
 import org.totschnig.myexpenses.provider.KEY_SHORT_NAME
+import org.totschnig.myexpenses.provider.KEY_ROWID
+import org.totschnig.myexpenses.provider.TABLE_PAYEES
 import org.totschnig.myexpenses.util.Utils
 
 data class Party(
@@ -35,6 +37,19 @@ data class Party(
         fun selectionArgs(search: String): Array<String> = arrayOf(
             "$search%",
             "*[ (.;,]$search*"
+        )
+
+        const val SELECTION_WITH_ALIASES =
+            "(($KEY_PAYEE_NAME_NORMALIZED LIKE ? OR $KEY_PAYEE_NAME_NORMALIZED GLOB ? OR $KEY_IBAN LIKE ?) OR " +
+            "($KEY_ROWID IN (SELECT $KEY_PARENTID FROM $TABLE_PAYEES WHERE $KEY_PARENTID IS NOT NULL AND ($KEY_PAYEE_NAME_NORMALIZED LIKE ? OR $KEY_PAYEE_NAME_NORMALIZED GLOB ? OR $KEY_IBAN LIKE ?))))"
+
+        fun selectionArgsWithAliases(search: String): Array<String> = arrayOf(
+            "$search%",
+            "*[ (.;,]$search*",
+            "%$search%",
+            "$search%",
+            "*[ (.;,]$search*",
+            "%$search%"
         )
 
         fun validate(name: String) = name.trim().takeIf { it.isNotEmpty() }

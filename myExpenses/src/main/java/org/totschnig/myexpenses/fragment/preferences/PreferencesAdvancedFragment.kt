@@ -53,9 +53,9 @@ class PreferencesAdvancedFragment : BasePreferenceFragment(),
 
         viewModel.dataCorrupted().observe(this) {
             if (it > 0) {
-                with(requirePreference<Preference>(PrefKey.DEBUG_REPAIR_987)) {
-                    isVisible = true
-                    title = "Inspect Corrupted Data ($it)"
+                findPreference<Preference>(PrefKey.DEBUG_REPAIR_987)?.let { pref ->
+                    pref.isVisible = true
+                    pref.title = "Inspect Corrupted Data ($it)"
                 }
             }
         }
@@ -67,7 +67,7 @@ class PreferencesAdvancedFragment : BasePreferenceFragment(),
         if (featureManager.allowsUninstall()) {
             configureUninstallPrefs()
         } else {
-            requirePreference<Preference>(PrefKey.FEATURE_UNINSTALL).isVisible = false
+            findPreference<Preference>(PrefKey.FEATURE_UNINSTALL)?.isVisible = false
         }
 
         requirePreference<LocalizedFormatEditTextPreference>(PrefKey.CUSTOM_DECIMAL_FORMAT)
@@ -168,7 +168,7 @@ class PreferencesAdvancedFragment : BasePreferenceFragment(),
         action: (Set<String>) -> Unit,
         prettyPrint: (String) -> String
     ) {
-        (requirePreference(prefKey) as? MultiSelectListPreference)?.apply {
+        findPreference<MultiSelectListPreference>(prefKey)?.apply {
             if (entries.isEmpty()) {
                 isEnabled = false
             } else {

@@ -466,12 +466,13 @@ open class ContentResolvingAndroidViewModel(application: Application) :
         }.takeIf { it.isNotEmpty() } to joinArrays(filterSelectionArgs, accountSelectionArgs)
     }
 
-    fun saveParty(id: Long, name: String, shortName: String?): LiveData<Boolean> =
+    fun saveParty(id: Long, name: String, shortName: String?, iban: String? = null): LiveData<Boolean> =
         liveData(context = coroutineContext()) {
             val party = org.totschnig.myexpenses.model2.Party.create(
                 id = id,
                 name = name,
-                shortName = shortName
+                shortName = shortName,
+                iban = iban?.trim()?.takeIf { it.isNotEmpty() }
             )
             emit(
                 if (party == null) false else

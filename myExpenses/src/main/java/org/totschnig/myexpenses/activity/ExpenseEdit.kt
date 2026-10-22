@@ -113,6 +113,7 @@ import org.totschnig.myexpenses.provider.KEY_AMOUNT
 import org.totschnig.myexpenses.provider.KEY_COLOR
 import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.provider.KEY_DATE
+import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_INSTANCEID
 import org.totschnig.myexpenses.provider.KEY_LABEL
@@ -1888,7 +1889,8 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     viewModel.saveParty(
                         id,
                         name,
-                        shortName
+                        shortName,
+                        extras.getString(KEY_IBAN)
                     ).observe(this) {
                         if (it) {
                             rootBinding.Payee.party = DisplayParty(id, name, shortName)

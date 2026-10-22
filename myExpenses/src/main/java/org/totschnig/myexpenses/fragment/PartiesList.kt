@@ -61,6 +61,7 @@ import org.totschnig.myexpenses.dialog.buildPartyEditDialog
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.provider.KEY_ACCOUNTID
+import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_LABEL
 import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
@@ -134,11 +135,19 @@ class PartiesList : Fragment(), OnDialogResultListener {
             }
             binding.Debt.isVisible = party.hasOpenDebts()
             with(binding.BankDetails) {
-                val hasBankDetails = party.iban != null || party.bic != null
-                isVisible = hasBankDetails
-                if (hasBankDetails) {
-                    //noinspection SetTextI18n
-                    text = "${party.bic} : ${party.iban}"
+                val upi = party.iban?.takeIf { it.isNotBlank() }
+                val hasDetails = upi != null || !party.bic.isNullOrBlank()
+                isVisible = hasDetails
+                if (hasDetails) {
+                    val label = if (upi != null) "UPI: $upi" else "BIC: ${party.bic}"
+                    text = label
+                    if (upi != null) {
+                        setOnClickListener {
+                            val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("UPI ID", upi))
+                            manageParties.showSnackBar("Copied UPI ID: $upi")
+                        }
+                    }
                 }
             }
             binding.Unused.isVisible = party.isUnused
@@ -431,7 +440,7 @@ class PartiesList : Fragment(), OnDialogResultListener {
                 }
                 menu.prepareSearch(viewModel.filter)
                 menu.findItem(R.id.DEBT_COMMAND)?.let { menuItem ->
-                    menuItem.isVisible = viewModel.hasDebts
+                    menuItem.isVisible = true
                 }
                 menu.findItem(R.id.CLEANUP_COMMAND)?.let { menuItem ->
                     menuItem.isVisible = viewModel.unusedCount.value > 0
@@ -591,7 +600,8 @@ class PartiesList : Fragment(), OnDialogResultListener {
                     viewModel.saveParty(
                         extras.getLong(KEY_ROWID),
                         name,
-                        extras.getString(KEY_SHORT_NAME)
+                        extras.getString(KEY_SHORT_NAME),
+                        extras.getString(KEY_IBAN)
                     ).observe(this) {
                         if (!it)
                             manageParties.showSnackBar(
@@ -634,7 +644,7 @@ class PartiesList : Fragment(), OnDialogResultListener {
     }
 
     private fun showEditDialog(party: Party?) {
-        buildPartyEditDialog(party?.id, party?.name, party?.shortName)
+        buildPartyEditDialog(party?.id, party?.name, party?.shortName, party?.iban)
             .show(this, DIALOG_EDIT_PARTY)
     }
 

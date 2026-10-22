@@ -20,17 +20,20 @@ import android.widget.ViewSwitcher
 import androidx.core.os.BundleCompat
 import com.google.android.material.chip.Chip
 import kotlinx.parcelize.Parcelize
+import android.widget.TextView
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.ExpenseEdit
 import org.totschnig.myexpenses.databinding.PartyInputBinding
 import org.totschnig.myexpenses.dialog.buildPartyEditDialog
 import org.totschnig.myexpenses.fragment.PartiesList.Companion.DIALOG_EDIT_PARTY
 import org.totschnig.myexpenses.model2.Party
+import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_SHORT_NAME
+import org.totschnig.myexpenses.provider.TABLE_PAYEES
 import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.provider.getLongOrNull
 import org.totschnig.myexpenses.provider.getString
@@ -42,7 +45,8 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 data class DisplayParty(
     val id: Long?,
     val name: String,
-    val shortName: String? = null
+    val shortName: String? = null,
+    val iban: String? = null
 ) : Parcelable {
 
     val displayName: String
@@ -53,7 +57,8 @@ data class DisplayParty(
             DisplayParty(
                 it,
                 cursor.getString(KEY_PAYEE_NAME),
-                cursor.getStringOrNull(KEY_SHORT_NAME)
+                cursor.getStringOrNull(KEY_SHORT_NAME),
+                cursor.getStringOrNull(KEY_IBAN)
             )
         }
     }
@@ -146,7 +151,7 @@ class PartyInput @JvmOverloads constructor(
         }
 
         selectedItemChip.setOnCloseIconClickListener {
-            buildPartyEditDialog(party?.id, party?.name, party?.shortName)
+            buildPartyEditDialog(party?.id, party?.name, party?.shortName, party?.iban)
                 .show(host, DIALOG_EDIT_PARTY)
         }
         selectedItemChip.closeIconContentDescription = context.getString(R.string.menu_edit_party)
@@ -178,19 +183,40 @@ class PartyInput @JvmOverloads constructor(
             intArrayOf(android.R.id.text1),
             0
         )
+        payeeAdapter.viewBinder = SimpleCursorAdapter.ViewBinder { view, cursor, _ ->
+            if (view.id == android.R.id.text1) {
+                val name = cursor.getString(1)
+                val alias = if (cursor.isNull(2)) null else cursor.getString(2)
+                val upi = if (cursor.isNull(3)) null else cursor.getString(3)
+                val displayText = buildString {
+                    append(name)
+                    if (!alias.isNullOrBlank()) {
+                        append("  \u2022  aka: ").append(alias)
+                    } else if (!upi.isNullOrBlank()) {
+                        append("  \u2022  UPI: ").append(upi)
+                    }
+                }
+                (view as TextView).text = displayText
+                true
+            } else false
+        }
         if (withInputMethodNeeded) {
             setInputMethodModeNeeded()
         }
         autoCompleteTextView.setAdapter(payeeAdapter)
         payeeAdapter.filterQueryProvider = FilterQueryProvider { constraint: CharSequence? ->
             if (constraint != null) {
+                val normalized = Utils.escapeSqlLikeExpression(Utils.normalize(constraint.toString()))
                 val (selection, selectArgs) =
-                    " AND ${Party.SELECTION}" to Party.selectionArgs(
-                        Utils.escapeSqlLikeExpression(Utils.normalize(constraint.toString()))
-                    )
+                    " AND ${Party.SELECTION_WITH_ALIASES}" to Party.selectionArgsWithAliases(normalized)
                 context.contentResolver.query(
                     TransactionProvider.PAYEES_URI,
-                    arrayOf(KEY_ROWID, KEY_PAYEE_NAME, KEY_SHORT_NAME),
+                    arrayOf(
+                        KEY_ROWID,
+                        KEY_PAYEE_NAME,
+                        "(SELECT group_concat($KEY_PAYEE_NAME, ', ') FROM $TABLE_PAYEES WHERE $KEY_PARENTID = $TABLE_PAYEES.$KEY_ROWID) AS $KEY_SHORT_NAME",
+                        KEY_IBAN
+                    ),
                     "$KEY_PARENTID IS NULL $selection",
                     selectArgs,
                     null
@@ -204,8 +230,8 @@ class PartyInput @JvmOverloads constructor(
                 if (c.moveToPosition(position)) {
                     val partyId = c.getLong(0)
                     val name = c.getString(1)
-                    val shortName = c.getString(2)
-                    party = DisplayParty(partyId, name, shortName)
+                    val iban = if (c.isNull(3)) null else c.getString(3)
+                    party = DisplayParty(partyId, name, null, iban)
                     partySelectListener.onPartySelected(partyId)
                 }
             }
