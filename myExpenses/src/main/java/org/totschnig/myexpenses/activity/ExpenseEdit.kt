@@ -22,8 +22,6 @@ import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
@@ -59,7 +57,6 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.snackbar.Snackbar
 import com.theartofdev.edmodo.cropper.CropImage
 import kotlinx.coroutines.Dispatchers
-import org.totschnig.myexpenses.domain.commitment.ContextChipData
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
@@ -339,7 +336,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     rootBinding.Payee.party?.id,
                     if (catId != 0L) catId else null
                 )
-                updateDynamicContextChips()
             }
         }
     }
@@ -754,7 +750,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         loadTemplates()
         linkInputsWithLabels()
         observeTags()
-        observeContextChips()
         loadCurrencies()
         observeAutoFillData()
         lifecycleScope.launch {
@@ -881,195 +876,17 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         }
     }
 
-    private fun observeContextChips() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.contextChip.collect { chipData ->
-                    bindContextChip(chipData)
-                }
-            }
-        }
-    }
-
     fun onPayeeChanged(payeeId: Long?) {
         val catId = delegate.catId?.takeIf { it != 0L }
         viewModel.fetchSuggestedTags(payeeId, catId)
-        updateDynamicContextChips()
     }
 
     fun onAmountChanged() {
-        updateDynamicContextChips()
     }
 
     fun onCategoryReset() {
         val payeeId = (delegate as? MainDelegate)?.payeeId
         viewModel.fetchSuggestedTags(payeeId, null)
-        updateDynamicContextChips()
-    }
-
-    fun updateDynamicContextChips() {
-        if (!::viewModel.isInitialized || !::delegate.isInitialized) return
-        val payeeId = (delegate as? MainDelegate)?.payeeId
-        val payeeName = rootBinding.Payee.partyForSave?.name
-        val catId = delegate.catId?.takeIf { it != 0L }
-        val amountPaise = rootBinding.Amount.getAmount(false)?.movePointRight(2)?.toLong()?.let { kotlin.math.abs(it) } ?: 0L
-        viewModel.updateContextChip(payeeId, payeeName, catId, amountPaise)
-    }
-
-    private fun bindContextChip(chipData: ContextChipData?) {
-        if (chipData == null) {
-            rootBinding.ContextChipRow.visibility = View.GONE
-            rootBinding.ContextChipGroup.removeAllViews()
-            return
-        }
-        rootBinding.ContextChipRow.visibility = View.VISIBLE
-        rootBinding.ContextChipGroup.removeAllViews()
-
-        when (chipData) {
-            is ContextChipData.MobilePlan -> {
-                val chip = Chip(this).apply {
-                    isClickable = true
-                    isFocusable = true
-                    text = if (chipData.isBooster) {
-                        "⚡ ${chipData.operator}: Data Booster (0d) ✎"
-                    } else {
-                        "📱 ${chipData.operator}: ${chipData.validityDays} days validity ✎"
-                    }
-                    setOnClickListener {
-                        showMobileValidityDialog(chipData.operator, chipData.validityDays)
-                    }
-                }
-                rootBinding.ContextChipGroup.addView(chip)
-            }
-            is ContextChipData.LinkedCommitment -> {
-                val chip = Chip(this).apply {
-                    isClickable = true
-                    isFocusable = true
-                    text = "🔗 Linked: ${chipData.title} • Due ${chipData.dueDateFormatted}"
-                    setOnClickListener {
-                        showLinkedCommitmentDialog(chipData)
-                    }
-                }
-                rootBinding.ContextChipGroup.addView(chip)
-            }
-            is ContextChipData.UtilityMeters -> {
-                chipData.meters.forEach { meter ->
-                    val icon = when {
-                        chipData.serviceName.contains("Electricity", ignoreCase = true) || chipData.serviceName.contains("TNEB", ignoreCase = true) -> "⚡"
-                        chipData.serviceName.contains("Hathway", ignoreCase = true) || chipData.serviceName.contains("Internet", ignoreCase = true) -> "🌐"
-                        chipData.serviceName.contains("Gas", ignoreCase = true) || chipData.serviceName.contains("BPCL", ignoreCase = true) -> "🔥"
-                        chipData.serviceName.contains("Milk", ignoreCase = true) || chipData.serviceName.contains("Aavin", ignoreCase = true) -> "🥛"
-                        else -> "💡"
-                    }
-                    val chip = Chip(this).apply {
-                        isClickable = true
-                        isFocusable = true
-                        text = "$icon ${meter.label} • ${meter.meterNumber} 📋"
-                        setOnClickListener {
-                            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Consumer Number", meter.meterNumber))
-                            Toast.makeText(this@ExpenseEdit, "${meter.label} (${meter.meterNumber}) copied!", Toast.LENGTH_SHORT).show()
-
-                            if (rootBinding.Comment.text.isNullOrBlank()) {
-                                rootBinding.Comment.setText("${meter.label} (${meter.meterNumber})")
-                            }
-                            val currentAmount = rootBinding.Amount.getAmount(false)?.movePointRight(2)?.toLong() ?: 0L
-                            if (currentAmount == 0L && meter.estimatedAmountPaise > 0L) {
-                                val formatted = java.math.BigDecimal(meter.estimatedAmountPaise).movePointLeft(2)
-                                rootBinding.Amount.setAmount(formatted)
-                            }
-                        }
-                    }
-                    rootBinding.ContextChipGroup.addView(chip)
-                }
-            }
-            is ContextChipData.InsurancePolicies -> {
-                chipData.policies.forEach { policy ->
-                    val chip = Chip(this).apply {
-                        isClickable = true
-                        isFocusable = true
-                        text = "🛡️ ${policy.policyName}: ${policy.policyNumber} 📋"
-                        setOnClickListener {
-                            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Policy Number", policy.policyNumber))
-                            Toast.makeText(this@ExpenseEdit, "${policy.policyName} policy copied!", Toast.LENGTH_SHORT).show()
-
-                            if (rootBinding.Comment.text.isNullOrBlank()) {
-                                rootBinding.Comment.setText("${policy.policyName} (${policy.policyNumber})")
-                            }
-                            val currentAmount = rootBinding.Amount.getAmount(false)?.movePointRight(2)?.toLong() ?: 0L
-                            if (currentAmount == 0L && policy.premiumAmount > 0L) {
-                                val formatted = java.math.BigDecimal(policy.premiumAmount).movePointLeft(2)
-                                rootBinding.Amount.setAmount(formatted)
-                            }
-                        }
-                    }
-                    rootBinding.ContextChipGroup.addView(chip)
-                }
-            }
-        }
-    }
-
-    private fun showMobileValidityDialog(operator: String, currentValidityDays: Int) {
-        val options = arrayOf(
-            "28 Days (1 Month)",
-            "56 Days (2 Months)",
-            "84 Days (3 Months)",
-            "365 Days (1 Year)",
-            "0 Days (Data Booster / Add-on)",
-            "Custom days..."
-        )
-        val daysValues = intArrayOf(28, 56, 84, 365, 0)
-
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle("$operator Plan Validity")
-            .setItems(options) { _, which ->
-                if (which < daysValues.size) {
-                    applyCustomValidityDays(daysValues[which])
-                } else {
-                    showCustomDaysInputDialog(operator)
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun applyCustomValidityDays(days: Int) {
-        val currentComment = rootBinding.Comment.text.toString()
-        val regex = Regex("""(?i)\s*\[?\d+\s*d(?:ays)?(?:\s*validity)?\]?""")
-        val cleaned = currentComment.replace(regex, "").trim()
-        val newTag = if (days > 0) "[$days days validity]" else "[Data Booster 0d]"
-        val updatedComment = if (cleaned.isEmpty()) newTag else "$cleaned $newTag"
-        rootBinding.Comment.setText(updatedComment)
-        updateDynamicContextChips()
-    }
-
-    private fun showCustomDaysInputDialog(operator: String) {
-        val input = android.widget.EditText(this).apply {
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            hint = "Enter validity in days (e.g. 70)"
-        }
-        val container = android.widget.FrameLayout(this).apply {
-            setPadding(48, 16, 48, 16)
-            addView(input)
-        }
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle("Custom Validity ($operator)")
-            .setView(container)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val days = input.text.toString().toIntOrNull() ?: 28
-                applyCustomValidityDays(days)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun showLinkedCommitmentDialog(data: ContextChipData.LinkedCommitment) {
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle("Linked Commitment")
-            .setMessage("This transaction matches '${data.title}'. Saving it will automatically mark this obligation as paid.")
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
     }
 
     private fun loadTemplates() {
@@ -1288,7 +1105,6 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             (delegate as? MainDelegate)?.payeeId,
             delegate.catId?.takeIf { it != 0L }
         )
-        updateDynamicContextChips()
         invalidateOptionsMenu()
     }
 
