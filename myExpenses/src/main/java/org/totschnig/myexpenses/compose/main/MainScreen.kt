@@ -279,8 +279,7 @@ fun MainScreenAdaptive(
                     (isRail && fontScale >= 1.3f && isAdLoaded.value)
             )
 
-    val maxQuickItems = if (
-        (layoutType == NavigationSuiteType.ShortNavigationBarMedium) || isRail) 2 else 1
+    val maxQuickItems = 2
 
     val quickItems = menuConfig.take(maxQuickItems)
     val overflowItems = menuConfig.drop(maxQuickItems)
