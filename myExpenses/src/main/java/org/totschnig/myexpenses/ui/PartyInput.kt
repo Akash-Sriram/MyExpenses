@@ -37,6 +37,7 @@ import org.totschnig.myexpenses.provider.TABLE_PAYEES
 import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.provider.getLongOrNull
 import org.totschnig.myexpenses.provider.getString
+import org.totschnig.myexpenses.provider.getStringIfExists
 import org.totschnig.myexpenses.provider.getStringOrNull
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
@@ -57,8 +58,8 @@ data class DisplayParty(
             DisplayParty(
                 it,
                 cursor.getString(KEY_PAYEE_NAME),
-                cursor.getStringOrNull(KEY_SHORT_NAME),
-                cursor.getStringOrNull(KEY_IBAN)
+                cursor.getStringIfExists(KEY_SHORT_NAME),
+                cursor.getStringIfExists(KEY_IBAN)
             )
         }
     }
