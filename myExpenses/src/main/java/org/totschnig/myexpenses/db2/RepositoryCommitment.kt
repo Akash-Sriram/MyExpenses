@@ -1035,6 +1035,12 @@ class RepositoryCommitment @Inject constructor(
                 .toInstant()
                 .toEpochMilli()
 
+            // Clean up any duplicate pending records that match already paid cycles
+            db.execSQL(
+                "DELETE FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = 'INSURANCE' AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ? AND $KEY_DUE_DATE IN (SELECT $KEY_DUE_DATE FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = 'INSURANCE' AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?)",
+                arrayOf(policy.id.toString(), PaymentRecordStatus.PENDING.name, policy.id.toString(), PaymentRecordStatus.PAID.name)
+            )
+
             val pendingExists = db.query(
                 "SELECT COUNT(*) FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?",
                 arrayOf("INSURANCE", policy.id.toString(), PaymentRecordStatus.PENDING.name)
@@ -1055,6 +1061,11 @@ class RepositoryCommitment @Inject constructor(
                     nextCv,
                     "$KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?",
                     arrayOf("INSURANCE", policy.id.toString(), PaymentRecordStatus.PENDING.name)
+                )
+                db.delete(
+                    TABLE_COMMITMENT_PAYMENTS,
+                    "$KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ? AND $KEY_DUE_DATE != ?",
+                    arrayOf("INSURANCE", policy.id.toString(), PaymentRecordStatus.PENDING.name, nextDueMillis.toString())
                 )
             } else {
                 db.insert(TABLE_COMMITMENT_PAYMENTS, SQLiteDatabase.CONFLICT_NONE, nextCv)
@@ -1199,25 +1210,32 @@ class RepositoryCommitment @Inject constructor(
                 }
                 val scheduledDueMillis = estimatedDueLocalDate.atTime(LocalTime.of(9, 0)).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
+                val matchedMeter = if (subscription.isVariableAmount && utilityMeters.isNotEmpty()) {
+                    utilityMeters.firstOrNull { m ->
+                        (m.meterNumber.isNotBlank() && tx.comment.contains(m.meterNumber, ignoreCase = true)) ||
+                        (m.meterLabel.isNotBlank() && tx.comment.contains(m.meterLabel, ignoreCase = true)) ||
+                        (m.matchingKeywords.isNotBlank() && m.matchingKeywords.split(",").any { kw -> kw.trim().isNotEmpty() && tx.comment.contains(kw.trim(), ignoreCase = true) }) ||
+                        (m.estimatedAmount > 0L && kotlin.math.abs(tx.amount - m.estimatedAmount) <= 10000L)
+                    } ?: if (utilityMeters.size == 1) utilityMeters.first() else null
+                } else null
+
                 if (exists) {
-                    // Realign previously matched cycle to the current renewal day
+                    // Realign previously matched cycle to the current renewal day and update meter info
+                    val updateCv = ContentValues().apply {
+                        put(KEY_DUE_DATE, scheduledDueMillis)
+                        if (matchedMeter != null) {
+                            put(KEY_METER_ID, matchedMeter.id)
+                            put("notes", "Meter: ${matchedMeter.meterLabel} • Consumer #${matchedMeter.meterNumber}")
+                        }
+                    }
                     db.update(
                         TABLE_COMMITMENT_PAYMENTS,
                         SQLiteDatabase.CONFLICT_NONE,
-                        ContentValues().apply { put(KEY_DUE_DATE, scheduledDueMillis) },
+                        updateCv,
                         "$KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_TRANSACTION_ID = ?",
                         arrayOf("SUBSCRIPTION", subscription.id.toString(), tx.txId.toString())
                     )
                 } else {
-                    val matchedMeter = if (subscription.isVariableAmount && utilityMeters.isNotEmpty()) {
-                        utilityMeters.firstOrNull { m ->
-                            (m.meterNumber.isNotBlank() && tx.comment.contains(m.meterNumber, ignoreCase = true)) ||
-                            (m.meterLabel.isNotBlank() && tx.comment.contains(m.meterLabel, ignoreCase = true)) ||
-                            (m.matchingKeywords.isNotBlank() && m.matchingKeywords.split(",").any { kw -> kw.trim().isNotEmpty() && tx.comment.contains(kw.trim(), ignoreCase = true) }) ||
-                            (m.estimatedAmount > 0L && kotlin.math.abs(tx.amount - m.estimatedAmount) <= 10000L)
-                        }
-                    } else null
-
                     val pendingRecord = db.query(
                         "SELECT $KEY_ROWID, $KEY_DUE_DATE FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?",
                         arrayOf("SUBSCRIPTION", subscription.id.toString(), PaymentRecordStatus.PENDING.name)
@@ -1272,10 +1290,15 @@ class RepositoryCommitment @Inject constructor(
                 while (attempts < 120) {
                     attempts++
                     val cycleMillis = cycleDate.atTime(LocalTime.of(9, 0)).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    val paidMetersInCycle = db.query(
-                        "SELECT $KEY_METER_ID FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ? AND ABS($KEY_DUE_DATE - ?) <= ?",
+                    val paidRecordsInCycle = db.query(
+                        "SELECT $KEY_ROWID, $KEY_METER_ID FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ? AND ABS($KEY_DUE_DATE - ?) <= ?",
                         arrayOf("SUBSCRIPTION", subscription.id.toString(), PaymentRecordStatus.PAID.name, cycleMillis.toString(), tolerance.toString())
-                    ).useAndMapToList { it.getLongOrNull(KEY_METER_ID) }.filterNotNull().toSet()
+                    ).useAndMapToList { Pair(it.getLong(0), it.getLongOrNull(KEY_METER_ID)) }
+
+                    val paidMetersInCycle = paidRecordsInCycle.mapNotNull { it.second }.toMutableSet()
+                    if (utilityMeters.size == 1 && paidRecordsInCycle.isNotEmpty()) {
+                        paidMetersInCycle.add(utilityMeters.first().id)
+                    }
 
                     val allMetersPaid = utilityMeters.all { it.id in paidMetersInCycle }
                     if (!allMetersPaid && !cycleDate.isBefore(today.minusMonths(intervalMonths.toLong()))) {
@@ -1323,6 +1346,12 @@ class RepositoryCommitment @Inject constructor(
                 arrayOf(subscription.id.toString())
             )
 
+            // Clean up any duplicate pending records that match already paid cycles
+            db.execSQL(
+                "DELETE FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = 'SUBSCRIPTION' AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ? AND $KEY_DUE_DATE IN (SELECT $KEY_DUE_DATE FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = 'SUBSCRIPTION' AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?)",
+                arrayOf(subscription.id.toString(), PaymentRecordStatus.PENDING.name, subscription.id.toString(), PaymentRecordStatus.PAID.name)
+            )
+
             val pendingExists = db.query(
                 "SELECT COUNT(*) FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?",
                 arrayOf("SUBSCRIPTION", subscription.id.toString(), PaymentRecordStatus.PENDING.name)
@@ -1343,6 +1372,11 @@ class RepositoryCommitment @Inject constructor(
                     nextCv,
                     "$KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?",
                     arrayOf("SUBSCRIPTION", subscription.id.toString(), PaymentRecordStatus.PENDING.name)
+                )
+                db.delete(
+                    TABLE_COMMITMENT_PAYMENTS,
+                    "$KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ? AND $KEY_DUE_DATE != ?",
+                    arrayOf("SUBSCRIPTION", subscription.id.toString(), PaymentRecordStatus.PENDING.name, nextDueMillis.toString())
                 )
             } else {
                 db.insert(TABLE_COMMITMENT_PAYMENTS, SQLiteDatabase.CONFLICT_NONE, nextCv)
@@ -1444,6 +1478,7 @@ class RepositoryCommitment @Inject constructor(
 
                     meters.map { meter ->
                         val paymentForMeter = cyclePayments.firstOrNull { it.meterId == meter.id }
+                            ?: if (meters.size == 1 && cyclePayments.isNotEmpty()) cyclePayments.first() else null
                         val cycleCalculatedAmount = runCatching { meter.calculateAmountForDate(targetCycleDue) }.getOrDefault(meter.estimatedAmount)
                         MeterCycleStatus(
                             meter = meter,
