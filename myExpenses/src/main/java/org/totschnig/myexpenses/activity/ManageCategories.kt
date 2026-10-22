@@ -217,14 +217,7 @@ class ManageCategories : ProtectedFragmentActivity(),
                         }
                         LaunchedEffect(selectionStateForMapping.value) {
                             selectionStateForMapping.value?.let {
-                                if (it.level > 2) {
-                                    contribFeatureRequested(
-                                        ContribFeature.CATEGORY_TREE,
-                                        R.id.SELECT_COMMAND to it
-                                    )
-                                } else {
-                                    doSingleSelection(it)
-                                }
+                                doSingleSelection(it)
                             }
                         }
                         ChoiceMode.SingleChoiceMode(
@@ -373,14 +366,7 @@ class ManageCategories : ProtectedFragmentActivity(),
                                                             command = "CREATE_SUBCATEGORY",
                                                             icon = Icons.Filled.Add
                                                         ) {
-                                                            if (cat.level > 1) {
-                                                                contribFeatureRequested(
-                                                                    ContribFeature.CATEGORY_TREE,
-                                                                    R.id.CREATE_SUB_COMMAND to cat
-                                                                )
-                                                            } else {
-                                                                createCat(cat)
-                                                            }
+                                                            createCat(cat)
                                                         },
                                                         MenuEntry(
                                                             label = R.string.menu_move,
