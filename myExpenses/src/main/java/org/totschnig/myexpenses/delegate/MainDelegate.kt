@@ -200,6 +200,7 @@ abstract class MainDelegate(
             withInputMethodNeeded = configurator[AUTO_COMPLETE_DROPDOWN_SET_INPUT_METHOD_NEEDED, true]
         ) { partyId ->
             handleDebts()
+            host.onPayeeChanged(partyId)
             if (partyId != null) {
                 if (withAutoFill && shouldAutoFill) {
                     if (shouldStartAutoFill(prefHandler)) {

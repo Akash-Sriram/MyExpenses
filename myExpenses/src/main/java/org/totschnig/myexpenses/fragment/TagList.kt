@@ -15,6 +15,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updatePadding
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
@@ -149,9 +150,16 @@ class TagList : Fragment(), OnDialogResultListener {
         binding.recyclerView.adapter = adapter
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.tags.collect {
+                viewModel.filteredTags.collect {
                     adapter.submitList(it)
-                    binding.emptyView.isVisible = it.isEmpty() && allowModifications
+                    val query = viewModel.searchFilter.value.trim()
+                    if (query.isNotEmpty() && it.isEmpty()) {
+                        binding.emptyView.text = getString(R.string.no_tags_matching, query)
+                        binding.emptyView.isVisible = true
+                    } else {
+                        binding.emptyView.setText(R.string.help_ManageTags_manage_info)
+                        binding.emptyView.isVisible = it.isEmpty() && allowModifications
+                    }
                 }
             }
         }
@@ -162,6 +170,9 @@ class TagList : Fragment(), OnDialogResultListener {
 
         binding.tagEdit.apply {
             if (allowModifications) {
+                doAfterTextChanged { text ->
+                    viewModel.setSearchFilter(text?.toString() ?: "")
+                }
                 setOnEditorActionListener { _, actionId, event: KeyEvent? ->
                     return@setOnEditorActionListener when (actionId) {
                         EditorInfo.IME_ACTION_DONE -> {
@@ -180,7 +191,7 @@ class TagList : Fragment(), OnDialogResultListener {
                     }
                 }
             } else {
-                visibility = View.GONE
+                binding.searchInputLayout.visibility = View.GONE
             }
         }
         ViewCompat.setOnApplyWindowInsetsListener(binding.recyclerView, { v, insets ->
@@ -219,6 +230,7 @@ class TagList : Fragment(), OnDialogResultListener {
             } else {
                 viewLifecycleOwner.lifecycleScope.launch {
                     val tag = viewModel.addTagAndPersist(label)
+                    tag?.let { viewModel.toggleSelectedTagId(it.id) }
                     if (commit) {
                         commit(tag)
                     }
@@ -251,6 +263,7 @@ class TagList : Fragment(), OnDialogResultListener {
             KEY_TAG_LIST,
             ArrayList(
                 buildList {
+                    addAll(viewModel.allTags)
                     addAll(adapter.currentList)
                     newTag?.let { add(it) }
                 }

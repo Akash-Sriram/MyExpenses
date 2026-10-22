@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.R
+import timber.log.Timber
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_SPLIT
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_TRANSFER
 import org.totschnig.myexpenses.db2.RepositoryTemplate
@@ -58,6 +59,7 @@ import org.totschnig.myexpenses.exception.UnknownPictureSaveException
 import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.model.CurrencyUnit
+import org.totschnig.myexpenses.domain.commitment.ContextChipData
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.model.generateUuid
 import org.totschnig.myexpenses.model.sort.Sort
@@ -138,6 +140,15 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
 
     private val _autoFillData: MutableStateFlow<AutoFillData?> = MutableStateFlow(null)
     val autoFillData: StateFlow<AutoFillData?> = _autoFillData
+
+    private val _contextChip: MutableStateFlow<ContextChipData?> = MutableStateFlow(null)
+    val contextChip: StateFlow<ContextChipData?> = _contextChip
+
+    fun updateContextChip(payeeId: Long?, payeeName: String?, catId: Long?, amountPaise: Long) {
+        viewModelScope.launch {
+            _contextChip.value = repositoryCommitment.getContextChipInfo(payeeId, payeeName, catId, amountPaise)
+        }
+    }
 
     private val methods = MutableLiveData<List<PaymentMethod>>()
     fun getMethods(): LiveData<List<PaymentMethod>> = methods
@@ -301,6 +312,11 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                 repository.addAttachments(result.id, newAttachmentUris)
                 result.transferPeer?.let {
                     repository.addAttachments(it, newAttachmentUris)
+                }
+                try {
+                    repositoryCommitment.resyncAllCommitments()
+                } catch (e: Exception) {
+                    Timber.e(e, "Error resyncing commitments after transaction save")
                 }
             }
 
@@ -721,9 +737,6 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
             addAll(attachmentUris.value)
             addAll(uris)
         })
-        for (uri in uris) {
-            checkAndScanUpiReceipt(uri)
-        }
     }
 
     fun removeAttachmentUri(uri: Uri) {

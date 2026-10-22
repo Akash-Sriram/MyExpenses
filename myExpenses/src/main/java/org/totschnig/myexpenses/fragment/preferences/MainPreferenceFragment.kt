@@ -21,7 +21,6 @@ import org.totschnig.myexpenses.preference.PopupMenuPreference
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.util.AppDirHelper
 import org.totschnig.myexpenses.viewmodel.SettingsViewModel
-import java.util.Locale
 
 @SuppressLint("RestrictedApi")
 class MainPreferenceFragment : BasePreferenceFragment(),
@@ -107,9 +106,6 @@ class MainPreferenceFragment : BasePreferenceFragment(),
         requirePreference<Preference>(PrefKey.CATEGORY_IO).title = ioTitle
         requirePreference<Preference>(PrefKey.CATEGORY_BACKUP_RESTORE).title = backupRestoreTitle
         requirePreference<Preference>(PrefKey.CATEGORY_SECURITY).title = protectionTitle
-        with(requirePreference<Preference>(PrefKey.BANKING_FINTS)) {
-            summary = "FinTS (${Locale.GERMANY.displayCountry})"
-        }
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -237,7 +233,6 @@ class MainPreferenceFragment : BasePreferenceFragment(),
 
         super.onPreferenceTreeClick(preference) -> true
 
-        handleContrib(PrefKey.BANKING_FINTS, ContribFeature.BANKING, preference) -> true
         else -> false
     }
 

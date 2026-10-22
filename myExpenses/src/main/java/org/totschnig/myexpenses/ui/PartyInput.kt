@@ -140,6 +140,9 @@ class PartyInput @JvmOverloads constructor(
             party = null
             switchView(INDEX_AUTOCOMPLETE_TEXTVIEW)
             autoCompleteTextView.requestFocus()
+            if (::partySelectListener.isInitialized) {
+                partySelectListener.onPartySelected(null)
+            }
         }
 
         selectedItemChip.setOnCloseIconClickListener {

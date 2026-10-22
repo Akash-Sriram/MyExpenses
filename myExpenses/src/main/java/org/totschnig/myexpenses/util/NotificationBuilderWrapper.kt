@@ -19,6 +19,7 @@ const val CHANNEL_ID_SYNC = "sync"
 const val CHANNEL_ID_PLANNER = "planner"
 const val CHANNEL_ID_DEFAULT = "default"
 const val CHANNEL_ID_AUTO_BACKUP = "autoBackup"
+const val CHANNEL_ID_LOANS = "loans"
 
 class NotificationBuilderWrapper(
     private val context: Context,
@@ -86,6 +87,7 @@ class NotificationBuilderWrapper(
         const val CHANNEL_ID_PLANNER = org.totschnig.myexpenses.util.CHANNEL_ID_PLANNER
         const val CHANNEL_ID_DEFAULT = org.totschnig.myexpenses.util.CHANNEL_ID_DEFAULT
         const val CHANNEL_ID_AUTO_BACKUP = org.totschnig.myexpenses.util.CHANNEL_ID_AUTO_BACKUP
+        const val CHANNEL_ID_LOANS = org.totschnig.myexpenses.util.CHANNEL_ID_LOANS
 
         @JvmStatic
         fun createChannels(context: Context) {
@@ -120,6 +122,13 @@ class NotificationBuilderWrapper(
                     CHANNEL_ID_AUTO_BACKUP,
                     context.getString(R.string.pref_auto_backup_title),
                     importance
+                )
+            )
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID_LOANS,
+                    context.getString(R.string.loan_due_notification_channel),
+                    NotificationManager.IMPORTANCE_HIGH
                 )
             )
         }

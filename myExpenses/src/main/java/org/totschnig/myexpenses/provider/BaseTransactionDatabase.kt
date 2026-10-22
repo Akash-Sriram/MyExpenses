@@ -31,7 +31,7 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import timber.log.Timber
 import kotlin.math.pow
 
-const val DATABASE_VERSION = 191
+const val DATABASE_VERSION = 196
 
 private const val RAISE_UPDATE_SEALED_DEBT = "SELECT RAISE (FAIL, 'attempt to update sealed debt');"
 private const val RAISE_INCONSISTENT_CATEGORY_HIERARCHY =
@@ -261,7 +261,8 @@ CREATE TABLE $TABLE_LOANS (
     $KEY_START_DATE integer not null,
     $KEY_DUE_DAY_OF_MONTH integer not null,
     $KEY_LINKED_ACCOUNT_ID integer references $TABLE_ACCOUNTS($KEY_ROWID) ON DELETE SET NULL,
-    $KEY_STATUS text not null default 'ACTIVE'
+    $KEY_STATUS text not null default 'ACTIVE',
+    auto_debit integer not null default 0
 );
 """
 
@@ -297,6 +298,102 @@ CREATE TABLE $TABLE_CREDIT_CARD_DETAILS (
     $KEY_LAST_STATEMENT_DATE integer,
     $KEY_LAST_DUE_DATE integer
 );
+"""
+
+const val INSURANCE_POLICIES_CREATE = """
+CREATE TABLE $TABLE_INSURANCE_POLICIES (
+    $KEY_ROWID integer primary key autoincrement,
+    $KEY_POLICY_NAME text not null,
+    $KEY_POLICY_NUMBER text,
+    $KEY_INSURER_NAME text not null,
+    $KEY_INSURANCE_TYPE text not null,
+    $KEY_PREMIUM_AMOUNT integer not null,
+    $KEY_FREQUENCY text not null,
+    $KEY_START_DATE integer not null,
+    $KEY_END_DATE integer,
+    $KEY_DUE_DAY_OF_MONTH integer not null,
+    $KEY_DUE_MONTH integer,
+    $KEY_SUM_ASSURED integer default 0,
+    $KEY_LINKED_ACCOUNT_ID integer references $TABLE_ACCOUNTS($KEY_ROWID) ON DELETE SET NULL,
+    $KEY_TEMPLATE_ID integer references $TABLE_TEMPLATES($KEY_ROWID) ON DELETE SET NULL,
+    $KEY_AUTO_DEBIT integer not null default 0,
+    $KEY_STATUS text not null default 'ACTIVE',
+    payer_mode text not null default 'SELF',
+    $KEY_PAYEEID integer references $TABLE_PAYEES($KEY_ROWID) ON DELETE SET NULL
+);
+"""
+
+const val SUBSCRIPTIONS_CREATE = """
+CREATE TABLE $TABLE_SUBSCRIPTIONS (
+    $KEY_ROWID integer primary key autoincrement,
+    $KEY_SERVICE_NAME text not null,
+    $KEY_BILLING_CYCLE text not null,
+    $KEY_AMOUNT integer not null,
+    $KEY_CATID integer references $TABLE_CATEGORIES($KEY_ROWID) ON DELETE SET NULL,
+    $KEY_START_DATE integer not null,
+    $KEY_NEXT_RENEWAL_DATE integer not null,
+    $KEY_LINKED_ACCOUNT_ID integer references $TABLE_ACCOUNTS($KEY_ROWID) ON DELETE SET NULL,
+    $KEY_TEMPLATE_ID integer references $TABLE_TEMPLATES($KEY_ROWID) ON DELETE SET NULL,
+    $KEY_AUTO_DEBIT integer not null default 0,
+    $KEY_STATUS text not null default 'ACTIVE',
+    $KEY_NOTES text,
+    $KEY_PAYEEID integer references $TABLE_PAYEES($KEY_ROWID) ON DELETE SET NULL,
+    is_variable_amount integer default 0,
+    cancel_before_renewal integer default 0
+);
+"""
+
+const val COMMITMENT_PAYMENTS_CREATE = """
+CREATE TABLE $TABLE_COMMITMENT_PAYMENTS (
+    $KEY_ROWID integer primary key autoincrement,
+    $KEY_COMMITMENT_TYPE text not null,
+    $KEY_COMMITMENT_ID integer not null,
+    $KEY_DUE_DATE integer not null,
+    $KEY_AMOUNT integer not null,
+    $KEY_PAID_DATE integer,
+    $KEY_TRANSACTION_ID integer references $TABLE_TRANSACTIONS($KEY_ROWID) ON DELETE SET NULL,
+    $KEY_STATUS text not null default 'PENDING',
+    payer text not null default 'SELF',
+    notes text,
+    $KEY_METER_ID integer references $TABLE_UTILITY_METERS($KEY_ROWID) ON DELETE SET NULL
+);
+"""
+
+const val COMMITMENT_PAYMENTS_IDX = """
+CREATE INDEX IF NOT EXISTS commitment_payments_idx on $TABLE_COMMITMENT_PAYMENTS($KEY_COMMITMENT_TYPE, $KEY_COMMITMENT_ID);
+"""
+
+const val UTILITY_METERS_CREATE = """
+CREATE TABLE $TABLE_UTILITY_METERS (
+    $KEY_ROWID integer primary key autoincrement,
+    $KEY_SUBSCRIPTION_ID integer not null references $TABLE_SUBSCRIPTIONS($KEY_ROWID) ON DELETE CASCADE,
+    $KEY_METER_NUMBER text not null,
+    $KEY_METER_LABEL text not null,
+    $KEY_ESTIMATED_AMOUNT integer not null,
+    $KEY_MATCHING_KEYWORDS text,
+    $KEY_CREATED_AT integer not null,
+    $KEY_UNIT_PRICE integer not null default 0,
+    $KEY_UNITS_PER_DAY real not null default 0.0
+);
+"""
+
+const val UTILITY_METERS_IDX = """
+CREATE INDEX IF NOT EXISTS utility_meters_sub_idx on $TABLE_UTILITY_METERS($KEY_SUBSCRIPTION_ID);
+"""
+
+const val COMMITMENT_ATTACHMENTS_CREATE = """
+CREATE TABLE $TABLE_COMMITMENT_ATTACHMENTS (
+    $KEY_ROWID integer primary key autoincrement,
+    $KEY_COMMITMENT_TYPE text not null,
+    $KEY_COMMITMENT_ID integer not null,
+    $KEY_URI text not null,
+    label text,
+    $KEY_CREATED_AT integer not null
+);
+"""
+
+const val COMMITMENT_ATTACHMENTS_IDX = """
+CREATE INDEX IF NOT EXISTS commitment_attachments_idx on $TABLE_COMMITMENT_ATTACHMENTS($KEY_COMMITMENT_TYPE, $KEY_COMMITMENT_ID);
 """
 
 const val ATTACHMENTS_CREATE = """
@@ -1199,6 +1296,49 @@ abstract class BaseTransactionDatabase(
         execSQL(EMI_INSTALLMENTS_CREATE)
         execSQL(EMI_INSTALLMENTS_LOAN_ID_INDEX)
         execSQL(CREDIT_CARD_DETAILS_CREATE)
+    }
+
+    fun SupportSQLiteDatabase.upgradeTo192() {
+        try {
+            execSQL("ALTER TABLE $TABLE_LOANS ADD COLUMN auto_debit integer not null default 0")
+        } catch (e: Exception) {
+            Timber.w(e, "auto_debit column might already exist")
+        }
+    }
+
+    fun SupportSQLiteDatabase.upgradeTo193() {
+        execSQL(INSURANCE_POLICIES_CREATE)
+        execSQL(SUBSCRIPTIONS_CREATE)
+        execSQL(COMMITMENT_PAYMENTS_CREATE)
+        execSQL(COMMITMENT_PAYMENTS_IDX)
+    }
+
+    fun SupportSQLiteDatabase.upgradeTo194() {
+        execSQL(UTILITY_METERS_CREATE)
+        execSQL(UTILITY_METERS_IDX)
+        try {
+            execSQL("ALTER TABLE $TABLE_COMMITMENT_PAYMENTS ADD COLUMN $KEY_METER_ID integer references $TABLE_UTILITY_METERS($KEY_ROWID) ON DELETE SET NULL")
+        } catch (e: Exception) {
+            Timber.w(e, "meter_id column might already exist")
+        }
+    }
+
+    fun SupportSQLiteDatabase.upgradeTo195() {
+        try {
+            execSQL("ALTER TABLE $TABLE_UTILITY_METERS ADD COLUMN $KEY_UNIT_PRICE integer not null default 0")
+        } catch (e: Exception) {
+            Timber.w(e, "unit_price column might already exist")
+        }
+        try {
+            execSQL("ALTER TABLE $TABLE_UTILITY_METERS ADD COLUMN $KEY_UNITS_PER_DAY real not null default 0.0")
+        } catch (e: Exception) {
+            Timber.w(e, "units_per_day column might already exist")
+        }
+    }
+
+    fun SupportSQLiteDatabase.upgradeTo196() {
+        execSQL(COMMITMENT_ATTACHMENTS_CREATE)
+        execSQL(COMMITMENT_ATTACHMENTS_IDX)
     }
 
     protected fun SupportSQLiteDatabase.createOrRefreshAccountTriggers() {

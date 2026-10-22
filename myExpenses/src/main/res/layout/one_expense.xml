@@ -290,6 +290,29 @@
                 </TableRow>
 
                 <TableRow
+                    android:id="@+id/ContextChipRow"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/ContextChipLabel"
+                        style="@style/FormLabel"
+                        android:text="@string/menu_commitments" />
+
+                    <HorizontalScrollView
+                        style="@style/FormField"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:scrollbars="none">
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/ContextChipGroup"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:singleLine="true" />
+                    </HorizontalScrollView>
+                </TableRow>
+
+                <TableRow
                     android:id="@+id/DebtRow"
                     android:visibility="gone">
 

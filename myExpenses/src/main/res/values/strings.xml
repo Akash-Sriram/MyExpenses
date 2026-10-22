@@ -289,7 +289,7 @@
     <!-- %s is replaced with format (CSV, QIF) -->
     <string name="qif_parse_failure_found_multiple_accounts">Multiple accounts found in %s file.</string>
     <string name="qif_parse_failure_found_multiple_accounts_cannot_merge">Cannot merge them into existing account.</string>
-    <string name="reference_number">Reference Number</string>
+    <string name="reference_number">UPI Ref / UTR / Txn ID</string>
     <string name="restore_db_failure">Database restore failed.</string>
     <string name="restore_db_success">Database has been restored from backup.</string>
     <string name="restore_preferences_failure">Preferences restore failed</string>
@@ -398,6 +398,8 @@
     <string name="search_payee">Search for counterparty</string>
     <string name="search_method">Search for method</string>
     <string name="search_tag">Search for tag</string>
+    <string name="search_tags_or_add">Search tags or type to create…</string>
+    <string name="no_tags_matching">No tags matching \"%1$s\"</string>
     <string name="and">and</string>
     <string name="between_and">between %1$s and %2$s</string>
     <string name="before">before %s</string>
@@ -1201,6 +1203,14 @@
     <string name="next_emi_due">Next EMI Due: %1$s (%2$s)</string>
     <string name="amortization_schedule">Amortization Schedule</string>
     <string name="save_loan">Save Loan &amp; Generate Schedule</string>
+    <string name="edit_loan">Edit Loan</string>
+    <string name="update_loan">Update Loan</string>
+    <string name="convert_to_loan">Convert to Loan</string>
+    <string name="link_transaction">Link Transaction</string>
+    <string name="unlink_transaction">Unlink Transaction</string>
+    <string name="select_transaction_to_link">Select Transaction to Link</string>
+    <string name="no_candidate_transactions">No eligible transactions found in this account.</string>
+    <string name="convert_plan_title">Convert Recurring Plan to Loan</string>
 
     <!-- Credit Card Due Tracking -->
     <string name="tab_loans">Loans &amp; EMIs</string>
@@ -1230,4 +1240,39 @@
     <string name="template_applied_success">Transaction created successfully</string>
     <string name="delete_template_confirm">Delete template \"%1$s\"?</string>
     <string name="delete_plan_confirm">Delete recurring plan \"%1$s\"?</string>
+    <string name="auto_debit_loan">Auto-debit on due date</string>
+    <string name="auto_debit_loan_desc">Automatically record debit transaction from linked account on due day</string>
+    <string name="emi_due_today">EMI Due Today</string>
+    <string name="emi_auto_debited">EMI Auto-Debited</string>
+    <string name="pay_now">Pay Now</string>
+    <string name="pay_emi">Pay EMI</string>
+    <string name="emi_paid_success">EMI marked as paid</string>
+    <string name="loan_due_notification_channel">Loan &amp; EMI Reminders</string>
+    <string name="resync_transactions">Auto-match account transactions</string>
+    <string name="matched_emi_transactions">Linked %d EMI payments from account</string>
+    <string name="menu_commitments">Commitments</string>
+    <string name="tab_all">All</string>
+    <string name="tab_insurance">Insurance</string>
+    <string name="tab_subscriptions">Subscriptions</string>
+    <string name="add_insurance">Add Insurance Policy</string>
+    <string name="edit_insurance">Edit Insurance Policy</string>
+    <string name="insurance_policy_name">Policy Name</string>
+    <string name="insurer_name">Insurer / Company</string>
+    <string name="policy_number">Policy Number</string>
+    <string name="premium_amount">Premium Amount</string>
+    <string name="premium_frequency">Premium Frequency</string>
+    <string name="sum_assured">Sum Assured</string>
+    <string name="maturity_date">Maturity Date</string>
+    <string name="add_subscription">Add Subscription</string>
+    <string name="edit_subscription">Edit Subscription</string>
+    <string name="service_name">Service Name</string>
+    <string name="billing_cycle">Billing Cycle</string>
+    <string name="subscription_amount">Renewal Amount</string>
+    <string name="convert_to_insurance">Convert to Insurance Policy</string>
+    <string name="convert_to_subscription">Convert to Subscription</string>
+    <string name="total_monthly_obligations">Total Monthly Commitments</string>
+    <string name="monthly_premium">Monthly Eqv</string>
+    <string name="next_due">Next Due</string>
+    <string name="next_renewal">Next Renewal</string>
+    <string name="delete_commitment_confirm">Delete \"%1$s\"?</string>
 </resources>

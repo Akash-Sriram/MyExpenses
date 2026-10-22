@@ -70,6 +70,6 @@ AssetTransfer(
 
     companion object {
         val PORTFOLIO_ACTIONS = listOf(Buy, Sell, Deposit, Withdraw, AssetTransfer)
-        val STANDARD_ACTIONS = listOf(Expense, Income, Transfer, Split, Scan)
+        val STANDARD_ACTIONS = listOf(Expense, Income, Transfer, Scan)
     }
 }

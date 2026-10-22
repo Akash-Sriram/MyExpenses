@@ -11,25 +11,47 @@
 
     <LinearLayout
         style="@style/FormField"
-        android:orientation="horizontal">
+        android:orientation="vertical">
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/TagGroup"
-            android:layout_width="0dp"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_weight="1" />
+            android:orientation="horizontal">
 
-        <ImageView
-            android:id="@+id/TagSelection"
-            style="?actionButtonStyle"
-            android:layout_width="wrap_content"
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/TagGroup"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_weight="1" />
+
+            <ImageView
+                android:id="@+id/TagSelection"
+                style="?actionButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:tooltipText="@string/tags_create_or_select"
+                android:contentDescription="@string/tags_create_or_select"
+                android:focusable="true"
+                app:srcCompat="@drawable/ic_menu_add"
+                tools:ignore="UnusedAttribute" />
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/SuggestedTagsScroll"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:tooltipText="@string/tags_create_or_select"
-            android:contentDescription="@string/tags_create_or_select"
-            android:focusable="true"
-            app:srcCompat="@drawable/ic_menu_add"
-            tools:ignore="UnusedAttribute" />
+            android:layout_marginTop="2dp"
+            android:scrollbars="none"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/SuggestedTagGroup"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleLine="true" />
+        </HorizontalScrollView>
     </LinearLayout>
 </TableRow>

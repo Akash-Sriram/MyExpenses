@@ -52,9 +52,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.chip.Chip
 import com.google.android.material.snackbar.Snackbar
 import com.theartofdev.edmodo.cropper.CropImage
 import kotlinx.coroutines.Dispatchers
+import org.totschnig.myexpenses.domain.commitment.ContextChipData
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
@@ -321,14 +323,20 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
     val categorySelectionLauncher = registerForActivityResult(StartActivityForResult()) { result ->
         if (result.resultCode == RESULT_OK) {
             result.data?.let {
+                val catId = it.getLongExtra(KEY_ROWID, 0)
                 delegate.setCategory(
                     it.getStringExtra(KEY_LABEL),
                     it.getStringExtra(KEY_ICON),
-                    it.getLongExtra(KEY_ROWID, 0),
+                    catId,
                     it.getByteExtra(KEY_TYPE, FLAG_NEUTRAL)
                 )
                 setDirty()
                 showCategoryWarning()
+                viewModel.fetchSuggestedTags(
+                    rootBinding.Payee.party?.id,
+                    if (catId != 0L) catId else null
+                )
+                updateDynamicContextChips()
             }
         }
     }
@@ -743,6 +751,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         loadTemplates()
         linkInputsWithLabels()
         observeTags()
+        observeContextChips()
         loadCurrencies()
         observeAutoFillData()
         lifecycleScope.launch {
@@ -765,11 +774,18 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
     }
 
     private fun handleUpiReceiptData(data: org.totschnig.myexpenses.util.upi.UpiReceiptData) {
-        data.amount?.let { amt ->
-            val expenseAmt = if (data.isExpense) amt.negate() else amt
-            delegate.fillAmount(expenseAmt)
-            delegate.setType(!data.isExpense)
-            delegate.configureType()
+        if (!newInstance) {
+            timber.log.Timber.d("Suppressing UPI receipt autofill for existing transaction")
+            return
+        }
+        val isAmountUnset = amountInput.getUntypedValue(false).getOrNull() == null || amountInput.typedValue.compareTo(BigDecimal.ZERO) == 0
+        if (isAmountUnset) {
+            data.amount?.let { amt ->
+                val expenseAmt = if (data.isExpense) amt.negate() else amt
+                delegate.fillAmount(expenseAmt)
+                delegate.setType(!data.isExpense)
+                delegate.configureType()
+            }
         }
         data.dateTime?.let { dt ->
             dateEditBinding.DateButton.date = dt.toLocalDate()
@@ -777,28 +793,35 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             dateEditBinding.Date2Button.date = dt.toLocalDate()
             dateEditBinding.TimeButton.visibility = View.VISIBLE
         }
-        data.payeeName?.let { name ->
-            lifecycleScope.launch {
-                val payeeId = viewModel.resolvePayeeId(name)
-                if (payeeId != null) {
-                    rootBinding.Payee.party = DisplayParty(payeeId, name)
-                    startAutoFill(payeeId, false)
+        val isPayeeUnset = rootBinding.Payee.party == null || rootBinding.Payee.party?.name.isNullOrBlank()
+        if (isPayeeUnset) {
+            data.payeeName?.let { name ->
+                lifecycleScope.launch {
+                    val payeeId = viewModel.resolvePayeeId(name)
+                    if (payeeId != null) {
+                        rootBinding.Payee.party = DisplayParty(payeeId, name)
+                        startAutoFill(payeeId, false)
+                    }
                 }
             }
         }
         lifecycleScope.launch {
-            val targetMethod = data.paymentMethodHint
-            val methodId = viewModel.findMethodIdForLabel(targetMethod) ?: viewModel.findMethodIdForLabel("UPI")
-            methodId?.let {
-                delegate.methodId = it
-                delegate.setMethodSelection()
+            if (delegate.methodId == null || delegate.methodId == 0L) {
+                val targetMethod = data.paymentMethodHint
+                val methodId = viewModel.findMethodIdForLabel(targetMethod) ?: viewModel.findMethodIdForLabel("UPI")
+                methodId?.let {
+                    delegate.methodId = it
+                    delegate.setMethodSelection()
+                }
             }
-            val accId = (data.accountOrBankHint?.let { viewModel.findAccountIdForHint(it) })
-                ?: viewModel.findDefaultBaseAccountId()
-            accId?.let {
-                val pos = delegate.accountAdapter.getPosition(it)
-                if (pos >= 0) {
-                    delegate.accountSpinner.setSelection(pos)
+            if (delegate.accountId == null || delegate.accountId == 0L) {
+                val accId = (data.accountOrBankHint?.let { viewModel.findAccountIdForHint(it) })
+                    ?: viewModel.findDefaultBaseAccountId()
+                accId?.let {
+                    val pos = delegate.accountAdapter.getPosition(it)
+                    if (pos >= 0) {
+                        delegate.accountSpinner.setSelection(pos)
+                    }
                 }
             }
         }
@@ -845,6 +868,145 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                 }
             }
         }
+        viewModel.suggestedTagsLiveData.observe(this) { suggestedTags ->
+            if (::delegate.isInitialized) {
+                delegate.showSuggestedTags(suggestedTags) { tag ->
+                    viewModel.addTag(tag)
+                    setDirty()
+                }
+            }
+        }
+    }
+
+    private fun observeContextChips() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.contextChip.collect { chipData ->
+                    bindContextChip(chipData)
+                }
+            }
+        }
+    }
+
+    fun onPayeeChanged(payeeId: Long?) {
+        val catId = delegate.catId?.takeIf { it != 0L }
+        viewModel.fetchSuggestedTags(payeeId, catId)
+        updateDynamicContextChips()
+    }
+
+    fun onAmountChanged() {
+        updateDynamicContextChips()
+    }
+
+    fun onCategoryReset() {
+        val payeeId = (delegate as? MainDelegate)?.payeeId
+        viewModel.fetchSuggestedTags(payeeId, null)
+        updateDynamicContextChips()
+    }
+
+    fun updateDynamicContextChips() {
+        if (!::viewModel.isInitialized || !::delegate.isInitialized) return
+        val payeeId = (delegate as? MainDelegate)?.payeeId
+        val payeeName = rootBinding.Payee.partyForSave?.name
+        val catId = delegate.catId?.takeIf { it != 0L }
+        val amountPaise = rootBinding.Amount.getAmount(false)?.movePointRight(2)?.toLong()?.let { kotlin.math.abs(it) } ?: 0L
+        viewModel.updateContextChip(payeeId, payeeName, catId, amountPaise)
+    }
+
+    private fun bindContextChip(chipData: ContextChipData?) {
+        if (chipData == null) {
+            rootBinding.ContextChipRow.visibility = View.GONE
+            rootBinding.ContextChipGroup.removeAllViews()
+            return
+        }
+        rootBinding.ContextChipRow.visibility = View.VISIBLE
+        rootBinding.ContextChipGroup.removeAllViews()
+
+        val chip = Chip(this).apply {
+            isClickable = true
+            isFocusable = true
+            when (chipData) {
+                is ContextChipData.MobilePlan -> {
+                    text = if (chipData.isBooster) {
+                        "⚡ ${chipData.operator}: Data Booster (0d) ✎"
+                    } else {
+                        "📱 ${chipData.operator}: ${chipData.validityDays} days validity ✎"
+                    }
+                    setOnClickListener {
+                        showMobileValidityDialog(chipData.operator, chipData.validityDays)
+                    }
+                }
+                is ContextChipData.LinkedCommitment -> {
+                    text = "🔗 Linked: ${chipData.title} • Due ${chipData.dueDateFormatted}"
+                    setOnClickListener {
+                        showLinkedCommitmentDialog(chipData)
+                    }
+                }
+            }
+        }
+        rootBinding.ContextChipGroup.addView(chip)
+    }
+
+    private fun showMobileValidityDialog(operator: String, currentValidityDays: Int) {
+        val options = arrayOf(
+            "28 Days (1 Month)",
+            "56 Days (2 Months)",
+            "84 Days (3 Months)",
+            "365 Days (1 Year)",
+            "0 Days (Data Booster / Add-on)",
+            "Custom days..."
+        )
+        val daysValues = intArrayOf(28, 56, 84, 365, 0)
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("$operator Plan Validity")
+            .setItems(options) { _, which ->
+                if (which < daysValues.size) {
+                    applyCustomValidityDays(daysValues[which])
+                } else {
+                    showCustomDaysInputDialog(operator)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun applyCustomValidityDays(days: Int) {
+        val currentComment = rootBinding.Comment.text.toString()
+        val regex = Regex("""(?i)\s*\[?\d+\s*d(?:ays)?(?:\s*validity)?\]?""")
+        val cleaned = currentComment.replace(regex, "").trim()
+        val newTag = if (days > 0) "[$days days validity]" else "[Data Booster 0d]"
+        val updatedComment = if (cleaned.isEmpty()) newTag else "$cleaned $newTag"
+        rootBinding.Comment.setText(updatedComment)
+        updateDynamicContextChips()
+    }
+
+    private fun showCustomDaysInputDialog(operator: String) {
+        val input = android.widget.EditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = "Enter validity in days (e.g. 70)"
+        }
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(48, 16, 48, 16)
+            addView(input)
+        }
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Custom Validity ($operator)")
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val days = input.text.toString().toIntOrNull() ?: 28
+                applyCustomValidityDays(days)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showLinkedCommitmentDialog(data: ContextChipData.LinkedCommitment) {
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            .setTitle("Linked Commitment")
+            .setMessage("This transaction matches '${data.title}'. Saving it will automatically mark this obligation as paid.")
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun loadTemplates() {
@@ -998,8 +1160,12 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                 }
             }
         }
+        val shouldExtractOcr = intent.getBooleanExtra(KEY_EXTRACT_OCR, false)
         IntentCompat.getParcelableExtra(intent, KEY_URI, Uri::class.java)?.let {
             viewModel.addAttachmentUris(it)
+            if (shouldExtractOcr) {
+                viewModel.checkAndScanUpiReceipt(it)
+            }
         }
         delegate.setType(intent.getBooleanExtra(KEY_INCOME, false))
         IntentCompat.getSerializableExtra(intent, KEY_AMOUNT, BigDecimal::class.java)?.let {
@@ -1055,6 +1221,11 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             configureFloatingActionButton()
         }
         viewModel.updateTags(transaction.tags, false)
+        viewModel.fetchSuggestedTags(
+            (delegate as? MainDelegate)?.payeeId,
+            delegate.catId?.takeIf { it != 0L }
+        )
+        updateDynamicContextChips()
         invalidateOptionsMenu()
     }
 
@@ -1680,6 +1851,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             overridePreferences,
             intent.getBooleanExtra(KEY_AUTOFILL_MAY_SET_ACCOUNT, false)
         )
+        viewModel.fetchSuggestedTags(id, delegate.catId?.takeIf { it != 0L })
     }
 
     override fun onNegative(args: Bundle) {
@@ -1777,6 +1949,7 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         const val KEY_CREATE_TEMPLATE = "createTemplate"
         const val KEY_AUTOFILL_MAY_SET_ACCOUNT = "autoFillMaySetAccount"
         const val KEY_OCR_RESULT = "ocrResult"
+        const val KEY_EXTRACT_OCR = "extractOcr"
         const val KEY_INCOME = "income"
         const val KEY_PARENT_HAS_DEBT = "parentHasDebt"
 
@@ -1802,6 +1975,10 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     data?.let {
                         (delegate as? CategoryDelegate)?.autoFill(it)
                         viewModel.autoFillDone()
+                        viewModel.fetchSuggestedTags(
+                            rootBinding.Payee.party?.id,
+                            if (it.catId != 0L) it.catId else null
+                        )
                     }
                 }
             }

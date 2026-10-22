@@ -339,6 +339,9 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       db.execSQL("PRAGMA recursive_triggers = ON;");
       db.checkDefaultTransferCategory();
       db.ensurePreDefinedPaymentMethods();
+      runCatching {
+        db.execSQL("ALTER TABLE $TABLE_SUBSCRIPTIONS ADD COLUMN cancel_before_renewal INTEGER DEFAULT 0;")
+      }
     }
 
   }
@@ -443,6 +446,14 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
     db.execSQL(EMI_INSTALLMENTS_CREATE);
     db.execSQL(EMI_INSTALLMENTS_LOAN_ID_INDEX);
     db.execSQL(CREDIT_CARD_DETAILS_CREATE);
+    db.execSQL(INSURANCE_POLICIES_CREATE);
+    db.execSQL(SUBSCRIPTIONS_CREATE);
+    db.execSQL(COMMITMENT_PAYMENTS_CREATE);
+    db.execSQL(COMMITMENT_PAYMENTS_IDX);
+    db.execSQL(UTILITY_METERS_CREATE);
+    db.execSQL(UTILITY_METERS_IDX);
+    db.execSQL(COMMITMENT_ATTACHMENTS_CREATE);
+    db.execSQL(COMMITMENT_ATTACHMENTS_IDX);
 
     super.onCreate(db);
   }
@@ -2084,6 +2095,26 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
 
       if (oldVersion < 191) {
         db.upgradeTo191();
+      }
+
+      if (oldVersion < 192) {
+        db.upgradeTo192();
+      }
+
+      if (oldVersion < 193) {
+        db.upgradeTo193();
+      }
+
+      if (oldVersion < 194) {
+        db.upgradeTo194();
+      }
+
+      if (oldVersion < 195) {
+        db.upgradeTo195();
+      }
+
+      if (oldVersion < 196) {
+        db.upgradeTo196();
       }
 
       TransactionProvider.resumeChangeTrigger(db)

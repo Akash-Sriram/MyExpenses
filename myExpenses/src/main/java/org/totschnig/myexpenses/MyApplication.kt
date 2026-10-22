@@ -57,6 +57,7 @@ import org.totschnig.myexpenses.provider.PlannerUtils
 import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.service.AutoBackupWorker.Companion.enqueueOrCancel
 import org.totschnig.myexpenses.service.BudgetWidgetUpdateWorker
+import org.totschnig.myexpenses.service.LoanDueWorker
 import org.totschnig.myexpenses.service.PlanExecutor
 import org.totschnig.myexpenses.sync.SyncAdapter
 import org.totschnig.myexpenses.ui.ContextHelper
@@ -162,6 +163,7 @@ open class MyApplication : Application(), SharedPreferences.OnSharedPreferenceCh
         licenceHandler.init()
         currencyContext.preload()
         NotificationBuilderWrapper.createChannels(this)
+        LoanDueWorker.enqueue(this)
         if (BuildConfig.DEBUG) {
             contentResolver.persistedUriPermissions.forEach(Consumer { uriPermission: UriPermission? ->
                 Timber.d(

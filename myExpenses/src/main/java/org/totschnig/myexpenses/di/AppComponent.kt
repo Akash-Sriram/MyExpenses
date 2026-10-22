@@ -17,6 +17,7 @@ import org.totschnig.myexpenses.activity.ProtectedFragmentActivity
 import org.totschnig.myexpenses.db2.Repository
 import org.totschnig.myexpenses.db2.RepositoryCreditCard
 import org.totschnig.myexpenses.db2.RepositoryLoan
+import org.totschnig.myexpenses.db2.RepositoryCommitment
 import org.totschnig.myexpenses.delegate.CategoryDelegate
 import org.totschnig.myexpenses.delegate.SplitDelegate
 import org.totschnig.myexpenses.delegate.TransferDelegate
@@ -139,6 +140,8 @@ interface AppComponent {
     fun repositoryLoan(): RepositoryLoan
 
     fun repositoryCreditCard(): RepositoryCreditCard
+
+    fun repositoryCommitment(): RepositoryCommitment
 
     fun okHttpClientBuilder(): OkHttpClient.Builder
 

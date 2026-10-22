@@ -45,6 +45,7 @@ import org.totschnig.myexpenses.model.CrStatus
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
+import org.totschnig.myexpenses.model.PreDefinedPaymentMethod
 import org.totschnig.myexpenses.model.PreDefinedPaymentMethod.Companion.translateIfPredefined
 import org.totschnig.myexpenses.model.generateUuid
 import org.totschnig.myexpenses.preference.PrefHandler
@@ -331,6 +332,7 @@ abstract class TransactionDelegate(
         if (!userSetAmount && !isProcessingLinkedAmountInputs) {
             userSetAmount = true
         }
+        host.onAmountChanged()
     }
 
     /**
@@ -371,6 +373,7 @@ abstract class TransactionDelegate(
 
     fun resetCategory() {
         setCategory(null, null, null)
+        host.onCategoryReset()
     }
 
     protected fun hideRowsSpecificToMain() {
@@ -596,7 +599,16 @@ abstract class TransactionDelegate(
 
     fun setMethods(paymentMethods: List<PaymentMethod>?) {
         methodsLoaded = true
-        if (paymentMethods.isNullOrEmpty() && methodId == null) {
+        val chequeLabel = PreDefinedPaymentMethod.CHEQUE.getLocalizedLabel(context)
+        val directDebitLabel = PreDefinedPaymentMethod.DIRECTDEBIT.getLocalizedLabel(context)
+        val filtered = paymentMethods?.filterNot {
+            it.isNumbered ||
+                    it.label.equals("CHEQUE", ignoreCase = true) ||
+                    it.label.equals(chequeLabel, ignoreCase = true) ||
+                    it.label.equals("DIRECTDEBIT", ignoreCase = true) ||
+                    it.label.equals(directDebitLabel, ignoreCase = true)
+        }
+        if (filtered.isNullOrEmpty() && methodId == null) {
             methodRowBinding.MethodRow.visibility = View.GONE
         } else {
             methodRowBinding.MethodRow.visibility = View.VISIBLE
@@ -604,8 +616,8 @@ abstract class TransactionDelegate(
                 setMethodSelection(null)
             }
             methodsAdapter.clear()
-            if (paymentMethods?.isNotEmpty() == true) {
-                methodsAdapter.addAll(paymentMethods)
+            if (filtered?.isNotEmpty() == true) {
+                methodsAdapter.addAll(filtered)
             }
             setMethodSelection()
         }
@@ -974,10 +986,7 @@ abstract class TransactionDelegate(
     }
 
     private fun configureStatusSpinner() {
-        currentAccount()?.let {
-            statusSpinner.spinner.isVisible =
-                !isSplitPart && !isTemplate && it.type.supportsReconciliation && crStatus != CrStatus.RECONCILED
-        }
+        statusSpinner.spinner.isVisible = false
     }
 
     open fun updateAccount(account: Account, isInitialSetup: Boolean) {
@@ -1166,6 +1175,38 @@ abstract class TransactionDelegate(
         with(viewBinding.TagRow.TagGroup) {
             removeAllViews()
             tags?.let { addChipsBulk(it, closeFunction) }
+        }
+    }
+
+    fun showSuggestedTags(tags: List<Tag>?, clickFunction: (Tag) -> Unit) {
+        val scroll = viewBinding.TagRow.SuggestedTagsScroll
+        val group = viewBinding.TagRow.SuggestedTagGroup
+        if (tags.isNullOrEmpty()) {
+            scroll.isVisible = false
+            group.removeAllViews()
+        } else {
+            group.removeAllViews()
+            val density = group.resources.displayMetrics.density
+            for (tag in tags) {
+                val chip = com.google.android.material.chip.Chip(group.context).apply {
+                    text = "+ ${tag.label}"
+                    isClickable = true
+                    isCheckable = false
+                    chipStrokeWidth = 1f * density
+                    val accentColor = org.totschnig.myexpenses.util.readPrimaryColor(context)
+                    val effectiveColor = tag.color ?: accentColor
+                    chipStrokeColor = android.content.res.ColorStateList.valueOf(effectiveColor)
+                    chipBackgroundColor = android.content.res.ColorStateList.valueOf(
+                        androidx.core.graphics.ColorUtils.setAlphaComponent(effectiveColor, 35)
+                    )
+                    setTextColor(effectiveColor)
+                    setOnClickListener {
+                        clickFunction(tag)
+                    }
+                }
+                group.addView(chip)
+            }
+            scroll.isVisible = true
         }
     }
 

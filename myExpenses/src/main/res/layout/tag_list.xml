@@ -6,15 +6,31 @@
     android:layout_marginHorizontal="@dimen/padding_form"
     android:orientation="vertical">
 
-    <EditText
-        android:id="@+id/tag_edit"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/search_input_layout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/new_tag_hint"
-        android:imeActionLabel="Add"
-        android:imeOptions="actionDone"
-        android:importantForAutofill="no"
-        android:inputType="textCapWords" />
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        app:boxCornerRadiusBottomEnd="16dp"
+        app:boxCornerRadiusBottomStart="16dp"
+        app:boxCornerRadiusTopEnd="16dp"
+        app:boxCornerRadiusTopStart="16dp"
+        app:endIconMode="clear_text"
+        app:startIconDrawable="@drawable/ic_menu_search">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/tag_edit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/search_tags_or_add"
+            android:imeActionLabel="Add"
+            android:imeOptions="actionDone"
+            android:importantForAutofill="no"
+            android:inputType="textCapWords" />
+
+    </com.google.android.material.textfield.TextInputLayout>
 
     <org.totschnig.myexpenses.ui.ContextAwareRecyclerView
         android:id="@+id/recycler_view"

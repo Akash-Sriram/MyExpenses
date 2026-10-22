@@ -1072,16 +1072,7 @@ fun AccountCard(
                     )
                 }
 
-                if (!(showEquivalent || account.isAggregate || !account.type.supportsReconciliation)) {
-                    SumRow(
-                        R.string.total_cleared,
-                        format.convAmount(account.clearedTotal, account.currencyUnit)
-                    )
-                    SumRow(
-                        R.string.total_reconciled,
-                        format.convAmount(account.reconciledTotal, account.currencyUnit)
-                    )
-                }
+                // Cleared and reconciled totals suppressed (Western check reconciliation hold concept not used in Indian banking)
             }
         }
     }
@@ -1213,22 +1204,7 @@ fun AccountSummaryV2(
         )
     }
 
-    if (account.type.supportsReconciliation) {
-        SumRowV2(
-            label = R.string.total_cleared,
-            amount = account.clearedTotal,
-            currency = account.currencyUnit,
-            highlight = balanceType == BalanceType.CLEARED,
-            onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.CLEARED) } }
-        )
-        SumRowV2(
-            label = R.string.total_reconciled,
-            amount = account.reconciledTotal,
-            currency = account.currencyUnit,
-            highlight = balanceType == BalanceType.RECONCILED,
-            onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.RECONCILED) } }
-        )
-    }
+    // Cleared and reconciled totals suppressed for Indian banking flow
 }
 
 @Composable

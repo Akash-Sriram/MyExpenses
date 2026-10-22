@@ -1547,6 +1547,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
             getEditIntent()?.apply {
                 putExtra(KEY_OCR_RESULT, result)
                 putExtra(KEY_URI, scanUri)
+                putExtra(ExpenseEdit.KEY_EXTRACT_OCR, true)
             }?.let { startEdit(it) }
         }
     }

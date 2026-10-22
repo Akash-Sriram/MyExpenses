@@ -3,6 +3,9 @@ package org.totschnig.myexpenses.viewmodel
 import android.app.Application
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.viewmodel.data.Tag
 
 open class TagHandlingViewModel(application: Application, savedStateHandle: SavedStateHandle)
@@ -30,6 +33,32 @@ open class TagHandlingViewModel(application: Application, savedStateHandle: Save
 
     fun removeTags(vararg tagIds: Long) {
         savedStateHandle[KEY_MAPPED_TAGS] = tagsLiveData.value?.filter { !tagIds.contains(it.id) }
+    }
+
+    val suggestedTagsLiveData: MutableLiveData<List<Tag>> = MutableLiveData(emptyList())
+
+    fun fetchSuggestedTags(payeeId: Long?, catId: Long?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val suggestions = repositoryCommitment.getSuggestedTagsForContext(payeeId, catId)
+                val currentSelectedIds = tagsLiveData.value?.map { it.id }?.toSet() ?: emptySet()
+                val filtered = suggestions.filter { it.id !in currentSelectedIds }
+                suggestedTagsLiveData.postValue(filtered)
+            } catch (e: Exception) {
+                suggestedTagsLiveData.postValue(emptyList())
+            }
+        }
+    }
+
+    fun addTag(tag: Tag) {
+        userHasUpdatedTags = true
+        val current = tagsLiveData.value.orEmpty()
+        if (current.none { it.id == tag.id }) {
+            val updated = current + tag
+            tagsLiveData.postValue(updated)
+            val currentSuggestions = suggestedTagsLiveData.value.orEmpty()
+            suggestedTagsLiveData.postValue(currentSuggestions.filter { it.id != tag.id })
+        }
     }
 
     companion object {

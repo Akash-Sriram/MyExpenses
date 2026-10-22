@@ -217,6 +217,50 @@ class RepositoryCreditCard @Inject constructor(
         }
     }
 
+    fun refresh() {
+        invalidate()
+    }
+
+    /**
+     * Observes active credit cards that currently have an outstanding unpaid balance (balance < 0).
+     */
+    fun getCreditCardDues(): Flow<List<CreditCardDueInfo>> = _creditCardInvalidation
+        .onStart { emit(Unit) }
+        .map {
+            withContext(coroutineDispatcher) {
+                val db = openHelper.readableDatabase
+                val list = mutableListOf<CreditCardDueInfo>()
+                val query = """
+                    SELECT a._id, a.label, a.currency, (coalesce(a.opening_balance, 0) + coalesce(sum(t.amount), 0)) as current_balance
+                    FROM accounts a
+                    JOIN account_types at ON a.type = at._id
+                    LEFT JOIN transactions t ON a._id = t.account_id
+                    WHERE at.label = '_CCARD_' AND a.sealed = 0
+                    GROUP BY a._id
+                    HAVING current_balance < 0
+                """.trimIndent()
+                db.query(query, emptyArray()).use { cursor ->
+                    val idIdx = cursor.getColumnIndexOrThrow("_id")
+                    val labelIdx = cursor.getColumnIndexOrThrow("label")
+                    val currIdx = cursor.getColumnIndexOrThrow("currency")
+                    val balIdx = cursor.getColumnIndexOrThrow("current_balance")
+                    while (cursor.moveToNext()) {
+                        val bal = cursor.getLong(balIdx)
+                        list.add(
+                            CreditCardDueInfo(
+                                accountId = cursor.getLong(idIdx),
+                                accountLabel = cursor.getString(labelIdx),
+                                currency = cursor.getString(currIdx),
+                                currentBalancePaise = bal,
+                                outstandingAmountPaise = -bal
+                            )
+                        )
+                    }
+                }
+                list
+            }
+        }.flowOn(coroutineDispatcher)
+
     private fun Cursor.toCreditCardDetail(): CreditCardDetail = CreditCardDetail(
         id = getLong(KEY_ROWID),
         accountId = getLong(KEY_ACCOUNTID),
@@ -230,3 +274,12 @@ class RepositoryCreditCard @Inject constructor(
         lastDueDate = getLongOrNull(KEY_LAST_DUE_DATE)
     )
 }
+
+data class CreditCardDueInfo(
+    val accountId: Long,
+    val accountLabel: String,
+    val currency: String,
+    val currentBalancePaise: Long,
+    val outstandingAmountPaise: Long
+)
+

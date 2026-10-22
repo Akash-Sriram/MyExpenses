@@ -275,29 +275,7 @@ abstract class ItemRenderer(
 
     @Composable
     protected fun Transaction2.StatusToggle() {
-        onToggleCrStatus?.let { toggle ->
-            val color = colorResource(id = crStatus.color)
-            val contentDescription = stringResource(crStatus.toStringRes())
-            val onClickLabel = when (crStatus) {
-                CrStatus.UNRECONCILED -> stringResource(R.string.mark_as_cleared)
-                CrStatus.CLEARED -> stringResource(R.string.mark_as_unreconciled)
-                else -> null
-            }
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .optional(onClickLabel) {
-                        clickable(onClickLabel = it) { toggle(id) }
-                    }
-                    .padding(8.dp)
-                    .conditional(crStatus != CrStatus.VOID) {
-                        background(color = color)
-                            .semantics {
-                                this.contentDescription = contentDescription
-                            }
-                    }
-            )
-        }
+        // Suppress Western check-reconciliation toggle button on transaction rows for streamlined Indian banking flow
     }
 
     @Composable

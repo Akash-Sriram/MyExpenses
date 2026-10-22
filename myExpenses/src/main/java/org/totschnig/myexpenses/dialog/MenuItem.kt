@@ -63,7 +63,7 @@ sealed class MenuItem(
 
     data object Loans : MenuItem(
         R.id.LOANS_COMMAND,
-        R.string.menu_loans,
+        R.string.menu_commitments,
         R.drawable.ic_bank
     )
 
@@ -308,17 +308,14 @@ sealed class MenuItem(
         fun all(menuContext: MenuContext) = when (menuContext) {
             MenuContext.V1 -> listOf(
                 Search,
-                Templates,
-                Budget,
                 Loans,
+                Budget,
                 Distribution,
                 History,
                 Parties,
                 ScanMode,
                 Reset,
                 Sync,
-                ShowStatusHandle,
-                Balance,
                 Sort,
                 Grouping,
                 Print,
@@ -330,9 +327,8 @@ sealed class MenuItem(
             )
 
             MenuContext.V2Navigation -> listOf(
-                Templates,
-                Budget,
                 Loans,
+                Budget,
                 Parties,
                 Settings,
                 Help,
@@ -345,13 +341,10 @@ sealed class MenuItem(
                 Distribution,
                 History,
                 Sync,
-                Balance,
                 Reset,
                 Print,
                 Tune,
                 Archive,
-                ShowStatusHandle,
-                ImportTrades,
             )
         }
 

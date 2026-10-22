@@ -30,11 +30,34 @@ import org.totschnig.myexpenses.provider.appendBooleanQueryParameter
 import org.totschnig.myexpenses.util.toggle
 import org.totschnig.myexpenses.viewmodel.data.Tag
 
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
+
 class TagListViewModel(application: Application, savedStateHandle: SavedStateHandle) :
     TagBaseViewModel(application, savedStateHandle) {
 
     private val _tags = MutableStateFlow<List<Tag>>(emptyList())
     val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
+
+    private val _searchFilter = MutableStateFlow("")
+    val searchFilter: StateFlow<String> = _searchFilter.asStateFlow()
+
+    val filteredTags: StateFlow<List<Tag>> = combine(_tags, _searchFilter) { tagList, query ->
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            tagList
+        } else {
+            tagList.filter { it.label.contains(trimmed, ignoreCase = true) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allTags: List<Tag>
+        get() = _tags.value
+
+    fun setSearchFilter(query: String) {
+        _searchFilter.value = query
+    }
 
     fun toggleSelectedTagId(tagId: Long) {
         savedStateHandle[KEY_SELECTED_IDS] = selectedTagIds.apply {

@@ -39,7 +39,17 @@ data class Loan(
     val actualEmiAmount: Long? = null,   // Optional user override
     val dueDayOfMonth: Int,              // 1 to 31: day of month EMI is debited
     val linkedAccountId: Long? = null,   // Bank account from which EMI is debited
-    val status: LoanStatus = LoanStatus.ACTIVE
+    val status: LoanStatus = LoanStatus.ACTIVE,
+    val autoDebit: Boolean = false       // Auto-debit and auto-record transaction on due date
+)
+
+/**
+ * Encapsulates an installment due for notification or automatic processing.
+ */
+data class DueInstallmentInfo(
+    val installment: EmiInstallment,
+    val loan: Loan,
+    val accountLabel: String? = null
 )
 
 /**

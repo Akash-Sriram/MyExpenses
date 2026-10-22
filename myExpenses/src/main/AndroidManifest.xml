@@ -258,6 +258,9 @@
         <receiver
             android:name=".service.SyncNotificationDismissHandler"
             android:exported="false" />
+        <receiver
+            android:name=".service.LoanNotificationReceiver"
+            android:exported="false" />
 
         <activity
             android:name=".activity.SimpleToastActivity"
