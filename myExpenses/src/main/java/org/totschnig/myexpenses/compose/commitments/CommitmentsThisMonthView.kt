@@ -336,6 +336,7 @@ fun CommitmentsThisMonthView(
                                 createTransaction = accountId != null,
                                 paidDate = System.currentTimeMillis(),
                                 attachmentUri = uri,
+                                accountId = accountId,
                                 onComplete = {
                                     activePayingTarget = null
                                     viewModel.resyncAllCommitments()

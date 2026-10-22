@@ -223,6 +223,7 @@ fun CommitmentEmisView(
                     createTransaction = accountId != null,
                     paidDate = System.currentTimeMillis(),
                     attachmentUri = uri,
+                    accountId = accountId,
                     onComplete = {
                         payingInstallmentTarget = null
                         viewModel.resyncAllCommitments()

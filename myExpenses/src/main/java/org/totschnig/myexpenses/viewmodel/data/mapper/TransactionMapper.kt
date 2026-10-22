@@ -31,10 +31,7 @@ object TransactionMapper {
             amount = money,
             date = epoch2LocalDateTime(transaction.date),
             valueDate = epoch2LocalDate(transaction.valueDate),
-            party = transaction.payeeId?.let { DisplayParty(it, transaction.payeeName ?: run {
-                CrashHandler.report(NullPointerException())
-                "_null_"
-            }) },
+            party = transaction.payeeId?.let { DisplayParty(it, transaction.payeeName ?: "") },
             categoryId = transaction.categoryId,
             categoryPath = transaction.categoryPath,
             categoryIcon = transaction.categoryIcon,

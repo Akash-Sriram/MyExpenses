@@ -45,8 +45,11 @@ import org.totschnig.myexpenses.provider.KEY_START_DATE
 import org.totschnig.myexpenses.provider.KEY_STATUS
 import org.totschnig.myexpenses.provider.KEY_TENURE_MONTHS
 import org.totschnig.myexpenses.provider.KEY_TOTAL_AMOUNT
+import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
 import org.totschnig.myexpenses.provider.TABLE_EMI_INSTALLMENTS
 import org.totschnig.myexpenses.provider.TABLE_LOANS
+import org.totschnig.myexpenses.provider.TABLE_PAYEES
+import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.getDouble
 import org.totschnig.myexpenses.provider.getInt
 import org.totschnig.myexpenses.provider.getLong
@@ -288,7 +291,8 @@ class RepositoryLoan @Inject constructor(
         installmentId: Long,
         paidDate: Long = System.currentTimeMillis(),
         createTransaction: Boolean = false,
-        attachmentUri: Uri? = null
+        attachmentUri: Uri? = null,
+        accountId: Long? = null
     ): Result<Unit> = withContext(coroutineDispatcher) {
         runCatching {
             val db = openHelper.writableDatabase
@@ -307,13 +311,33 @@ class RepositoryLoan @Inject constructor(
                     ?: throw IllegalArgumentException("Loan ${installment.loanId} not found")
 
                 var createdTransactionId: Long? = null
-                if (createTransaction && loan.linkedAccountId != null && loan.linkedAccountId > 0) {
+                val targetAccountId = accountId ?: loan.linkedAccountId
+                if (createTransaction && targetAccountId != null && targetAccountId > 0) {
+                    val resolvedPayeeId = if (loan.lenderName.isNotBlank()) {
+                        db.query(
+                            "SELECT $KEY_ROWID FROM $TABLE_PAYEES WHERE $KEY_PAYEE_NAME = ? OR $KEY_PAYEE_NAME LIKE ? LIMIT 1",
+                            arrayOf(loan.lenderName, "%${loan.lenderName}%")
+                        ).use { if (it.moveToFirst()) it.getLong(0) else null }
+                    } else {
+                        db.query(
+                            "SELECT $KEY_ROWID FROM $TABLE_PAYEES WHERE $KEY_PAYEE_NAME LIKE '%loan%' OR $KEY_PAYEE_NAME LIKE '%icici%' LIMIT 1",
+                            emptyArray()
+                        ).use { if (it.moveToFirst()) it.getLong(0) else null }
+                    }
+
+                    val resolvedCatId = db.query(
+                        "SELECT $KEY_ROWID FROM $TABLE_CATEGORIES WHERE $KEY_LABEL LIKE '%loan%' OR $KEY_LABEL LIKE '%emi%' ORDER BY CASE WHEN $KEY_LABEL = 'Personal Loan' THEN 1 WHEN $KEY_LABEL = 'EMI' THEN 2 ELSE 3 END LIMIT 1",
+                        emptyArray()
+                    ).use { if (it.moveToFirst()) it.getLong(0) else null }
+
                     val tx = Transaction(
-                        accountId = loan.linkedAccountId,
+                        accountId = targetAccountId,
                         amount = -installment.totalAmount,
                         date = paidDate / 1000L,
                         uuid = generateUuid(),
-                        comment = "EMI #${installment.installmentNumber} - ${loan.label}"
+                        comment = "EMI #${installment.installmentNumber} - ${loan.label}",
+                        payeeId = resolvedPayeeId,
+                        categoryId = resolvedCatId
                     )
                     val resultTx = repository.createTransaction(tx)
                     createdTransactionId = resultTx.id

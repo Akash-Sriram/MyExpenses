@@ -35,6 +35,7 @@ import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_SHORT_NAME
 import org.totschnig.myexpenses.provider.TABLE_PAYEES
 import org.totschnig.myexpenses.provider.TransactionProvider
+import org.totschnig.myexpenses.provider.getLongIfExists
 import org.totschnig.myexpenses.provider.getLongOrNull
 import org.totschnig.myexpenses.provider.getString
 import org.totschnig.myexpenses.provider.getStringIfExists
@@ -54,10 +55,10 @@ data class DisplayParty(
         get() = shortName ?: name
 
     companion object {
-        fun fromCursor(cursor: Cursor) = cursor.getLongOrNull(KEY_PAYEEID)?.let {
+        fun fromCursor(cursor: Cursor) = cursor.getLongIfExists(KEY_PAYEEID)?.let {
             DisplayParty(
                 it,
-                cursor.getString(KEY_PAYEE_NAME),
+                cursor.getStringIfExists(KEY_PAYEE_NAME) ?: "",
                 cursor.getStringIfExists(KEY_SHORT_NAME),
                 cursor.getStringIfExists(KEY_IBAN)
             )

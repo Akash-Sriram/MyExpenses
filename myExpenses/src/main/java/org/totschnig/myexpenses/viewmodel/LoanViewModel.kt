@@ -242,6 +242,7 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
         createTransaction: Boolean,
         paidDate: Long = System.currentTimeMillis(),
         attachmentUri: Uri? = null,
+        accountId: Long? = null,
         onComplete: () -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -249,7 +250,8 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
                 installmentId = installmentId,
                 paidDate = paidDate,
                 createTransaction = createTransaction,
-                attachmentUri = attachmentUri
+                attachmentUri = attachmentUri,
+                accountId = accountId
             )
             onComplete()
         }
