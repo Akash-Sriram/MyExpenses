@@ -350,6 +350,30 @@ sealed class ContextChipData {
         val amount: Long,
         val dueDateFormatted: String
     ) : ContextChipData()
+
+    data class UtilityMeters(
+        val serviceName: String,
+        val meters: List<UtilityMeterChip>
+    ) : ContextChipData()
+
+    data class InsurancePolicies(
+        val insurerName: String,
+        val policies: List<InsurancePolicyChip>
+    ) : ContextChipData()
 }
+
+data class UtilityMeterChip(
+    val id: Long,
+    val label: String,
+    val meterNumber: String,
+    val estimatedAmountPaise: Long
+)
+
+data class InsurancePolicyChip(
+    val id: Long,
+    val policyName: String,
+    val policyNumber: String,
+    val premiumAmount: Long
+)
 
 

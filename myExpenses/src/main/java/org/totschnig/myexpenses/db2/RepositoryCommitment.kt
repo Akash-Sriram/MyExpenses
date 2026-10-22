@@ -35,6 +35,8 @@ import org.totschnig.myexpenses.domain.commitment.MeterCycleStatus
 import org.totschnig.myexpenses.domain.commitment.PaidCommitmentInfo
 import org.totschnig.myexpenses.domain.commitment.MobilePlanTracker
 import org.totschnig.myexpenses.domain.commitment.ContextChipData
+import org.totschnig.myexpenses.domain.commitment.UtilityMeterChip
+import org.totschnig.myexpenses.domain.commitment.InsurancePolicyChip
 import org.totschnig.myexpenses.viewmodel.data.Tag
 import org.totschnig.myexpenses.provider.TABLE_TAGS
 import org.totschnig.myexpenses.provider.TABLE_TRANSACTIONS_TAGS
@@ -2312,11 +2314,87 @@ class RepositoryCommitment @Inject constructor(
 
         val db = openHelper.readableDatabase
         try {
-            // Check subscriptions
-            val subQuery = if (payeeId != null) {
-                "SELECT _id, title, amount, due_day FROM commitment_subscriptions WHERE status = 'ACTIVE' AND (payee_id = ? OR title LIKE ?) LIMIT 1"
+            // 1. Check utility meters (TNEB, Hathway, Bharat Gas, Aavin, etc.)
+            val metersList = mutableListOf<UtilityMeterChip>()
+            var resolvedServiceName = ""
+            val metersQuery = if (payeeId != null) {
+                """
+                SELECT m._id, m.meter_label, m.meter_number, m.estimated_amount, s.service_name 
+                FROM utility_meters m 
+                JOIN subscriptions s ON m.subscription_id = s._id 
+                WHERE s.status = 'ACTIVE' AND (s.payee_id = ? OR s.service_name LIKE ? OR m.matching_keywords LIKE ?)
+                ORDER BY m._id ASC
+                """.trimIndent()
             } else if (name.isNotBlank()) {
-                "SELECT _id, title, amount, due_day FROM commitment_subscriptions WHERE status = 'ACTIVE' AND title LIKE ? LIMIT 1"
+                """
+                SELECT m._id, m.meter_label, m.meter_number, m.estimated_amount, s.service_name 
+                FROM utility_meters m 
+                JOIN subscriptions s ON m.subscription_id = s._id 
+                WHERE s.status = 'ACTIVE' AND (s.service_name LIKE ? OR m.matching_keywords LIKE ?)
+                ORDER BY m._id ASC
+                """.trimIndent()
+            } else null
+
+            if (metersQuery != null) {
+                val args = if (payeeId != null) arrayOf(payeeId.toString(), "%$name%", "%$name%") else arrayOf("%$name%", "%$name%")
+                db.query(metersQuery, args).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val mId = cursor.getLong(0)
+                        val mLabel = cursor.getString(1)
+                        val mNumber = cursor.getString(2)
+                        val mAmount = cursor.getLong(3)
+                        resolvedServiceName = cursor.getString(4) ?: name
+                        metersList.add(UtilityMeterChip(mId, mLabel, mNumber, mAmount))
+                    }
+                }
+                if (metersList.isNotEmpty()) {
+                    return@withContext ContextChipData.UtilityMeters(resolvedServiceName, metersList)
+                }
+            }
+
+            // 2. Check insurance policies (LIC, ICICI Lombard, etc.)
+            val policyList = mutableListOf<InsurancePolicyChip>()
+            var resolvedInsurer = ""
+            val insQuery = if (payeeId != null) {
+                """
+                SELECT _id, policy_name, policy_number, premium_amount, insurer_name 
+                FROM insurance_policies 
+                WHERE status = 'ACTIVE' AND (payee_id = ? OR insurer_name LIKE ? OR policy_name LIKE ?)
+                ORDER BY _id ASC
+                """.trimIndent()
+            } else if (name.isNotBlank()) {
+                """
+                SELECT _id, policy_name, policy_number, premium_amount, insurer_name 
+                FROM insurance_policies 
+                WHERE status = 'ACTIVE' AND (insurer_name LIKE ? OR policy_name LIKE ?)
+                ORDER BY _id ASC
+                """.trimIndent()
+            } else null
+
+            if (insQuery != null) {
+                val args = if (payeeId != null) arrayOf(payeeId.toString(), "%$name%", "%$name%") else arrayOf("%$name%", "%$name%")
+                db.query(insQuery, args).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val pId = cursor.getLong(0)
+                        val pName = cursor.getString(1)
+                        val pNumber = cursor.getString(2) ?: ""
+                        val pAmount = cursor.getLong(3)
+                        resolvedInsurer = cursor.getString(4) ?: name
+                        if (pNumber.isNotBlank()) {
+                            policyList.add(InsurancePolicyChip(pId, pName, pNumber, pAmount))
+                        }
+                    }
+                }
+                if (policyList.isNotEmpty()) {
+                    return@withContext ContextChipData.InsurancePolicies(resolvedInsurer, policyList)
+                }
+            }
+
+            // 3. Check general subscriptions without meters (e.g. Bitwarden, YouTube Premium, etc.)
+            val subQuery = if (payeeId != null) {
+                "SELECT _id, service_name, amount, next_renewal_date FROM subscriptions WHERE status = 'ACTIVE' AND (payee_id = ? OR service_name LIKE ?) LIMIT 1"
+            } else if (name.isNotBlank()) {
+                "SELECT _id, service_name, amount, next_renewal_date FROM subscriptions WHERE status = 'ACTIVE' AND service_name LIKE ? LIMIT 1"
             } else null
 
             if (subQuery != null) {
@@ -2326,39 +2404,15 @@ class RepositoryCommitment @Inject constructor(
                         val id = cursor.getLong(0)
                         val title = cursor.getString(1)
                         val amount = cursor.getLong(2)
-                        val dueDay = cursor.getInt(3)
+                        val nextRenewal = cursor.getLong(3)
+                        val dateFormatted = if (nextRenewal > 0) {
+                            java.time.Instant.ofEpochMilli(nextRenewal)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
+                        } else ""
                         return@withContext ContextChipData.LinkedCommitment(
                             id = id,
                             type = "SUBSCRIPTION",
-                            title = title,
-                            amount = amount,
-                            dueDateFormatted = "Day $dueDay"
-                        )
-                    }
-                }
-            }
-
-            // Check insurance
-            val insQuery = if (payeeId != null) {
-                "SELECT _id, policy_name, premium_amount, due_date FROM commitment_insurance_policies WHERE status = 'ACTIVE' AND (payee_id = ? OR policy_name LIKE ?) LIMIT 1"
-            } else if (name.isNotBlank()) {
-                "SELECT _id, policy_name, premium_amount, due_date FROM commitment_insurance_policies WHERE status = 'ACTIVE' AND policy_name LIKE ? LIMIT 1"
-            } else null
-
-            if (insQuery != null) {
-                val args = if (payeeId != null) arrayOf(payeeId.toString(), "%$name%") else arrayOf("%$name%")
-                db.query(insQuery, args).use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val id = cursor.getLong(0)
-                        val title = cursor.getString(1)
-                        val amount = cursor.getLong(2)
-                        val dueDate = cursor.getLong(3)
-                        val dateFormatted = java.time.Instant.ofEpochMilli(dueDate)
-                            .atZone(java.time.ZoneId.systemDefault())
-                            .format(java.time.format.DateTimeFormatter.ofPattern("d MMM"))
-                        return@withContext ContextChipData.LinkedCommitment(
-                            id = id,
-                            type = "INSURANCE",
                             title = title,
                             amount = amount,
                             dueDateFormatted = dateFormatted
@@ -2367,7 +2421,7 @@ class RepositoryCommitment @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error checking getContextChipInfo")
+            Timber.e(e, "Error checking resolveContextChip")
         }
 
         null

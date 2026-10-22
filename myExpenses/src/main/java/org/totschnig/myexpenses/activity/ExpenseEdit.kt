@@ -22,6 +22,9 @@ import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -922,11 +925,11 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         rootBinding.ContextChipRow.visibility = View.VISIBLE
         rootBinding.ContextChipGroup.removeAllViews()
 
-        val chip = Chip(this).apply {
-            isClickable = true
-            isFocusable = true
-            when (chipData) {
-                is ContextChipData.MobilePlan -> {
+        when (chipData) {
+            is ContextChipData.MobilePlan -> {
+                val chip = Chip(this).apply {
+                    isClickable = true
+                    isFocusable = true
                     text = if (chipData.isBooster) {
                         "⚡ ${chipData.operator}: Data Booster (0d) ✎"
                     } else {
@@ -936,15 +939,75 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                         showMobileValidityDialog(chipData.operator, chipData.validityDays)
                     }
                 }
-                is ContextChipData.LinkedCommitment -> {
+                rootBinding.ContextChipGroup.addView(chip)
+            }
+            is ContextChipData.LinkedCommitment -> {
+                val chip = Chip(this).apply {
+                    isClickable = true
+                    isFocusable = true
                     text = "🔗 Linked: ${chipData.title} • Due ${chipData.dueDateFormatted}"
                     setOnClickListener {
                         showLinkedCommitmentDialog(chipData)
                     }
                 }
+                rootBinding.ContextChipGroup.addView(chip)
+            }
+            is ContextChipData.UtilityMeters -> {
+                chipData.meters.forEach { meter ->
+                    val icon = when {
+                        chipData.serviceName.contains("Electricity", ignoreCase = true) || chipData.serviceName.contains("TNEB", ignoreCase = true) -> "⚡"
+                        chipData.serviceName.contains("Hathway", ignoreCase = true) || chipData.serviceName.contains("Internet", ignoreCase = true) -> "🌐"
+                        chipData.serviceName.contains("Gas", ignoreCase = true) || chipData.serviceName.contains("BPCL", ignoreCase = true) -> "🔥"
+                        chipData.serviceName.contains("Milk", ignoreCase = true) || chipData.serviceName.contains("Aavin", ignoreCase = true) -> "🥛"
+                        else -> "💡"
+                    }
+                    val chip = Chip(this).apply {
+                        isClickable = true
+                        isFocusable = true
+                        text = "$icon ${meter.label} • ${meter.meterNumber} 📋"
+                        setOnClickListener {
+                            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Consumer Number", meter.meterNumber))
+                            Toast.makeText(this@ExpenseEdit, "${meter.label} (${meter.meterNumber}) copied!", Toast.LENGTH_SHORT).show()
+
+                            if (rootBinding.Comment.text.isNullOrBlank()) {
+                                rootBinding.Comment.setText("${meter.label} (${meter.meterNumber})")
+                            }
+                            val currentAmount = rootBinding.Amount.getAmount(false)?.movePointRight(2)?.toLong() ?: 0L
+                            if (currentAmount == 0L && meter.estimatedAmountPaise > 0L) {
+                                val formatted = java.math.BigDecimal(meter.estimatedAmountPaise).movePointLeft(2)
+                                rootBinding.Amount.setAmount(formatted)
+                            }
+                        }
+                    }
+                    rootBinding.ContextChipGroup.addView(chip)
+                }
+            }
+            is ContextChipData.InsurancePolicies -> {
+                chipData.policies.forEach { policy ->
+                    val chip = Chip(this).apply {
+                        isClickable = true
+                        isFocusable = true
+                        text = "🛡️ ${policy.policyName}: ${policy.policyNumber} 📋"
+                        setOnClickListener {
+                            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Policy Number", policy.policyNumber))
+                            Toast.makeText(this@ExpenseEdit, "${policy.policyName} policy copied!", Toast.LENGTH_SHORT).show()
+
+                            if (rootBinding.Comment.text.isNullOrBlank()) {
+                                rootBinding.Comment.setText("${policy.policyName} (${policy.policyNumber})")
+                            }
+                            val currentAmount = rootBinding.Amount.getAmount(false)?.movePointRight(2)?.toLong() ?: 0L
+                            if (currentAmount == 0L && policy.premiumAmount > 0L) {
+                                val formatted = java.math.BigDecimal(policy.premiumAmount).movePointLeft(2)
+                                rootBinding.Amount.setAmount(formatted)
+                            }
+                        }
+                    }
+                    rootBinding.ContextChipGroup.addView(chip)
+                }
             }
         }
-        rootBinding.ContextChipGroup.addView(chip)
     }
 
     private fun showMobileValidityDialog(operator: String, currentValidityDays: Int) {
