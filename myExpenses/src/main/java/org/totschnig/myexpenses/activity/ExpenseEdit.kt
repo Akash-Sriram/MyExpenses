@@ -794,12 +794,15 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
         }
         val isPayeeUnset = rootBinding.Payee.party == null || rootBinding.Payee.party?.name.isNullOrBlank()
         if (isPayeeUnset) {
-            data.payeeName?.let { name ->
+            val candidateName = data.payeeName?.takeIf { it.isNotBlank() } ?: data.upiId
+            candidateName?.let { name ->
                 lifecycleScope.launch {
                     val payeeId = viewModel.resolvePayeeId(name)
                     if (payeeId != null) {
-                        rootBinding.Payee.party = DisplayParty(payeeId, name)
+                        rootBinding.Payee.party = DisplayParty(payeeId, name, null, data.upiId)
                         startAutoFill(payeeId, false)
+                    } else {
+                        rootBinding.Payee.party = DisplayParty(null, name, null, data.upiId)
                     }
                 }
             }
@@ -824,12 +827,23 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                 }
             }
         }
+        val currentComment = rootBinding.Comment.text?.toString() ?: ""
+        val commentParts = mutableListOf<String>()
+        if (currentComment.isNotBlank()) {
+            commentParts.add(currentComment)
+        }
         data.referenceNumber?.let { utr ->
-            val current = rootBinding.Comment.text?.toString() ?: ""
-            if (!current.contains(utr)) {
-                val updated = if (current.isBlank()) "UTR: $utr" else "$current (UTR: $utr)"
-                rootBinding.Comment.setText(updated)
+            if (!currentComment.contains(utr)) {
+                commentParts.add("UTR: $utr")
             }
+        }
+        data.upiId?.let { upi ->
+            if (!currentComment.contains(upi)) {
+                commentParts.add("UPI: $upi")
+            }
+        }
+        if (commentParts.isNotEmpty() && commentParts.joinToString(" • ") != currentComment) {
+            rootBinding.Comment.setText(commentParts.joinToString(" • "))
         }
         val amountStr = data.amount?.let { "₹$it" } ?: ""
         val payeeStr = data.payeeName ?: ""

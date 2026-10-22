@@ -94,11 +94,16 @@ class PartyInput @JvmOverloads constructor(
     var party: DisplayParty? = null
         set(value) {
             field = value
-            if (value?.id == null) {
+            if (value?.id == null && value?.iban.isNullOrBlank()) {
                 autoCompleteTextView.setText(value?.name)
                 switchView(INDEX_AUTOCOMPLETE_TEXTVIEW)
             } else {
-                selectedItemChip.text = value.name
+                val chipText = if (value.iban.isNullOrBlank()) {
+                    value.name
+                } else {
+                    "${value.name} • ${value.iban}"
+                }
+                selectedItemChip.text = chipText
                 switchView(INDEX_CHIP_CONTAINER)
             }
         }
