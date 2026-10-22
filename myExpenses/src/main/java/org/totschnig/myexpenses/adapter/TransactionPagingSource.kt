@@ -209,6 +209,7 @@ open class TransactionPagingSource(
             itemsAfter = itemsAfter
         )
     } catch (e: Throwable) {
+        Timber.e(e, "TransactionPagingSource load failed for account %d", account.id)
         LoadResult.Error(e)
     } finally {
         onLoadFinished()

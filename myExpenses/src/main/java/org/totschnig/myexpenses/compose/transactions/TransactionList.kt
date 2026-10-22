@@ -248,9 +248,10 @@ fun TransactionList(
     if (lazyPagingItems.itemCount == 0) {
         val refreshState = lazyPagingItems.loadState.refresh
         if (refreshState is LoadState.Error) {
+            timber.log.Timber.e(refreshState.error, "TransactionList refresh error")
             PagingErrorPage(
                 modifier = modifier,
-                message = "Data loading failed"
+                message = "Data loading failed: ${refreshState.error.localizedMessage ?: refreshState.error::class.simpleName}"
             )
         } else if (refreshState != LoadState.Loading) {
             Text(
