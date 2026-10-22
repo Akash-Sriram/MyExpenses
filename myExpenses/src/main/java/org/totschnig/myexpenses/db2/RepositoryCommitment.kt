@@ -1537,7 +1537,7 @@ class RepositoryCommitment @Inject constructor(
             val catQuery = """
                 SELECT count(*), sum(abs(amount))
                 FROM $TABLE_TRANSACTIONS
-                WHERE ($KEY_CATID = 164 OR $KEY_CATID IN (205, 7)) AND amount < 0 AND date BETWEEN ? AND ?
+                WHERE $KEY_CATID = 164 AND amount < 0 AND date BETWEEN ? AND ?
                   AND _id NOT IN (SELECT $KEY_TRANSACTION_ID FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_TRANSACTION_ID IS NOT NULL)
             """.trimIndent()
             db.query(catQuery, arrayOf(startSecs.toString(), endSecs.toString())).use { cursor ->
@@ -2053,44 +2053,6 @@ class RepositoryCommitment @Inject constructor(
                             payer = "SELF",
                             commitmentType = CommitmentType.SUBSCRIPTION,
                             iconKey = "mobile"
-                        )
-                    )
-                }
-            }
-
-            // Grocery / Provisions category (205, 7)
-            val groceryQuery = """
-                SELECT tr._id, tr.date, tr.amount, p.name, tr.comment
-                FROM $TABLE_TRANSACTIONS tr
-                LEFT JOIN $TABLE_PAYEES p ON tr.$KEY_PAYEEID = p._id
-                WHERE tr.$KEY_CATID IN (205, 7) AND tr.amount < 0 AND tr.date BETWEEN ? AND ?
-                  AND tr._id NOT IN (SELECT $KEY_TRANSACTION_ID FROM $TABLE_COMMITMENT_PAYMENTS WHERE $KEY_TRANSACTION_ID IS NOT NULL)
-                ORDER BY tr.date DESC
-            """.trimIndent()
-
-            db.query(groceryQuery, arrayOf(startSecs.toString(), endSecs.toString())).use { cursor ->
-                val idIdx = cursor.getColumnIndexOrThrow("_id")
-                val dateIdx = cursor.getColumnIndexOrThrow("date")
-                val amtIdx = cursor.getColumnIndexOrThrow("amount")
-                val nameIdx = cursor.getColumnIndexOrThrow("name")
-                val commentIdx = cursor.getColumnIndexOrThrow("comment")
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idIdx)
-                    val date = cursor.getLong(dateIdx) * 1000L
-                    val amt = kotlin.math.abs(cursor.getLong(amtIdx))
-                    val payee = if (cursor.isNull(nameIdx)) "Provisions" else cursor.getString(nameIdx)
-                    val comment = if (cursor.isNull(commentIdx)) "" else cursor.getString(commentIdx)
-
-                    result.add(
-                        PaidCommitmentInfo(
-                            id = id,
-                            title = "Provisions • $payee",
-                            subtitle = if (comment.isNotBlank()) comment else "Category: Grocery",
-                            amount = amt,
-                            paidDate = date,
-                            payer = "SELF",
-                            commitmentType = CommitmentType.UTILITY,
-                            iconKey = "grocery"
                         )
                     )
                 }
