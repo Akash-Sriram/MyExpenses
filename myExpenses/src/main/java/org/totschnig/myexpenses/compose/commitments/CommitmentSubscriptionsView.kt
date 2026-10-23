@@ -515,9 +515,10 @@ fun SubscriptionCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    StatusBadge(isPaid = nextPayment == null, dueDateMillis = nextPayment?.dueDate ?: sub.nextRenewalDate)
+                    val isPaid = item.isCurrentCyclePaid
+                    StatusBadge(isPaid = isPaid, dueDateMillis = nextPayment?.dueDate ?: sub.nextRenewalDate)
                     Text(
-                        text = "Renewal: ${formatCommitmentDate(nextPayment?.dueDate ?: sub.nextRenewalDate)}",
+                        text = if (isPaid) "Next Renewal: ${formatCommitmentDate(nextPayment?.dueDate ?: sub.nextRenewalDate)}" else "Renewal: ${formatCommitmentDate(nextPayment?.dueDate ?: sub.nextRenewalDate)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -567,7 +568,7 @@ fun SubscriptionCard(
                     }
                 }
 
-                if (nextPayment != null && sub.status == CommitmentStatus.ACTIVE) {
+                if (nextPayment != null && !item.isCurrentCyclePaid && sub.status == CommitmentStatus.ACTIVE) {
                     Button(
                         onClick = onPay,
                         shape = RoundedCornerShape(8.dp),

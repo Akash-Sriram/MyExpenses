@@ -7,10 +7,13 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -527,11 +530,18 @@ fun MainScreenAdaptive(
                     .padding(bottom = 24.dp)
             ) {
                 Text(
-                    text = stringResource(R.string.more),
+                    text = "More Features & Tools",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
                 )
+                Text(
+                    text = "Reports, people management, and settings",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
                 val reports = overflowItems.filter { it is MenuItem.Distribution || it is MenuItem.History || it is MenuItem.Budget }
                 val manage = overflowItems.filter { it is MenuItem.Parties || it is MenuItem.Loans || it is MenuItem.Templates }
