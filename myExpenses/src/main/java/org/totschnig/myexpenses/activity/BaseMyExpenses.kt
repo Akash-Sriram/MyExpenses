@@ -855,13 +855,8 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
     override fun contribFeatureCalled(feature: ContribFeature, tag: Serializable?) {
         when (feature) {
             ContribFeature.DISTRIBUTION -> {
-                currentAccount?.let {
-                    recordUsage(feature)
-                    startActivity(Intent(this, DistributionActivity::class.java).apply {
-                        forwardCurrentConfiguration(it)
-                        putExtra(DistributionViewModelBase.KEY_GROUPING_INFO, tag)
-                    })
-                }
+                recordUsage(feature)
+                startActivity(Intent(this, InsightsActivity::class.java))
             }
 
             ContribFeature.HISTORY -> {

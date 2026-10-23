@@ -31,6 +31,7 @@ import org.totschnig.myexpenses.db2.Repository
 import org.totschnig.myexpenses.db2.RepositoryCreditCard
 import org.totschnig.myexpenses.db2.RepositoryLoan
 import org.totschnig.myexpenses.db2.RepositoryCommitment
+import org.totschnig.myexpenses.db2.RepositoryInsights
 import org.totschnig.myexpenses.db2.asContentValues
 import org.totschnig.myexpenses.db2.countAccounts
 import org.totschnig.myexpenses.db2.createParty
@@ -126,6 +127,9 @@ open class ContentResolvingAndroidViewModel(application: Application) :
 
     @Inject
     lateinit var repositoryCommitment: RepositoryCommitment
+
+    @Inject
+    lateinit var repositoryInsights: RepositoryInsights
 
     @Inject
     lateinit var prefHandler: PrefHandler

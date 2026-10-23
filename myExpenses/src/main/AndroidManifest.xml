@@ -305,6 +305,11 @@
             android:label="@string/menu_loans" />
 
         <activity
+            android:name=".activity.InsightsActivity"
+            android:exported="false"
+            android:label="@string/menu_insights" />
+
+        <activity
             android:name=".activity.MyExpensesV2"
             android:launchMode="singleTop" />
 

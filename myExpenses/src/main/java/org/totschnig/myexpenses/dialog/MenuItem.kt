@@ -69,7 +69,7 @@ sealed class MenuItem(
 
     data object Distribution : MenuItem(
         R.id.DISTRIBUTION_COMMAND,
-        R.string.menu_distribution,
+        R.string.menu_insights,
         R.drawable.ic_menu_chart
     )
 

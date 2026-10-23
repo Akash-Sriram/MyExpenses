@@ -18,6 +18,7 @@ import org.totschnig.myexpenses.db2.Repository
 import org.totschnig.myexpenses.db2.RepositoryCreditCard
 import org.totschnig.myexpenses.db2.RepositoryLoan
 import org.totschnig.myexpenses.db2.RepositoryCommitment
+import org.totschnig.myexpenses.db2.RepositoryInsights
 import org.totschnig.myexpenses.delegate.CategoryDelegate
 import org.totschnig.myexpenses.delegate.SplitDelegate
 import org.totschnig.myexpenses.delegate.TransferDelegate
@@ -66,6 +67,7 @@ import org.totschnig.myexpenses.viewmodel.ContentResolvingAndroidViewModel
 import org.totschnig.myexpenses.viewmodel.CurrencyViewModel
 import org.totschnig.myexpenses.viewmodel.DebtViewModel
 import org.totschnig.myexpenses.viewmodel.DistributionViewModel
+import org.totschnig.myexpenses.viewmodel.InsightsViewModel
 import org.totschnig.myexpenses.viewmodel.ExportViewModel
 import org.totschnig.myexpenses.viewmodel.FeatureViewModel
 import org.totschnig.myexpenses.viewmodel.LoanViewModel
@@ -142,6 +144,8 @@ interface AppComponent {
     fun repositoryCreditCard(): RepositoryCreditCard
 
     fun repositoryCommitment(): RepositoryCommitment
+
+    fun repositoryInsights(): RepositoryInsights
 
     fun okHttpClientBuilder(): OkHttpClient.Builder
 
@@ -254,6 +258,8 @@ interface AppComponent {
     fun inject(partiesList: PartiesList)
 
     fun inject(distributionViewModel: DistributionViewModel)
+
+    fun inject(insightsViewModel: InsightsViewModel)
 
     fun inject(distributionViewModel: BudgetViewModel2)
 

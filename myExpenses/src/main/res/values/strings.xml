@@ -1278,4 +1278,20 @@
     <string name="next_due">Next Due</string>
     <string name="next_renewal">Next Renewal</string>
     <string name="delete_commitment_confirm">Delete \"%1$s\"?</string>
+
+    <!-- Insights & Analytics Hub -->
+    <string name="menu_insights">Insights</string>
+    <string name="insights_title">Insights &amp; Analytics</string>
+    <string name="insights_cashflow_title">Monthly Cashflow</string>
+    <string name="insights_inflow">Inflow</string>
+    <string name="insights_outflow">Outflow</string>
+    <string name="insights_net_savings">Net Saved</string>
+    <string name="insights_net_deficit">Net Deficit</string>
+    <string name="insights_savings_rate">Savings Rate</string>
+    <string name="insights_daily_average">Daily Avg Spend</string>
+    <string name="insights_monthly_trend_title">6-Month Spending Trend</string>
+    <string name="insights_top_categories_title">Top Spending Categories</string>
+    <string name="insights_top_merchants_title">Top Merchants &amp; Payees</string>
+    <string name="insights_all_accounts">All Accounts (Consolidated)</string>
+    <string name="insights_no_transactions">No expenses recorded for this period.</string>
 </resources>
