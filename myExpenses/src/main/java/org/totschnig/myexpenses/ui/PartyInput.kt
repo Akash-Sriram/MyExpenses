@@ -31,6 +31,7 @@ import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
+import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME_NORMALIZED
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_SHORT_NAME
 import org.totschnig.myexpenses.provider.TABLE_PAYEES
@@ -98,12 +99,7 @@ class PartyInput @JvmOverloads constructor(
                 autoCompleteTextView.setText(value?.name)
                 switchView(INDEX_AUTOCOMPLETE_TEXTVIEW)
             } else {
-                val chipText = if (value.iban.isNullOrBlank()) {
-                    value.name
-                } else {
-                    "${value.name} • ${value.iban}"
-                }
-                selectedItemChip.text = chipText
+                selectedItemChip.text = value.name
                 switchView(INDEX_CHIP_CONTAINER)
             }
         }
@@ -214,8 +210,6 @@ class PartyInput @JvmOverloads constructor(
         payeeAdapter.filterQueryProvider = FilterQueryProvider { constraint: CharSequence? ->
             if (constraint != null) {
                 val normalized = Utils.escapeSqlLikeExpression(Utils.normalize(constraint.toString()))
-                val (selection, selectArgs) =
-                    " AND ${Party.SELECTION_WITH_ALIASES}" to Party.selectionArgsWithAliases(normalized)
                 context.contentResolver.query(
                     TransactionProvider.PAYEES_URI,
                     arrayOf(
@@ -224,9 +218,9 @@ class PartyInput @JvmOverloads constructor(
                         "(SELECT group_concat($KEY_PAYEE_NAME, ', ') FROM $TABLE_PAYEES WHERE $KEY_PARENTID = $TABLE_PAYEES.$KEY_ROWID) AS $KEY_SHORT_NAME",
                         KEY_IBAN
                     ),
-                    "$KEY_PARENTID IS NULL $selection",
-                    selectArgs,
-                    null
+                    Party.SELECTION_WITH_ALIASES,
+                    Party.selectionArgsWithAliases(normalized),
+                    "$KEY_PAYEE_NAME_NORMALIZED ASC, $KEY_PARENTID IS NOT NULL ASC"
                 )
             } else null
         }

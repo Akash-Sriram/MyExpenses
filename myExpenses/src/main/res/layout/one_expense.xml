@@ -289,6 +289,24 @@
                         android:layout_height="wrap_content" />
                 </TableRow>
 
+                <TableRow android:id="@+id/UpiIdRow">
+
+                    <TextView
+                        android:id="@+id/UpiIdLabel"
+                        style="@style/FormLabel"
+                        android:labelFor="@+id/UpiId"
+                        android:text="@string/upi_id" />
+
+                    <EditText
+                        android:id="@+id/UpiId"
+                        style="@style/FormField"
+                        android:hint="@string/upi_id_hint"
+                        android:importantForAutofill="no"
+                        android:inputType="textEmailAddress"
+                        android:maxLines="1"
+                        tools:ignore="TextFields" />
+                </TableRow>
+
                 <TableRow
                     android:id="@+id/DebtRow"
                     android:visibility="gone">

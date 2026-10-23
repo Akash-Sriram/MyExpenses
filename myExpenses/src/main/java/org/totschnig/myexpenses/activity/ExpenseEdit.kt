@@ -827,23 +827,12 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                 }
             }
         }
-        val currentComment = rootBinding.Comment.text?.toString() ?: ""
-        val commentParts = mutableListOf<String>()
-        if (currentComment.isNotBlank()) {
-            commentParts.add(currentComment)
+        data.upiId?.let { upi ->
+            rootBinding.UpiId.setText(upi)
         }
         data.referenceNumber?.let { utr ->
-            if (!currentComment.contains(utr)) {
-                commentParts.add("UTR: $utr")
-            }
-        }
-        data.upiId?.let { upi ->
-            if (!currentComment.contains(upi)) {
-                commentParts.add("UPI: $upi")
-            }
-        }
-        if (commentParts.isNotEmpty() && commentParts.joinToString(" • ") != currentComment) {
-            rootBinding.Comment.setText(commentParts.joinToString(" • "))
+            delegate.methodRowBinding.Number.setText(utr)
+            delegate.setReferenceNumberVisibility()
         }
         val amountStr = data.amount?.let { "₹$it" } ?: ""
         val payeeStr = data.payeeName ?: ""

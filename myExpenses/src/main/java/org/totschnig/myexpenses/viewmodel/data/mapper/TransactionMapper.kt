@@ -31,7 +31,7 @@ object TransactionMapper {
             amount = money,
             date = epoch2LocalDateTime(transaction.date),
             valueDate = epoch2LocalDate(transaction.valueDate),
-            party = transaction.payeeId?.let { DisplayParty(it, transaction.payeeName ?: "") },
+            party = transaction.payeeId?.let { DisplayParty(it, transaction.payeeName ?: "", null, transaction.iban) },
             categoryId = transaction.categoryId,
             categoryPath = transaction.categoryPath,
             categoryIcon = transaction.categoryIcon,

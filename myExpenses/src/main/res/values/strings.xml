@@ -290,6 +290,9 @@
     <string name="qif_parse_failure_found_multiple_accounts">Multiple accounts found in %s file.</string>
     <string name="qif_parse_failure_found_multiple_accounts_cannot_merge">Cannot merge them into existing account.</string>
     <string name="reference_number">UPI Ref / UTR / Txn ID</string>
+    <string name="reference_number_hint">12-digit UTR or Ref #</string>
+    <string name="upi_id">UPI ID</string>
+    <string name="upi_id_hint">name@upi</string>
     <string name="restore_db_failure">Database restore failed.</string>
     <string name="restore_db_success">Database has been restored from backup.</string>
     <string name="restore_preferences_failure">Preferences restore failed</string>

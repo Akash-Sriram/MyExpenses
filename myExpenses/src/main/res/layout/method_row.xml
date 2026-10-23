@@ -38,6 +38,7 @@
         <EditText
             android:id="@+id/Number"
             style="@style/FormField"
+            android:hint="@string/reference_number_hint"
             android:importantForAutofill="no"
             android:inputType="text"
             android:maxLines="1"

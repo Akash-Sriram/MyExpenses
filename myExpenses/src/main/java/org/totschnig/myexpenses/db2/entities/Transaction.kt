@@ -14,6 +14,7 @@ import org.totschnig.myexpenses.provider.KEY_DATE
 import org.totschnig.myexpenses.provider.KEY_DEBT_ID
 import org.totschnig.myexpenses.provider.KEY_EQUIVALENT_AMOUNT
 import org.totschnig.myexpenses.provider.KEY_ICON
+import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_IS_PORTFOLIO
 import org.totschnig.myexpenses.provider.KEY_METHODID
 import org.totschnig.myexpenses.provider.KEY_METHOD_LABEL
@@ -136,6 +137,11 @@ data class Transaction(
     val payeeName: String? = null,
 
     /**
+     * Read-only property holding the payee IBAN / UPI ID.
+     */
+    val iban: String? = null,
+
+    /**
      * Read-only property holding the category icon.
      */
     val categoryIcon: String? = null,
@@ -232,6 +238,7 @@ data class Transaction(
                 currency = getStringOrNull(KEY_CURRENCY),
                 sealed = getBoolean(KEY_SEALED),
                 payeeName = getStringOrNull(KEY_PAYEE_NAME),
+                iban = getStringIfExists(KEY_IBAN),
                 status = getInt(KEY_STATUS),
                 categoryIcon = getStringOrNull(KEY_ICON),
                 methodLabel = getStringOrNull(KEY_METHOD_LABEL),

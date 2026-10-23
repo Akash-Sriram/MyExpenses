@@ -169,7 +169,12 @@ abstract class MainDelegate(
         return buildMainTransaction(account).let {
             it.copy(
                 amount = amount,
-                party = if (!isSplitPart) viewBinding.Payee.partyForSave else null,
+                party = if (!isSplitPart) {
+                    val upiText = viewBinding.UpiId.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                    viewBinding.Payee.partyForSave?.let { p ->
+                        if (upiText != null) p.copy(iban = upiText) else p.copy(iban = null)
+                    }
+                } else null,
                 debtId = this@MainDelegate.debtId,
                 methodId = this@MainDelegate.methodId,
                 originalAmount = viewBinding.OriginalAmount.selectedCurrency?.let {
@@ -201,6 +206,7 @@ abstract class MainDelegate(
         ) { partyId ->
             handleDebts()
             host.onPayeeChanged(partyId)
+            viewBinding.UpiId.setText(viewBinding.Payee.party?.iban ?: "")
             if (partyId != null) {
                 if (withAutoFill && shouldAutoFill) {
                     if (shouldStartAutoFill(prefHandler)) {
@@ -235,6 +241,7 @@ abstract class MainDelegate(
     override fun populateFields(transaction: TransactionEditData, withAutoFill: Boolean) {
         if (!isSplitPart) {
             viewBinding.Payee.party = transaction.party
+            viewBinding.UpiId.setText(transaction.party?.iban ?: "")
         }
         transaction.equivalentAmount?.let {
             viewBinding.EquivalentAmount.setFractionDigits(it.currencyUnit.fractionDigits)

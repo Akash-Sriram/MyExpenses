@@ -85,7 +85,7 @@ import kotlin.math.absoluteValue
 abstract class TransactionDelegate(
     val viewBinding: OneExpenseBinding,
     private val dateEditBinding: DateEditBinding,
-    private val methodRowBinding: MethodRowBinding,
+    val methodRowBinding: MethodRowBinding,
     val isTemplate: Boolean,
 ) : AdapterView.OnItemSelectedListener {
 
@@ -508,17 +508,9 @@ abstract class TransactionDelegate(
         setReferenceNumberVisibility()
     }
 
-    private fun setReferenceNumberVisibility() {
+    fun setReferenceNumberVisibility() {
         if (isTemplate) return
-        //ignore first row "select" merged in
-        val position = methodSpinner.selectedItemPosition
-        val visibility = if (position > 0) {
-            val pm = methodsAdapter.getItem(position - 1)
-            if (pm != null && pm.isNumbered) View.VISIBLE else View.GONE
-        } else {
-            View.GONE
-        }
-        (methodRowBinding.ReferenceNumberRow ?: methodRowBinding.Number).visibility = visibility
+        (methodRowBinding.ReferenceNumberRow ?: methodRowBinding.Number).visibility = View.VISIBLE
     }
 
     val context: Context

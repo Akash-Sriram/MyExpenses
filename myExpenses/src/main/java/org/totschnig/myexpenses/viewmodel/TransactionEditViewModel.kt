@@ -50,6 +50,9 @@ import org.totschnig.myexpenses.db2.loadPlan
 import org.totschnig.myexpenses.db2.loadTemplate
 import org.totschnig.myexpenses.db2.loadTransaction
 import org.totschnig.myexpenses.db2.requireParty
+import org.totschnig.myexpenses.db2.requireRootParty
+import org.totschnig.myexpenses.db2.requireBranchParty
+import org.totschnig.myexpenses.db2.getRootPartyId
 import org.totschnig.myexpenses.db2.savePrice
 import org.totschnig.myexpenses.db2.updateNewPlanEnabled
 import org.totschnig.myexpenses.db2.updatePlan
@@ -219,12 +222,23 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
         userSetExchangeRate: BigDecimal?,
     ): Result<TransactionEditResult> = withContext(coroutineContext()) {
         runCatching {
-            val transaction = transaction.copy(
-                party = transaction.party?.let {
-                    (it.id ?: repository.requireParty(it.name))
-                        ?.let { id -> DisplayParty(id, it.name) }
+            val resolvedParty = transaction.party?.let { party ->
+                val rootId = party.id?.let { id ->
+                    repository.getRootPartyId(id) ?: id
+                } ?: repository.requireRootParty(party.name)
+
+                if (rootId != null) {
+                    val finalPartyId = if (!party.iban.isNullOrBlank()) {
+                        repository.requireBranchParty(rootId, party.name, party.iban)
+                    } else {
+                        rootId
+                    }
+                    DisplayParty(finalPartyId, party.name, party.shortName, party.iban)
+                } else {
+                    party
                 }
-            )
+            }
+            val transaction = transaction.copy(party = resolvedParty)
             val result = if (transaction.isTemplate) {
                 val initialPlanId = transaction.initialPlan?.let {
                     maybeCreateInitialPlan(
