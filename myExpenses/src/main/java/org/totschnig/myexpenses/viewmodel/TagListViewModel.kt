@@ -65,6 +65,12 @@ class TagListViewModel(application: Application, savedStateHandle: SavedStateHan
         }
     }
 
+    fun selectTagId(tagId: Long) {
+        val current = selectedTagIds
+        current.add(tagId)
+        savedStateHandle[KEY_SELECTED_IDS] = current
+    }
+
     var selectedTagIds: MutableSet<Long>
         get() = savedStateHandle[KEY_SELECTED_IDS] ?: mutableSetOf()
         set(value) {
@@ -131,7 +137,7 @@ class TagListViewModel(application: Application, savedStateHandle: SavedStateHan
                 ContentValues().apply { put(KEY_LABEL, label) })?.let {
                 ContentUris.parseId(it)
             }?.let {
-                toggleSelectedTagId(it)
+                selectTagId(it)
                 Tag(it, label)
             }
         }

@@ -13,7 +13,7 @@ open class TagHandlingViewModel(application: Application, savedStateHandle: Save
 
     val tagsLiveData : MutableLiveData<List<Tag>> = savedStateHandle.getLiveData(KEY_MAPPED_TAGS)
 
-    protected var userHasUpdatedTags: Boolean
+    var userHasUpdatedTags: Boolean
         get() = savedStateHandle.get<Boolean>(KEY_USER_HAS_UPDATED_TAG) == true
         set(value) {
             savedStateHandle[KEY_USER_HAS_UPDATED_TAG] = value
@@ -24,6 +24,7 @@ open class TagHandlingViewModel(application: Application, savedStateHandle: Save
             userHasUpdatedTags = true
         }
         tagsLiveData.postValue(tagList)
+        refreshSuggestedTags(tagList)
     }
 
     fun removeTag(tag: Tag) {
@@ -32,22 +33,30 @@ open class TagHandlingViewModel(application: Application, savedStateHandle: Save
     }
 
     fun removeTags(vararg tagIds: Long) {
-        savedStateHandle[KEY_MAPPED_TAGS] = tagsLiveData.value?.filter { !tagIds.contains(it.id) }
+        val updated = tagsLiveData.value?.filter { !tagIds.contains(it.id) }.orEmpty()
+        savedStateHandle[KEY_MAPPED_TAGS] = updated
+        refreshSuggestedTags(updated)
     }
 
     val suggestedTagsLiveData: MutableLiveData<List<Tag>> = MutableLiveData(emptyList())
+    private var cachedSuggestions: List<Tag> = emptyList()
 
     fun fetchSuggestedTags(payeeId: Long?, catId: Long?) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val suggestions = repositoryCommitment.getSuggestedTagsForContext(payeeId, catId)
-                val currentSelectedIds = tagsLiveData.value?.map { it.id }?.toSet() ?: emptySet()
-                val filtered = suggestions.filter { it.id !in currentSelectedIds }
-                suggestedTagsLiveData.postValue(filtered)
+                cachedSuggestions = repositoryCommitment.getSuggestedTagsForContext(payeeId, catId)
+                refreshSuggestedTags(tagsLiveData.value)
             } catch (e: Exception) {
+                cachedSuggestions = emptyList()
                 suggestedTagsLiveData.postValue(emptyList())
             }
         }
+    }
+
+    private fun refreshSuggestedTags(currentTags: List<Tag>?) {
+        val currentSelectedIds = currentTags?.map { it.id }?.toSet() ?: emptySet()
+        val filtered = cachedSuggestions.filter { it.id !in currentSelectedIds }
+        suggestedTagsLiveData.postValue(filtered)
     }
 
     fun addTag(tag: Tag) {
@@ -56,8 +65,7 @@ open class TagHandlingViewModel(application: Application, savedStateHandle: Save
         if (current.none { it.id == tag.id }) {
             val updated = current + tag
             tagsLiveData.postValue(updated)
-            val currentSuggestions = suggestedTagsLiveData.value.orEmpty()
-            suggestedTagsLiveData.postValue(currentSuggestions.filter { it.id != tag.id })
+            refreshSuggestedTags(updated)
         }
     }
 

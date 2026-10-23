@@ -53,6 +53,7 @@ import org.totschnig.myexpenses.db2.requireParty
 import org.totschnig.myexpenses.db2.requireRootParty
 import org.totschnig.myexpenses.db2.requireBranchParty
 import org.totschnig.myexpenses.db2.getRootPartyId
+import org.totschnig.myexpenses.db2.loadTagsForTransaction
 import org.totschnig.myexpenses.db2.savePrice
 import org.totschnig.myexpenses.db2.updateNewPlanEnabled
 import org.totschnig.myexpenses.db2.updatePlan
@@ -115,6 +116,7 @@ import org.totschnig.myexpenses.viewmodel.data.Account
 import org.totschnig.myexpenses.viewmodel.data.InitialPlanData
 import org.totschnig.myexpenses.viewmodel.data.PaymentMethod
 import org.totschnig.myexpenses.viewmodel.data.PlanLoadedData
+import org.totschnig.myexpenses.viewmodel.data.Tag
 import org.totschnig.myexpenses.viewmodel.data.TemplateEditData
 import org.totschnig.myexpenses.viewmodel.data.TransactionEditData
 import org.totschnig.myexpenses.viewmodel.data.TransactionEditResult
@@ -590,7 +592,7 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
 
     fun startAutoFill(id: Long, overridePreferences: Boolean, autoFillAccountFromExtra: Boolean) {
         val dataToLoad = buildList {
-
+            add(KEY_ROWID)
             val autoFillAccountFromPreference =
                 prefHandler.getString(PrefKey.AUTO_FILL_ACCOUNT, "aggregate")
             val mayLoadAccount =
@@ -632,7 +634,9 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                 dataToLoad.toTypedArray(), null, null, null
             )?.use {
                 if (it.moveToFirst()) {
-                    _autoFillData.tryEmit(AutoFillData.fromCursor(it, currencyContext))
+                    val txnId = it.getLongIfExists(KEY_ROWID)
+                    val tags = txnId?.let { tid -> repository.loadTagsForTransaction(tid) }
+                    _autoFillData.tryEmit(AutoFillData.fromCursor(it, currencyContext, tags))
                 }
             }
         }
@@ -768,9 +772,10 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
         val methodId: Long?,
         val accountId: Long?,
         val debtId: Long?,
+        val tags: List<Tag>? = null,
     ) {
         companion object {
-            fun fromCursor(cursor: Cursor, currencyContext: CurrencyContext) = AutoFillData(
+            fun fromCursor(cursor: Cursor, currencyContext: CurrencyContext, tags: List<Tag>? = null) = AutoFillData(
                 catId = cursor.getLongIfExists(KEY_CATID),
                 label = cursor.getStringIfExists(KEY_LABEL),
                 icon = cursor.getStringIfExists(KEY_ICON),
@@ -782,7 +787,8 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                 },
                 methodId = cursor.getLongIfExists(KEY_METHODID),
                 accountId = cursor.getLongIfExists(KEY_ACCOUNTID),
-                debtId = cursor.getLongIfExists(KEY_DEBT_ID)
+                debtId = cursor.getLongIfExists(KEY_DEBT_ID),
+                tags = tags
             )
         }
     }

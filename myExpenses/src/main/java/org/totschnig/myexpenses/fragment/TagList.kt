@@ -219,24 +219,24 @@ class TagList : Fragment(), OnDialogResultListener {
     private fun addTag(commit: Boolean = false) {
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         binding.tagEdit.text.toString().trim().takeIf { it.isNotEmpty() }?.let { label ->
-            val position = adapter.getPosition(label)
-            if (position > -1) {
-                (activity as? ProtectedFragmentActivity)?.showSnackBar(
-                    getString(
-                        R.string.already_defined,
-                        label
-                    )
-                )
+            val existingTag = viewModel.allTags.find { it.label.equals(label, ignoreCase = true) }
+            if (existingTag != null) {
+                viewModel.selectTagId(existingTag.id)
+                binding.tagEdit.text = null
+                adapter.notifyDataSetChanged()
+                if (commit) {
+                    commit(existingTag)
+                }
             } else {
                 viewLifecycleOwner.lifecycleScope.launch {
                     val tag = viewModel.addTagAndPersist(label)
-                    tag?.let { viewModel.toggleSelectedTagId(it.id) }
+                    tag?.let { viewModel.selectTagId(it.id) }
+                    binding.tagEdit.text = null
                     if (commit) {
                         commit(tag)
                     }
                 }
             }
-            binding.tagEdit.text = null
         } ?: kotlin.run { if (commit) commit(null) }
     }
 

@@ -538,9 +538,9 @@ open class TransactionProvider : BaseTransactionProvider() {
 
       AUTOFILL -> {
         qb = SupportSQLiteQueryBuilder.builder(VIEW_EXTENDED)
-        sel = "$KEY_ROWID= (SELECT max($KEY_ROWID) FROM $TABLE_TRANSACTIONS WHERE $WHERE_NOT_SPLIT AND $KEY_PAYEEID IN (?, (SELECT $KEY_PARENTID FROM $TABLE_PAYEES WHERE $KEY_ROWID = ?)))"
+        sel = "$KEY_ROWID = (SELECT max($KEY_ROWID) FROM $TABLE_TRANSACTIONS WHERE $WHERE_NOT_SPLIT AND $KEY_PAYEEID IN (SELECT _id FROM $TABLE_PAYEES WHERE _id = ? OR parent_id = ? OR (parent_id IS NOT NULL AND parent_id = (SELECT parent_id FROM $TABLE_PAYEES WHERE _id = ?)) OR _id = (SELECT parent_id FROM $TABLE_PAYEES WHERE _id = ?)))"
         val id = uri.pathSegments[1]
-        selArgs = arrayOf<Any>(id, id)
+        selArgs = arrayOf<Any>(id, id, id, id)
       }
 
       ACCOUNT_EXCHANGE_RATE -> {

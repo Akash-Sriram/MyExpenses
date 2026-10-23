@@ -2192,24 +2192,31 @@ class RepositoryCommitment @Inject constructor(
     fun getSuggestedTagsForContext(payeeId: Long?, catId: Long?): List<Tag> {
         val results = LinkedHashMap<Long, Tag>()
         val db = openHelper.readableDatabase
+        val maxSuggestions = 8
 
         try {
-            // 1. By Payee (Highest Priority)
+            // 1. By Payee (Highest Priority) - includes full hierarchy (root, branches, siblings)
             if (payeeId != null && payeeId > 0) {
                 db.query("""
                     SELECT tg._id, tg.label, tg.color, count(*) as freq, max(tr.date) as last_used
                     FROM $TABLE_TRANSACTIONS_TAGS tt
                     JOIN $TABLE_TRANSACTIONS tr ON tt.transaction_id = tr._id
                     JOIN $TABLE_TAGS tg ON tt.tag_id = tg._id
-                    WHERE tr.$KEY_PAYEEID = ?
+                    WHERE tr.$KEY_PAYEEID IN (
+                        SELECT _id FROM $TABLE_PAYEES 
+                        WHERE _id = ? 
+                           OR parent_id = ? 
+                           OR (parent_id IS NOT NULL AND parent_id = (SELECT parent_id FROM $TABLE_PAYEES WHERE _id = ?))
+                           OR _id = (SELECT parent_id FROM $TABLE_PAYEES WHERE _id = ?)
+                    )
                     GROUP BY tt.tag_id
                     ORDER BY freq DESC, last_used DESC
-                    LIMIT 4
-                """.trimIndent(), arrayOf(payeeId.toString())).use { cursor ->
+                    LIMIT $maxSuggestions
+                """.trimIndent(), arrayOf(payeeId.toString(), payeeId.toString(), payeeId.toString(), payeeId.toString())).use { cursor ->
                     val idIdx = cursor.getColumnIndexOrThrow("_id")
                     val labelIdx = cursor.getColumnIndexOrThrow(KEY_LABEL)
                     val colorIdx = cursor.getColumnIndexOrThrow(KEY_COLOR)
-                    while (cursor.moveToNext() && results.size < 4) {
+                    while (cursor.moveToNext() && results.size < maxSuggestions) {
                         val id = cursor.getLong(idIdx)
                         val label = cursor.getString(labelIdx)
                         val color = if (cursor.isNull(colorIdx)) null else cursor.getInt(colorIdx)
@@ -2219,7 +2226,7 @@ class RepositoryCommitment @Inject constructor(
             }
 
             // 2. By Category (if slots remain)
-            if (results.size < 4 && catId != null && catId > 0) {
+            if (results.size < maxSuggestions && catId != null && catId > 0) {
                 db.query("""
                     SELECT tg._id, tg.label, tg.color, count(*) as freq, max(tr.date) as last_used
                     FROM $TABLE_TRANSACTIONS_TAGS tt
@@ -2228,12 +2235,12 @@ class RepositoryCommitment @Inject constructor(
                     WHERE tr.$KEY_CATID = ?
                     GROUP BY tt.tag_id
                     ORDER BY freq DESC, last_used DESC
-                    LIMIT 4
+                    LIMIT $maxSuggestions
                 """.trimIndent(), arrayOf(catId.toString())).use { cursor ->
                     val idIdx = cursor.getColumnIndexOrThrow("_id")
                     val labelIdx = cursor.getColumnIndexOrThrow(KEY_LABEL)
                     val colorIdx = cursor.getColumnIndexOrThrow(KEY_COLOR)
-                    while (cursor.moveToNext() && results.size < 4) {
+                    while (cursor.moveToNext() && results.size < maxSuggestions) {
                         val id = cursor.getLong(idIdx)
                         if (!results.containsKey(id)) {
                             val label = cursor.getString(labelIdx)
@@ -2245,7 +2252,7 @@ class RepositoryCommitment @Inject constructor(
             }
 
             // 3. Fallback to globally frequent recent tags
-            if (results.size < 4) {
+            if (results.size < maxSuggestions) {
                 db.query("""
                     SELECT tg._id, tg.label, tg.color, count(*) as freq, max(tr.date) as last_used
                     FROM $TABLE_TRANSACTIONS_TAGS tt
@@ -2253,7 +2260,7 @@ class RepositoryCommitment @Inject constructor(
                     JOIN $TABLE_TAGS tg ON tt.tag_id = tg._id
                     GROUP BY tt.tag_id
                     ORDER BY freq DESC, last_used DESC
-                    LIMIT 4
+                    LIMIT $maxSuggestions
                 """.trimIndent(), emptyArray()).use { cursor ->
                     val idIdx = cursor.getColumnIndexOrThrow("_id")
                     val labelIdx = cursor.getColumnIndexOrThrow(KEY_LABEL)

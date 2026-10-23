@@ -1862,6 +1862,9 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     data?.let {
                         (delegate as? CategoryDelegate)?.autoFill(it)
                         viewModel.autoFillDone()
+                        if (!viewModel.userHasUpdatedTags && !it.tags.isNullOrEmpty()) {
+                            viewModel.updateTags(it.tags, false)
+                        }
                         viewModel.fetchSuggestedTags(
                             rootBinding.Payee.party?.id,
                             if (it.catId != 0L) it.catId else null
