@@ -17,7 +17,16 @@ import org.totschnig.myexpenses.service.AutoBackupWorker
 import org.totschnig.myexpenses.service.PREF_KEY_RESOLVE_CONTACTS_PAYEE
 import org.totschnig.myexpenses.service.PREF_KEY_SMS_LOGGING_ENABLED
 import org.totschnig.myexpenses.util.AppDirHelper
+import android.content.Intent
+import org.totschnig.myexpenses.util.io.displayName
 import org.totschnig.myexpenses.util.ui.setNightMode
+import timber.log.Timber
+
+data class BackupLocationInfo(
+    val uri: Uri?,
+    val displayName: String,
+    val isDefault: Boolean
+)
 
 data class SettingsBackupSnapshot(
     val uri: Uri,
@@ -67,6 +76,9 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
     )
     val autoBackup: StateFlow<Boolean> = _autoBackup.asStateFlow()
 
+    private val _backupLocation = MutableStateFlow<BackupLocationInfo?>(null)
+    val backupLocation: StateFlow<BackupLocationInfo?> = _backupLocation.asStateFlow()
+
     private val _backupSnapshots = MutableStateFlow<List<SettingsBackupSnapshot>>(emptyList())
     val backupSnapshots: StateFlow<List<SettingsBackupSnapshot>> = _backupSnapshots.asStateFlow()
 
@@ -74,6 +86,7 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
     val backupOpState: StateFlow<BackupOperationState> = _backupOpState.asStateFlow()
 
     init {
+        loadBackupLocation()
         loadBackups()
     }
 
@@ -108,6 +121,46 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
         prefHandler.putBoolean(PrefKey.AUTO_BACKUP, enabled)
         _autoBackup.value = enabled
         AutoBackupWorker.enqueueOrCancel(getApplication(), prefHandler)
+    }
+
+    fun loadBackupLocation() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            AppDirHelper.getAppDirWithDefault(app).onSuccess { (docFile, isDefault) ->
+                _backupLocation.value = BackupLocationInfo(
+                    uri = if (isDefault) null else docFile.uri,
+                    displayName = if (isDefault) "Default App Storage" else docFile.displayName,
+                    isDefault = isDefault
+                )
+            }.onFailure {
+                _backupLocation.value = BackupLocationInfo(
+                    uri = null,
+                    displayName = "Default App Storage",
+                    isDefault = true
+                )
+            }
+        }
+    }
+
+    fun setBackupFolder(uri: Uri?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            if (uri != null) {
+                try {
+                    app.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (e: Exception) {
+                    Timber.e(e, "Error taking persistable URI permission")
+                }
+                prefHandler.putString(PrefKey.APP_DIR, uri.toString())
+            } else {
+                prefHandler.putString(PrefKey.APP_DIR, null)
+            }
+            loadBackupLocation()
+            loadBackups()
+        }
     }
 
     fun loadBackups() {
