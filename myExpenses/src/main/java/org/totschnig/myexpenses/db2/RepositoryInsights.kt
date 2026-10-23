@@ -73,6 +73,15 @@ data class InsightAccount(
     val currency: String
 )
 
+data class MonthlyBudgetInfo(
+    val budgetCapPaise: Long = 5000000L, // Default ₹50,000
+    val spentPaise: Long = 0L,
+    val remainingPaise: Long = 5000000L,
+    val percentSpent: Float = 0f,
+    val daysRemaining: Int = 30,
+    val dailySafeSpendPaise: Long = 166666L
+)
+
 @Singleton
 class RepositoryInsights @Inject constructor(
     private val openHelper: SupportSQLiteOpenHelper,

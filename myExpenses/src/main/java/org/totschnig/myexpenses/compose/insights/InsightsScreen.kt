@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.Store
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,6 +46,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,7 +57,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +78,7 @@ import org.totschnig.myexpenses.compose.LocalCurrencyFormatter
 import org.totschnig.myexpenses.db2.CashflowSummary
 import org.totschnig.myexpenses.db2.CategorySpendItem
 import org.totschnig.myexpenses.db2.MerchantSpendItem
+import org.totschnig.myexpenses.db2.MonthlyBudgetInfo
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.util.formatMoney
@@ -97,6 +106,8 @@ fun InsightsScreen(
     val trends by viewModel.monthlyTrends.collectAsState()
     val topCategories by viewModel.topCategories.collectAsState()
     val topMerchants by viewModel.topMerchants.collectAsState()
+    val monthlyBudget by viewModel.monthlyBudget.collectAsState()
+    var showEditBudgetDialog by remember { mutableStateOf(false) }
 
     val currencyContext = LocalCurrencyContext.current
     val homeCurrency = currencyContext.homeCurrencyUnit
@@ -167,6 +178,15 @@ fun InsightsScreen(
                 )
             }
 
+            // 3b. Monthly Spending Budget & Pace Card
+            item(key = "monthly_budget_card") {
+                MonthlyBudgetCard(
+                    budget = monthlyBudget,
+                    currency = homeCurrency,
+                    onEditLimit = { showEditBudgetDialog = true }
+                )
+            }
+
             // 4. 6-Month Spending Trend Bar Chart Card
             item(key = "monthly_trend_chart") {
                 InsightsTrendChartCard(
@@ -196,6 +216,17 @@ fun InsightsScreen(
             item(key = "bottom_space") {
                 Spacer(modifier = Modifier.height(32.dp))
             }
+        }
+
+        if (showEditBudgetDialog) {
+            EditBudgetLimitDialog(
+                currentLimitPaise = monthlyBudget.budgetCapPaise,
+                onDismiss = { showEditBudgetDialog = false },
+                onConfirm = { newCap ->
+                    viewModel.setBudgetCap(newCap)
+                    showEditBudgetDialog = false
+                }
+            )
         }
     }
 }
@@ -849,4 +880,234 @@ private fun TopMerchantsCard(
             }
         }
     }
+}
+
+@Composable
+private fun MonthlyBudgetCard(
+    budget: MonthlyBudgetInfo,
+    currency: CurrencyUnit,
+    onEditLimit: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val formatter = LocalCurrencyFormatter.current
+    val progress = budget.percentSpent.coerceIn(0f, 1f)
+    val isOverBudget = budget.spentPaise > budget.budgetCapPaise
+
+    val statusColor = when {
+        isOverBudget -> RedAmount
+        budget.percentSpent > 0.85f -> OrangeAccent
+        else -> GreenAmount
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(statusColor.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Savings,
+                            contentDescription = null,
+                            tint = statusColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Monthly Spending Budget",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isOverBudget) "Budget cap exceeded!" else "${(budget.percentSpent * 100).toInt()}% of budget spent",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = statusColor,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                TextButton(onClick = onEditLimit) {
+                    Text(
+                        text = "Edit Limit",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Visual linear progress bar
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp)),
+                color = statusColor,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 3-Column Metrics (Spent, Remaining, Daily Safe Pace)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text = "Spent",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatter.formatMoney(Money(currency, budget.spentPaise)),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Remaining",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatter.formatMoney(Money(currency, budget.remainingPaise)),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (budget.remainingPaise > 0) GreenAmount else RedAmount
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Daily Safe Pace",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${formatter.formatMoney(Money(currency, budget.dailySafeSpendPaise))}/d",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = OrangeAccent
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Monthly Cap: ${formatter.formatMoney(Money(currency, budget.budgetCapPaise))}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "${budget.daysRemaining} days left",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditBudgetLimitDialog(
+    currentLimitPaise: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var textValue by remember { mutableStateOf((currentLimitPaise / 100).toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("Set Monthly Budget Limit", fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column {
+                Text(
+                    "Set your maximum spending target for the month. Insights will calculate your daily safe spending pace.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = { input ->
+                        if (input.all { it.isDigit() }) {
+                            textValue = input
+                        }
+                    },
+                    label = { Text("Monthly Budget (₹)") },
+                    prefix = { Text("₹ ") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(30000L, 50000L, 75000L).forEach { quickAmount ->
+                        OutlinedButton(
+                            onClick = { textValue = quickAmount.toString() },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text("₹${quickAmount / 1000}k", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsed = textValue.toLongOrNull() ?: 50000L
+                    onConfirm(parsed * 100L)
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

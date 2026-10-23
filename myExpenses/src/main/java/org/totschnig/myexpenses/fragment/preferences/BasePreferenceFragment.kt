@@ -98,7 +98,7 @@ abstract class BasePreferenceFragment : PreferenceFragmentCompat(),
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         headerPreference?.isVisible =
-            !preferenceActivity.twoPanePreference.slidingPaneLayout.isSlideable
+            preferenceActivity.twoPanePreference?.slidingPaneLayout?.isSlideable == false
     }
 
     val headerPreference: HeaderPreference?

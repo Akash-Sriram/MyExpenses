@@ -12,6 +12,7 @@ import org.totschnig.myexpenses.sync.SyncAdapter
 import org.totschnig.myexpenses.util.AppDirHelper
 import org.totschnig.myexpenses.util.ZipUtils
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
+import org.totschnig.myexpenses.util.crypt.EncryptionHelper
 import org.totschnig.myexpenses.util.localizedThrowable
 import java.io.File
 import java.time.LocalDate
@@ -40,12 +41,23 @@ fun doBackup(
         backup(cacheDir, context, prefHandler, lenientMode).getOrThrow()
         try {
             ZipUtils.zipBackup(context, cacheDir, backupFile, password, lenientMode)
+
+            // Automated SQLite & ZIP Integrity Validation
+            val isValid = validateBackupFile(context, backupFile, password)
+            if (!isValid) {
+                backupFile.delete()
+                throw IllegalStateException("Backup integrity check failed! Corrupt file deleted. Existing healthy backups were preserved.")
+            }
+
             try {
                 sync(context.contentResolver, cloudStorage, backupFile)
             } catch (e: Exception) {
                 if (!lenientMode) throw e
             }
-            backupFile to listOldBackups(appDir, prefHandler)
+
+            // Keep exactly the last 3 healthy backups, prune older ones silently
+            val pruned = pruneOldBackups(appDir, prefHandler.backupFilePrefix, keep = 3)
+            backupFile to pruned
         } catch (e: Throwable) {
             CrashHandler.report(e)
             throw if (e is OutOfMemoryError && encrypted) {
@@ -57,6 +69,56 @@ fun doBackup(
     }
 }
 
+fun validateBackupFile(
+    context: Context,
+    backupFile: DocumentFile,
+    password: String? = null
+): Boolean {
+    val tempDir = AppDirHelper.newWorkingDirectory(context, "validate_backup").getOrNull() ?: return false
+    return try {
+        context.contentResolver.openInputStream(backupFile.uri)?.use { inputStream ->
+            val wrapped = EncryptionHelper.wrap(inputStream) ?: return false
+            val isEncrypted = EncryptionHelper.isEncrypted(wrapped)
+            ZipUtils.unzip(wrapped, tempDir, if (isEncrypted) password else null)
+        } ?: return false
+
+        val dbFile = getBackupDbFile(tempDir)
+        val prefFile = getBackupPrefFile(tempDir)
+        if (!dbFile.exists() || !prefFile.exists()) return false
+
+        android.database.sqlite.SQLiteDatabase.openDatabase(dbFile.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY).use { db ->
+            val version = db.version
+            if (version > DATABASE_VERSION) return false
+
+            val pragmaCheckOk = db.rawQuery("PRAGMA integrity_check", null).use { cursor ->
+                cursor.moveToFirst() && cursor.getString(0).equals("ok", ignoreCase = true)
+            }
+            val integrityOk = try { db.isDatabaseIntegrityOk } catch (_: Exception) { false }
+            pragmaCheckOk && integrityOk
+        }
+    } catch (e: Exception) {
+        timber.log.Timber.e(e, "Backup validation failed for %s", backupFile.name)
+        false
+    } finally {
+        tempDir.deleteRecursively()
+    }
+}
+
+fun pruneOldBackups(
+    appDir: DocumentFile,
+    prefix: String = "myexpenses-backup",
+    keep: Int = 3
+): List<DocumentFile> {
+    val backups = appDir.listFiles()
+        .filter {
+            it.name?.matches("""$prefix-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()) == true
+        }
+        .sortedByDescending { it.lastModified() }
+    val toDelete = backups.drop(keep)
+    toDelete.forEach { it.delete() }
+    return toDelete
+}
+
 private val PrefHandler.backupFilePrefix
     get() = requireString(
         PrefKey.BACKUP_FILE_PREFIX,
@@ -64,15 +126,13 @@ private val PrefHandler.backupFilePrefix
     )
 
 fun listOldBackups(appDir: DocumentFile, prefHandler: PrefHandler): List<DocumentFile> {
-    val keep = prefHandler.getInt(PrefKey.PURGE_BACKUP_KEEP, 0)
-    return if (prefHandler.getBoolean(PrefKey.PURGE_BACKUP, false) && keep > 0) {
-        appDir.listFiles()
-            .filter {
-                it.name?.matches("""${prefHandler.backupFilePrefix}-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()) == true
-            }
-            .sortedBy { it.lastModified() }
-            .dropLast(keep)
-    } else emptyList()
+    val keep = prefHandler.getInt(PrefKey.PURGE_BACKUP_KEEP, 3)
+    val backups = appDir.listFiles()
+        .filter {
+            it.name?.matches("""${prefHandler.backupFilePrefix}-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()) == true
+        }
+        .sortedByDescending { it.lastModified() }
+    return backups.drop(keep)
 }
 
 private fun sync(contentResolver: ContentResolver, backend: String?, backupFile: DocumentFile) {

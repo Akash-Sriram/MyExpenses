@@ -20,6 +20,7 @@ const val CHANNEL_ID_PLANNER = "planner"
 const val CHANNEL_ID_DEFAULT = "default"
 const val CHANNEL_ID_AUTO_BACKUP = "autoBackup"
 const val CHANNEL_ID_LOANS = "loans"
+const val CHANNEL_ID_SMS = "sms_logging"
 
 class NotificationBuilderWrapper(
     private val context: Context,
@@ -130,6 +131,15 @@ class NotificationBuilderWrapper(
                     context.getString(R.string.loan_due_notification_channel),
                     NotificationManager.IMPORTANCE_HIGH
                 )
+            )
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID_SMS,
+                    "Bank & UPI SMS 1-Tap Log",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Actionable notifications to quickly log bank and UPI debit SMS"
+                }
             )
         }
 

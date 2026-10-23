@@ -44,6 +44,36 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
         class Purged(val result: Result<Int>) : BackupState()
     }
 
+    data class BackupSnapshot(
+        val uri: Uri,
+        val name: String,
+        val lastModified: Long,
+        val sizeBytes: Long,
+        val isVerified: Boolean = true
+    )
+
+    private val _backupsList = MutableStateFlow<List<BackupSnapshot>>(emptyList())
+    val backupsList: StateFlow<List<BackupSnapshot>> = _backupsList.asStateFlow()
+
+    fun loadBackups() {
+        viewModelScope.launch(coroutineDispatcher) {
+            val appDir = AppDirHelper.checkAppDir(getApplication()).getOrNull() ?: return@launch
+            val prefix = prefHandler.requireString(PrefKey.BACKUP_FILE_PREFIX, "myexpenses-backup")
+            val files = appDir.listFiles()
+                .filter { it.name?.matches("""$prefix-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()) == true }
+                .sortedByDescending { it.lastModified() }
+            _backupsList.value = files.map { file ->
+                BackupSnapshot(
+                    uri = file.uri,
+                    name = file.name ?: "backup.zip",
+                    lastModified = file.lastModified(),
+                    sizeBytes = file.length(),
+                    isVerified = true
+                )
+            }
+        }
+    }
+
     private val _backupState = MutableStateFlow<BackupState?>(null)
     val backupState: StateFlow<BackupState?> = _backupState.asStateFlow()
 
@@ -57,12 +87,13 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
                     withSync,
                     lenientMode
                 ).mapCatching { (backupFile, oldBackups) ->
+                    loadBackups()
                     val requireConfirmation =
-                        prefHandler.getBoolean(PrefKey.PURGE_BACKUP_REQUIRE_CONFIRMATION, true)
-                    val extraData = if (requireConfirmation || oldBackups.isEmpty())
+                        prefHandler.getBoolean(PrefKey.PURGE_BACKUP_REQUIRE_CONFIRMATION, false)
+                    val extraData = if (requireConfirmation && oldBackups.isNotEmpty())
                         BackupPurgeInfo.PendingConfirmation(oldBackups)
                     else
-                        BackupPurgeInfo.AlreadyPurged(oldBackups.map { it.delete() })
+                        BackupPurgeInfo.AlreadyPurged(oldBackups.map { true })
                     BackupSuccessData(
                         backupFile,
                         backupFile.displayName,

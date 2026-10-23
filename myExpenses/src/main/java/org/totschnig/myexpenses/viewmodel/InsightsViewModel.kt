@@ -59,6 +59,42 @@ class InsightsViewModel(application: Application) : ContentResolvingAndroidViewM
         repositoryInsights.getTopMerchants(month, accId, limit = 8)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribedWithTimeout, emptyList())
 
+    private val _budgetCapPaise = MutableStateFlow(
+        prefHandler.getLong("monthly_budget_cap_paise", 5000000L)
+    )
+    val budgetCapPaise: StateFlow<Long> = _budgetCapPaise.asStateFlow()
+
+    fun setBudgetCap(capPaise: Long) {
+        prefHandler.putLong("monthly_budget_cap_paise", capPaise)
+        _budgetCapPaise.value = capPaise
+    }
+
+    val monthlyBudget: StateFlow<org.totschnig.myexpenses.db2.MonthlyBudgetInfo> = combine(
+        cashflowSummary,
+        _budgetCapPaise,
+        _selectedMonth
+    ) { summary, cap, month ->
+        val spent = summary.outflowPaise
+        val remaining = (cap - spent).coerceAtLeast(0L)
+        val percent = if (cap > 0) (spent.toFloat() / cap.toFloat()).coerceAtLeast(0f) else 0f
+        val today = java.time.LocalDate.now()
+        val isCurrentMonth = month == YearMonth.now()
+        val daysRemaining = if (isCurrentMonth) {
+            (month.lengthOfMonth() - today.dayOfMonth + 1).coerceAtLeast(1)
+        } else {
+            month.lengthOfMonth()
+        }
+        val dailySafe = if (daysRemaining > 0) remaining / daysRemaining else 0L
+        org.totschnig.myexpenses.db2.MonthlyBudgetInfo(
+            budgetCapPaise = cap,
+            spentPaise = spent,
+            remainingPaise = remaining,
+            percentSpent = percent,
+            daysRemaining = daysRemaining,
+            dailySafeSpendPaise = dailySafe
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribedWithTimeout, org.totschnig.myexpenses.db2.MonthlyBudgetInfo())
+
     fun selectMonth(yearMonth: YearMonth) {
         _selectedMonth.value = yearMonth
     }
