@@ -2,11 +2,15 @@ package org.totschnig.myexpenses.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.totschnig.myexpenses.MyApplication
+import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.doBackup
 import org.totschnig.myexpenses.service.AutoBackupWorker
@@ -30,7 +34,10 @@ sealed interface BackupOperationState {
     data class Error(val message: String) : BackupOperationState
 }
 
-class SettingsViewModel2(application: Application) : ContentResolvingAndroidViewModel(application) {
+class SettingsViewModel2(application: Application) : AndroidViewModel(application) {
+
+    private val prefHandler: PrefHandler
+        get() = (getApplication<Application>() as MyApplication).prefHandler
 
     private val _theme = MutableStateFlow(prefHandler.uiMode(application) ?: "auto")
     val theme: StateFlow<String> = _theme.asStateFlow()
@@ -104,7 +111,7 @@ class SettingsViewModel2(application: Application) : ContentResolvingAndroidView
     }
 
     fun loadBackups() {
-        viewModelScope.launch(coroutineDispatcher) {
+        viewModelScope.launch(Dispatchers.IO) {
             val appDir = AppDirHelper.checkAppDir(getApplication()).getOrNull() ?: return@launch
             val prefix = prefHandler.requireString(PrefKey.BACKUP_FILE_PREFIX, "myexpenses-backup")
             val files = appDir.listFiles()
@@ -123,7 +130,7 @@ class SettingsViewModel2(application: Application) : ContentResolvingAndroidView
     }
 
     fun performBackupNow() {
-        viewModelScope.launch(coroutineDispatcher) {
+        viewModelScope.launch(Dispatchers.IO) {
             _backupOpState.value = BackupOperationState.InProgress
             val result = doBackup(getApplication(), prefHandler, withSync = false)
             result.onSuccess { (file, _) ->
