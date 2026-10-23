@@ -543,9 +543,9 @@ fun MainScreenAdaptive(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val reports = overflowItems.filter { it is MenuItem.Distribution || it is MenuItem.History || it is MenuItem.Budget }
+                val reports = overflowItems.filter { it is MenuItem.Distribution || it is MenuItem.Budget }
                 val manage = overflowItems.filter { it is MenuItem.Parties || it is MenuItem.Loans || it is MenuItem.Templates }
-                val system = overflowItems.filter { it !in reports && it !in manage }
+                val system = overflowItems.filter { it !in reports && it !in manage && it !is MenuItem.History }
 
                 val renderSection = @Composable { title: String, items: List<MenuItem> ->
                     if (items.isNotEmpty()) {

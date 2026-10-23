@@ -860,12 +860,8 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             }
 
             ContribFeature.HISTORY -> {
-                currentAccount?.let {
-                    recordUsage(feature)
-                    startActivity(Intent(this, HistoryActivity::class.java).apply {
-                        forwardCurrentConfiguration(it)
-                    })
-                }
+                recordUsage(feature)
+                startActivity(Intent(this, InsightsActivity::class.java))
             }
 
             ContribFeature.SPLIT_TRANSACTION -> {
