@@ -8,6 +8,7 @@ import org.totschnig.myexpenses.databinding.MethodRowBinding
 import org.totschnig.myexpenses.databinding.OneExpenseBinding
 import org.totschnig.myexpenses.db2.entities.Recurrence
 import org.totschnig.myexpenses.preference.shouldStartAutoFillWithFocus
+import org.totschnig.myexpenses.util.upi.UpiReceiptParser
 import org.totschnig.myexpenses.viewmodel.TransactionEditViewModel
 import org.totschnig.myexpenses.viewmodel.data.TransactionEditData
 
@@ -74,7 +75,10 @@ class CategoryDelegate(
             setCategoryButton()
         }
         if (viewBinding.Comment.text.isNullOrEmpty() && data.comment != null) {
-            viewBinding.Comment.setText(data.comment)
+            val clean = UpiReceiptParser.cleanComment(data.comment)
+            if (clean.isNotEmpty()) {
+                viewBinding.Comment.setText(clean)
+            }
         }
 
         if (viewBinding.Amount.getAmount(

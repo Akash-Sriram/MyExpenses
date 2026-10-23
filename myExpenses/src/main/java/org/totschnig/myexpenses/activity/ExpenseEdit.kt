@@ -834,6 +834,10 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             delegate.methodRowBinding.Number.setText(utr)
             delegate.setReferenceNumberVisibility()
         }
+        val cleanedComment = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanComment(rootBinding.Comment.text?.toString())
+        if (cleanedComment != rootBinding.Comment.text?.toString().orEmpty()) {
+            rootBinding.Comment.setText(cleanedComment)
+        }
         val amountStr = data.amount?.let { "₹$it" } ?: ""
         val payeeStr = data.payeeName ?: ""
         val msg = getString(R.string.upi_receipt_detected, amountStr, payeeStr)
@@ -1862,6 +1866,10 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                             rootBinding.Payee.party?.id,
                             if (it.catId != 0L) it.catId else null
                         )
+                        val cleanedComment = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanComment(rootBinding.Comment.text?.toString())
+                        if (cleanedComment != rootBinding.Comment.text?.toString().orEmpty()) {
+                            rootBinding.Comment.setText(cleanedComment)
+                        }
                     }
                 }
             }

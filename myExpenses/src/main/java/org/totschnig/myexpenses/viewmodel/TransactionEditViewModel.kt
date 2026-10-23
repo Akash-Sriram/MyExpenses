@@ -774,7 +774,9 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                 catId = cursor.getLongIfExists(KEY_CATID),
                 label = cursor.getStringIfExists(KEY_LABEL),
                 icon = cursor.getStringIfExists(KEY_ICON),
-                comment = cursor.getStringIfExists(KEY_COMMENT),
+                comment = cursor.getStringIfExists(KEY_COMMENT)?.let {
+                    org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanComment(it).takeIf { c -> c.isNotEmpty() }
+                },
                 amount = cursor.getLongIfExists(KEY_AMOUNT)?.let {
                     Money(currencyContext[cursor.getString(KEY_CURRENCY)], it)
                 },

@@ -723,4 +723,19 @@ class UpiReceiptParserTest {
         assertEquals("Net Banking", result.paymentMethodHint)
         assertEquals("Canara Bank", result.accountOrBankHint)
     }
+
+    @Test
+    fun testCleanComment() {
+        assertEquals("", UpiReceiptParser.cleanComment("UTR: 242169832876 • UPI: paytmqr6tgwxe@ptys"))
+        assertEquals("", UpiReceiptParser.cleanComment("UPI: paytmqr6tgwxe@ptys • UTR: 242169832876"))
+        assertEquals("", UpiReceiptParser.cleanComment("UTR: 450885942956"))
+        assertEquals("", UpiReceiptParser.cleanComment("UPI: pinelabs.stq4526680@pineaxis"))
+        assertEquals("Grocery shopping", UpiReceiptParser.cleanComment("Grocery shopping (UTR: 242169832876 • UPI: paytmqr6tgwxe@ptys)"))
+        assertEquals("Grocery shopping", UpiReceiptParser.cleanComment("Grocery shopping • UTR: 242169832876"))
+        assertEquals("UPI to cash", UpiReceiptParser.cleanComment("UPI to cash"))
+        assertEquals("Upi by Devi", UpiReceiptParser.cleanComment("Upi by Devi"))
+        assertEquals("50 rs shared as upi refund", UpiReceiptParser.cleanComment("50 rs shared as upi refund"))
+        assertEquals("", UpiReceiptParser.cleanComment(null))
+        assertEquals("", UpiReceiptParser.cleanComment(""))
+    }
 }

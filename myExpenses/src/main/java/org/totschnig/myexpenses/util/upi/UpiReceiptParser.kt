@@ -671,4 +671,16 @@ object UpiReceiptParser {
                 lower.contains("refund") ||
                 lower.contains("cashback received")
     }
+
+    @JvmStatic
+    fun cleanComment(comment: String?): String {
+        if (comment.isNullOrBlank()) return ""
+        return comment
+            .replace(Regex("""(?i)\s*(?:[•/,\-]\s*)?UTR\s*:\s*[^\s)\]]+"""), "")
+            .replace(Regex("""(?i)\s*(?:[•/,\-]\s*)?UPI\s*:\s*[^\s)\]]+"""), "")
+            .replace(Regex("""\(\s*\)"""), "")
+            .replace(Regex("""\[\s*\]"""), "")
+            .trim(' ', '•', '-', ',', '/', '(', ')')
+            .trim()
+    }
 }
