@@ -72,7 +72,7 @@ along with My Expenses.  If not, see <http://www.gnu.org/licenses/>.
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
-    <style name="Onboarding" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Onboarding" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimaryDark">?colorSurface</item>
         <item name="textInputStyle">@style/MyTextInputLayout</item>
         <item name="simpleDialogTheme">@style/SimpleDialog</item>

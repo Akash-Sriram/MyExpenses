@@ -51,3 +51,9 @@
 -keep class org.xml.sax.** { *;}
 
 -dontwarn com.google.j2objc.annotations.Weak
+
+# ML Kit OCR & Vision
+-keep public class * implements com.google.firebase.components.ComponentRegistrar {
+    public <init>();
+}
+-keep class com.google.mlkit.** { *; }

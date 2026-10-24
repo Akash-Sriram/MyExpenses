@@ -307,6 +307,8 @@ class AmountInput(context: Context, attrs: AttributeSet?) : ConstraintLayout(con
         this.withTypeSwitch = withTypeSwitch
         with(typeButton) {
             if (withTypeSwitch) {
+                if (textOn.isNullOrEmpty()) textOn = "+"
+                if (textOff.isNullOrEmpty()) textOff = "−"
                 setOnCheckedChangeListener { _: CompoundButton?, isChecked: Boolean ->
                     setContentDescriptionForTypeSwitch()
                     if (typeChangedListener != null) {
