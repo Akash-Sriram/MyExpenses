@@ -32,12 +32,34 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.StartScreen
 import org.totschnig.myexpenses.adapter.ClearingLastPagingSourceFactory
 import org.totschnig.myexpenses.adapter.TradePagingSource
 import org.totschnig.myexpenses.compose.transactions.Action
 import org.totschnig.myexpenses.compose.transactions.FabStyle
+import org.totschnig.myexpenses.db2.FLAG_EXPENSE
+import org.totschnig.myexpenses.db2.FLAG_INCOME
+import org.totschnig.myexpenses.db2.FLAG_NEUTRAL
+import org.totschnig.myexpenses.db2.FLAG_TRANSFER
+import org.totschnig.myexpenses.model.CrStatus
+import org.totschnig.myexpenses.provider.DatabaseConstants.WHERE_NOT_ARCHIVED
+import org.totschnig.myexpenses.provider.DatabaseConstants.WHERE_NOT_SPLIT
+import org.totschnig.myexpenses.provider.KEY_AMOUNT
+import org.totschnig.myexpenses.provider.KEY_CATID
+import org.totschnig.myexpenses.provider.KEY_CR_STATUS
+import org.totschnig.myexpenses.provider.KEY_EXCLUDE_FROM_TOTALS
+import org.totschnig.myexpenses.provider.KEY_TYPE
+import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
+import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
+import org.totschnig.myexpenses.provider.TABLE_TRANSACTIONS
+import org.totschnig.myexpenses.viewmodel.data.BalancePeriod
+import org.totschnig.myexpenses.viewmodel.data.BaseAccount
+import org.totschnig.myexpenses.viewmodel.data.PeriodBalanceSummary
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import org.totschnig.myexpenses.db2.createAccount
 import org.totschnig.myexpenses.db2.createDualSplitTransaction
 import org.totschnig.myexpenses.db2.createTransaction
@@ -1208,4 +1230,151 @@ open class MyExpensesV2ViewModel(
             )
         }
     }
+
+    suspend fun getPeriodSummary(
+        account: BaseAccount,
+        period: BalancePeriod
+    ): PeriodBalanceSummary = withContext(Dispatchers.IO) {
+        val today = LocalDate.now()
+        val zoneId = ZoneId.systemDefault()
+        val dateFmt = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+
+        if (period == BalancePeriod.ALL_TIME) {
+            val opening = when (account) {
+                is FullAccount -> account.openingBalance
+                is AggregateAccount -> account.openingBalance ?: account.equivalentOpeningBalance
+            }
+            val income = when (account) {
+                is FullAccount -> account.sumIncome
+                is AggregateAccount -> account.sumIncome ?: account.equivalentSumIncome
+            }
+            val expense = when (account) {
+                is FullAccount -> account.sumExpense
+                is AggregateAccount -> account.sumExpense ?: account.equivalentSumExpense
+            }
+            val transfer = when (account) {
+                is FullAccount -> account.sumTransfer
+                is AggregateAccount -> account.sumTransfer ?: account.equivalentSumTransfer
+            }
+            val current = when (account) {
+                is FullAccount -> account.currentBalance
+                is AggregateAccount -> account.currentBalance ?: account.equivalentCurrentBalance
+            }
+            return@withContext PeriodBalanceSummary(
+                period = period,
+                openingBalance = opening,
+                sumIncome = income,
+                sumExpense = expense,
+                sumTransfer = transfer,
+                closingBalance = current,
+                startLabel = getString(R.string.opening_balance),
+                endLabel = getString(R.string.current_balance),
+                total = account.total
+            )
+        }
+
+        val firstOfMonth = today.withDayOfMonth(1)
+        val prevMonth = today.minusMonths(1)
+        val firstOfPrev = prevMonth.withDayOfMonth(1)
+        val lastOfPrev = prevMonth.withDayOfMonth(prevMonth.lengthOfMonth())
+
+        val bounds = when (period) {
+            BalancePeriod.THIS_MONTH -> {
+                val start = firstOfMonth.atStartOfDay(zoneId).toEpochSecond()
+                val end = today.atTime(23, 59, 59).atZone(zoneId).toEpochSecond()
+                val sLabel = getString(R.string.opening_balance_with_date, firstOfMonth.format(dateFmt))
+                val eLabel = getString(R.string.current_balance)
+                PeriodBounds(start, end, sLabel, eLabel)
+            }
+            BalancePeriod.LAST_MONTH -> {
+                val start = firstOfPrev.atStartOfDay(zoneId).toEpochSecond()
+                val end = lastOfPrev.atTime(23, 59, 59).atZone(zoneId).toEpochSecond()
+                val sLabel = getString(R.string.opening_balance_with_date, firstOfPrev.format(dateFmt))
+                val eLabel = getString(R.string.closing_balance_with_date, lastOfPrev.format(dateFmt))
+                PeriodBounds(start, end, sLabel, eLabel)
+            }
+            BalancePeriod.ALL_TIME -> error("Handled above")
+        }
+
+        val db = openHelper.readableDatabase
+
+        val (accClause, baseOpening) = when (account) {
+            is FullAccount -> {
+                "t.$KEY_ACCOUNTID = ${account.id}" to account.openingBalance
+            }
+            is AggregateAccount -> {
+                val base = account.openingBalance ?: account.equivalentOpeningBalance
+                "t.$KEY_ACCOUNTID IN (SELECT $KEY_ROWID FROM $TABLE_ACCOUNTS WHERE $KEY_EXCLUDE_FROM_TOTALS = 0)" to base
+            }
+        }
+
+        val query = """
+            SELECT
+                COALESCE(SUM(CASE WHEN t.$KEY_DATE < ? THEN t.$KEY_AMOUNT ELSE 0 END), 0) AS prior_amount,
+                COALESCE(SUM(CASE 
+                    WHEN t.$KEY_DATE >= ? AND t.$KEY_DATE <= ? AND (t.$KEY_TRANSFER_PEER IS NOT NULL OR c.$KEY_TYPE = $FLAG_TRANSFER) 
+                    THEN t.$KEY_AMOUNT ELSE 0 END), 0) AS period_transfer,
+                COALESCE(SUM(CASE 
+                    WHEN t.$KEY_DATE >= ? AND t.$KEY_DATE <= ? AND (t.$KEY_TRANSFER_PEER IS NULL AND (c.$KEY_TYPE != $FLAG_TRANSFER OR c.$KEY_TYPE IS NULL)) AND (c.$KEY_TYPE = $FLAG_INCOME OR (c.$KEY_TYPE IS NULL AND t.$KEY_AMOUNT > 0) OR (c.$KEY_TYPE = $FLAG_NEUTRAL AND t.$KEY_AMOUNT > 0)) 
+                    THEN t.$KEY_AMOUNT ELSE 0 END), 0) AS period_income,
+                COALESCE(SUM(CASE 
+                    WHEN t.$KEY_DATE >= ? AND t.$KEY_DATE <= ? AND (t.$KEY_TRANSFER_PEER IS NULL AND (c.$KEY_TYPE != $FLAG_TRANSFER OR c.$KEY_TYPE IS NULL)) AND (c.$KEY_TYPE = $FLAG_EXPENSE OR (c.$KEY_TYPE IS NULL AND t.$KEY_AMOUNT < 0) OR (c.$KEY_TYPE = $FLAG_NEUTRAL AND t.$KEY_AMOUNT < 0)) 
+                    THEN t.$KEY_AMOUNT ELSE 0 END), 0) AS period_expense
+            FROM $TABLE_TRANSACTIONS t
+            LEFT JOIN $TABLE_CATEGORIES c ON t.$KEY_CATID = c.$KEY_ROWID
+            WHERE $WHERE_NOT_SPLIT 
+              AND $WHERE_NOT_ARCHIVED 
+              AND t.$KEY_CR_STATUS != '${CrStatus.VOID.name}'
+              AND $accClause
+        """.trimIndent()
+
+        val args = arrayOf(
+            bounds.startSecs.toString(),
+            bounds.startSecs.toString(), bounds.endSecs.toString(),
+            bounds.startSecs.toString(), bounds.endSecs.toString(),
+            bounds.startSecs.toString(), bounds.endSecs.toString()
+        )
+
+        var priorAmount = 0L
+        var periodTransfer = 0L
+        var periodIncome = 0L
+        var periodExpense = 0L
+
+        db.query(query, args).use { cursor ->
+            if (cursor.moveToFirst()) {
+                priorAmount = cursor.getLong(0)
+                periodTransfer = cursor.getLong(1)
+                periodIncome = cursor.getLong(2)
+                periodExpense = cursor.getLong(3)
+            }
+        }
+
+        val periodOpening = baseOpening + priorAmount
+        val periodClosing = periodOpening + periodIncome + periodExpense + periodTransfer
+
+        val finalClosing = if (period == BalancePeriod.THIS_MONTH && account.currentBalance != null) {
+            account.currentBalance!!
+        } else {
+            periodClosing
+        }
+
+        PeriodBalanceSummary(
+            period = period,
+            openingBalance = periodOpening,
+            sumIncome = periodIncome,
+            sumExpense = periodExpense,
+            sumTransfer = periodTransfer,
+            closingBalance = finalClosing,
+            startLabel = bounds.startLabel,
+            endLabel = bounds.endLabel,
+            total = account.total
+        )
+    }
+
+    private data class PeriodBounds(
+        val startSecs: Long,
+        val endSecs: Long,
+        val startLabel: String,
+        val endLabel: String
+    )
 }

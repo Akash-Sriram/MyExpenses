@@ -6,6 +6,7 @@ import android.content.ContentProviderOperation
 import android.content.ContentResolver
 import android.database.sqlite.SQLiteConstraintException
 import android.os.Bundle
+import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.lifecycle.LiveData
@@ -130,6 +131,9 @@ open class ContentResolvingAndroidViewModel(application: Application) :
 
     @Inject
     lateinit var repositoryInsights: RepositoryInsights
+
+    @Inject
+    lateinit var openHelper: SupportSQLiteOpenHelper
 
     @Inject
     lateinit var prefHandler: PrefHandler

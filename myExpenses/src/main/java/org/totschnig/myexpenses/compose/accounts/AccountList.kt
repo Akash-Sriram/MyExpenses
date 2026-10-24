@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
@@ -32,6 +34,8 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -115,11 +119,14 @@ import org.totschnig.myexpenses.util.calculateRealExchangeRate
 import org.totschnig.myexpenses.util.convAmount
 import org.totschnig.myexpenses.util.isolateText
 import org.totschnig.myexpenses.viewmodel.data.AggregateAccount
+import org.totschnig.myexpenses.viewmodel.data.BalancePeriod
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.Currency
 import org.totschnig.myexpenses.viewmodel.data.FullAccount
+import org.totschnig.myexpenses.viewmodel.data.PeriodBalanceSummary
 import java.text.DecimalFormat
 import kotlin.math.absoluteValue
+import kotlin.math.roundToLong
 
 const val SIGMA = "Σ"
 
@@ -133,7 +140,7 @@ sealed class AccountEvent {
     data class ViewPriceHistory(val commodity: String) : AccountEvent()
 }
 
-interface AccountEventHandler {
+fun interface AccountEventHandler {
     operator fun invoke(event: AccountEvent, account: FullAccount)
 }
 
@@ -1080,24 +1087,65 @@ fun AccountCard(
 
 
 @Composable
+fun PeriodFilterChips(
+    selectedPeriod: BalancePeriod,
+    onPeriodSelected: (BalancePeriod) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        BalancePeriod.values().forEach { period ->
+            val isSelected = period == selectedPeriod
+            FilterChip(
+                selected = isSelected,
+                onClick = { onPeriodSelected(period) },
+                label = {
+                    Text(
+                        text = stringResource(period.labelRes),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    }
+}
+
+@Composable
 fun AccountSummaryV2(
     account: BaseAccount,
     onDisplayBalanceTypeChange: ((BalanceType) -> Unit)? = null,
-    onAccountEvent: AccountEventHandler,
+    onAccountEvent: AccountEventHandler? = null,
+    periodSummary: PeriodBalanceSummary? = null,
+    selectedPeriod: BalancePeriod = BalancePeriod.THIS_MONTH,
+    onPeriodSelected: ((BalancePeriod) -> Unit)? = null,
 ) {
-
     when (account) {
         is FullAccount -> if (account.isPortfolio)
-            PortfolioInventory(account, onAccountEvent)
+            PortfolioInventory(account, onAccountEvent ?: AccountEventHandler { _, _ -> })
         else
             AccountSummaryV2(
-                account,
-                onDisplayBalanceTypeChange
+                account = account,
+                onDisplayBalanceTypeChange = onDisplayBalanceTypeChange,
+                periodSummary = periodSummary,
+                selectedPeriod = selectedPeriod,
+                onPeriodSelected = onPeriodSelected
             )
 
         is AggregateAccount -> AccountSummaryV2(
-            account,
-            onDisplayBalanceTypeChange
+            account = account,
+            onDisplayBalanceTypeChange = onDisplayBalanceTypeChange,
+            periodSummary = periodSummary,
+            selectedPeriod = selectedPeriod,
+            onPeriodSelected = onPeriodSelected
         )
     }
 }
@@ -1107,64 +1155,165 @@ fun AccountSummaryV2(
 fun AccountSummaryV2(
     account: FullAccount,
     onDisplayBalanceTypeChange: ((BalanceType) -> Unit)? = null,
+    periodSummary: PeriodBalanceSummary? = null,
+    selectedPeriod: BalancePeriod = BalancePeriod.THIS_MONTH,
+    onPeriodSelected: ((BalancePeriod) -> Unit)? = null,
 ) {
     val homeCurrency = LocalCurrencyContext.current.homeCurrencyUnit
     val isFx = account.currency != homeCurrency.code
     val showEquivalentValues = isFx && (account.dynamic || account.hasInitialExchangeRate)
     val balanceType = account.validatedBalanceType
-
-    if (account.openingBalance != 0L) {
-        SumRowV2(
-            label = R.string.opening_balance,
-            amount = account.openingBalance,
-            currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentOpeningBalance.takeIf {
-                isFx && account.hasInitialExchangeRate
-            }
-        )
-    }
-
-    if (account.sumIncome != 0L) {
-        SumRowV2(
-            label = R.string.sum_income,
-            amount = account.sumIncome,
-            currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentSumIncome
-                .takeIf { showEquivalentValues }
-        )
-    }
-
-    if (account.sumExpense != 0L) {
-        SumRowV2(
-            label = R.string.sum_expenses,
-            amount = account.sumExpense,
-            currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentSumExpense
-                .takeIf { showEquivalentValues }
-        )
-    }
-
-    if (account.sumTransfer != 0L) {
-        SumRowV2(
-            label = R.string.sum_transfer,
-            amount = account.sumTransfer,
-            currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentSumTransfer
-                .takeIf { showEquivalentValues }
-        )
-    }
-
     val hasMultipleBalanceTypeOptions =
         account.total != null || account.criterion != null
 
-    account.total?.let {
+    if (onPeriodSelected != null) {
+        PeriodFilterChips(
+            selectedPeriod = selectedPeriod,
+            onPeriodSelected = onPeriodSelected,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+    }
+
+    if (periodSummary != null) {
+        SumRowV2(
+            label = periodSummary.startLabel,
+            amount = periodSummary.openingBalance,
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = if (showEquivalentValues && periodSummary.openingBalance != 0L) {
+                (periodSummary.openingBalance * (account.latestExchangeRate?.second ?: 1.0)).roundToLong()
+            } else null
+        )
+
+        if (periodSummary.sumIncome != 0L) {
+            SumRowV2(
+                label = stringResource(R.string.sum_income),
+                amount = periodSummary.sumIncome,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = if (showEquivalentValues) {
+                    (periodSummary.sumIncome * (account.latestExchangeRate?.second ?: 1.0)).roundToLong()
+                } else null
+            )
+        }
+
+        if (periodSummary.sumExpense != 0L) {
+            SumRowV2(
+                label = stringResource(R.string.sum_expenses),
+                amount = periodSummary.sumExpense,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = if (showEquivalentValues) {
+                    (periodSummary.sumExpense * (account.latestExchangeRate?.second ?: 1.0)).roundToLong()
+                } else null
+            )
+        }
+
+        if (periodSummary.sumTransfer != 0L) {
+            SumRowV2(
+                label = stringResource(R.string.sum_transfer),
+                amount = periodSummary.sumTransfer,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = if (showEquivalentValues) {
+                    (periodSummary.sumTransfer * (account.latestExchangeRate?.second ?: 1.0)).roundToLong()
+                } else null
+            )
+        }
+
         HorizontalDivider(
             modifier = Modifier.padding(vertical = 6.dp),
             color = MaterialTheme.colorScheme.outlineVariant
         )
+
+        SumRowV2(
+            label = periodSummary.endLabel,
+            amount = periodSummary.closingBalance,
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = if (showEquivalentValues) {
+                (periodSummary.closingBalance * (account.latestExchangeRate?.second ?: 1.0)).roundToLong()
+            } else null,
+            highlight = balanceType == BalanceType.CURRENT || !hasMultipleBalanceTypeOptions,
+            onClick = if (hasMultipleBalanceTypeOptions) {
+                onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
+            } else null
+        )
+    } else {
+        if (account.openingBalance != 0L) {
+            SumRowV2(
+                label = R.string.opening_balance,
+                amount = account.openingBalance,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentOpeningBalance.takeIf {
+                    isFx && account.hasInitialExchangeRate
+                }
+            )
+        }
+
+        if (account.sumIncome != 0L) {
+            SumRowV2(
+                label = R.string.sum_income,
+                amount = account.sumIncome,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentSumIncome
+                    .takeIf { showEquivalentValues }
+            )
+        }
+
+        if (account.sumExpense != 0L) {
+            SumRowV2(
+                label = R.string.sum_expenses,
+                amount = account.sumExpense,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentSumExpense
+                    .takeIf { showEquivalentValues }
+            )
+        }
+
+        if (account.sumTransfer != 0L) {
+            SumRowV2(
+                label = R.string.sum_transfer,
+                amount = account.sumTransfer,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentSumTransfer
+                    .takeIf { showEquivalentValues }
+            )
+        }
+
+        if (account.total != null) {
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 6.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+            SumRowV2(
+                label = R.string.menu_aggregates,
+                amount = account.total,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentTotal
+                    .takeIf { showEquivalentValues },
+                highlight = balanceType == BalanceType.TOTAL,
+                onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.TOTAL) } }
+            )
+        } else {
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 6.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
+
+        SumRowV2(
+            label = R.string.current_balance,
+            amount = account.currentBalance,
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = account.equivalentCurrentBalance
+                .takeIf { showEquivalentValues },
+            highlight = balanceType == BalanceType.CURRENT || !hasMultipleBalanceTypeOptions,
+            onClick = if (hasMultipleBalanceTypeOptions) {
+                onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
+            } else null
+        )
+    }
+
+    account.total?.takeIf { periodSummary != null }?.let {
         SumRowV2(
             label = R.string.menu_aggregates,
-            amount = account.total,
+            amount = it,
             currency = account.currencyUnit,
             formattedEquivalentAmount = account.equivalentTotal
                 .takeIf { showEquivalentValues },
@@ -1172,25 +1321,6 @@ fun AccountSummaryV2(
             onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.TOTAL) } }
         )
     }
-
-    if (account.total == null) {
-        HorizontalDivider(
-            modifier = Modifier.padding(vertical = 6.dp),
-            color = MaterialTheme.colorScheme.outlineVariant
-        )
-    }
-
-    SumRowV2(
-        label = R.string.current_balance,
-        amount = account.currentBalance,
-        currency = account.currencyUnit,
-        formattedEquivalentAmount = account.equivalentCurrentBalance
-            .takeIf { showEquivalentValues },
-        highlight = balanceType == BalanceType.CURRENT || !hasMultipleBalanceTypeOptions,
-        onClick = if (hasMultipleBalanceTypeOptions) {
-            onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
-        } else null
-    )
 
     account.criterion?.let { criterion ->
         val delta = account.currentBalance - criterion
@@ -1218,50 +1348,128 @@ fun AccountSummaryV2(
 fun AccountSummaryV2(
     account: AggregateAccount,
     onDisplayBalanceTypeChange: ((BalanceType) -> Unit)? = null,
+    periodSummary: PeriodBalanceSummary? = null,
+    selectedPeriod: BalancePeriod = BalancePeriod.THIS_MONTH,
+    onPeriodSelected: ((BalancePeriod) -> Unit)? = null,
 ) {
     val homeCurrency = LocalCurrencyContext.current.homeCurrencyUnit
     val isFx = account.currency != homeCurrency.code
     val balanceType = account.validatedBalanceType
 
-    SumRowV2(
-        label = R.string.opening_balance,
-        amount = account.openingBalance ?: account.equivalentOpeningBalance,
-        currency = account.currencyUnit,
-        formattedEquivalentAmount = account.equivalentOpeningBalance.takeIf { isFx }
-    )
-
-    (account.sumIncome ?: account.equivalentSumIncome).takeIf { it != 0L }?.let {
-        SumRowV2(
-            label = R.string.sum_income,
-            amount = it,
-            currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentSumIncome.takeIf { isFx }
+    if (onPeriodSelected != null) {
+        PeriodFilterChips(
+            selectedPeriod = selectedPeriod,
+            onPeriodSelected = onPeriodSelected,
+            modifier = Modifier.padding(bottom = 8.dp)
         )
     }
 
-    (account.sumExpense ?: account.equivalentSumExpense).takeIf { it != 0L }?.let {
+    if (periodSummary != null) {
         SumRowV2(
-            label = R.string.sum_expenses,
-            amount = it,
+            label = periodSummary.startLabel,
+            amount = periodSummary.openingBalance,
             currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentSumExpense.takeIf { isFx }
+            formattedEquivalentAmount = periodSummary.openingBalance.takeIf { isFx }
         )
-    }
 
-    (account.sumTransfer ?: account.equivalentSumTransfer).takeIf { it != 0L }?.let {
-        SumRowV2(
-            label = R.string.sum_transfer,
-            amount = it,
-            currency = account.currencyUnit,
-            formattedEquivalentAmount = account.equivalentSumTransfer.takeIf { isFx }
+        if (periodSummary.sumIncome != 0L) {
+            SumRowV2(
+                label = stringResource(R.string.sum_income),
+                amount = periodSummary.sumIncome,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = periodSummary.sumIncome.takeIf { isFx }
+            )
+        }
+
+        if (periodSummary.sumExpense != 0L) {
+            SumRowV2(
+                label = stringResource(R.string.sum_expenses),
+                amount = periodSummary.sumExpense,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = periodSummary.sumExpense.takeIf { isFx }
+            )
+        }
+
+        if (periodSummary.sumTransfer != 0L) {
+            SumRowV2(
+                label = stringResource(R.string.sum_transfer),
+                amount = periodSummary.sumTransfer,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = periodSummary.sumTransfer.takeIf { isFx }
+            )
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant
         )
+
+        SumRowV2(
+            label = periodSummary.endLabel,
+            amount = periodSummary.closingBalance,
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = periodSummary.closingBalance.takeIf { isFx },
+            highlight = balanceType == BalanceType.CURRENT,
+            onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
+        )
+    } else {
+        SumRowV2(
+            label = R.string.opening_balance,
+            amount = account.openingBalance ?: account.equivalentOpeningBalance,
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = account.equivalentOpeningBalance.takeIf { isFx }
+        )
+
+        (account.sumIncome ?: account.equivalentSumIncome).takeIf { it != 0L }?.let {
+            SumRowV2(
+                label = R.string.sum_income,
+                amount = it,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentSumIncome.takeIf { isFx }
+            )
+        }
+
+        (account.sumExpense ?: account.equivalentSumExpense).takeIf { it != 0L }?.let {
+            SumRowV2(
+                label = R.string.sum_expenses,
+                amount = it,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentSumExpense.takeIf { isFx }
+            )
+        }
+
+        (account.sumTransfer ?: account.equivalentSumTransfer).takeIf { it != 0L }?.let {
+            SumRowV2(
+                label = R.string.sum_transfer,
+                amount = it,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentSumTransfer.takeIf { isFx }
+            )
+        }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+
+        (account.currentBalance ?: account.equivalentCurrentBalance).let {
+            SumRowV2(
+                label = R.string.current_balance,
+                amount = it,
+                currency = account.currencyUnit,
+                formattedEquivalentAmount = account.equivalentCurrentBalance.takeIf { isFx },
+                highlight = balanceType == BalanceType.CURRENT,
+                onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
+            )
+        }
     }
 
     if (account.liquidAssets != 0L) {
         SumRowV2(
             label = R.string.liquid_assets,
             amount = account.liquidAssets,
-            currency = account.currencyUnit
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = account.liquidAssets.takeIf { isFx }
         )
     }
 
@@ -1269,7 +1477,8 @@ fun AccountSummaryV2(
         SumRowV2(
             label = R.string.credit_liabilities,
             amount = account.creditLiabilities,
-            currency = account.currencyUnit
+            currency = account.currencyUnit,
+            formattedEquivalentAmount = account.creditLiabilities.takeIf { isFx }
         )
     }
 
@@ -1292,24 +1501,14 @@ fun AccountSummaryV2(
         )
     }
 
-    if (displayTotal == null) {
+    if (displayTotal == null && periodSummary == null) {
         HorizontalDivider(
             modifier = Modifier.padding(vertical = 6.dp),
             color = MaterialTheme.colorScheme.outlineVariant
         )
     }
-
-    SumRowV2(
-        label = R.string.current_balance,
-        amount = account.currentBalance ?: account.equivalentCurrentBalance,
-        currency = account.currencyUnit,
-        formattedEquivalentAmount = account.equivalentCurrentBalance.takeIf { isFx },
-        highlight = balanceType == BalanceType.CURRENT || !hasMultipleBalanceTypeOptions,
-        onClick = if (hasMultipleBalanceTypeOptions) {
-            onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
-        } else null
-    )
 }
+
 
 
 private fun accountMenu(
@@ -1393,7 +1592,7 @@ fun SumRow(label: Int, formattedAmount: String, modifier: Modifier = Modifier) {
 
 @Composable
 fun SumRowV2(
-    label: Int,
+    label: String,
     amount: Long,
     currency: CurrencyUnit,
     modifier: Modifier = Modifier,
@@ -1421,7 +1620,7 @@ fun SumRowV2(
             )
         }
         Text(
-            text = stringResource(label),
+            text = label,
             modifier = Modifier.weight(1f),
             maxLines = 1,
             fontWeight = fontWeight,
@@ -1446,6 +1645,27 @@ fun SumRowV2(
         }
     }
 }
+
+@Composable
+fun SumRowV2(
+    label: Int,
+    amount: Long,
+    currency: CurrencyUnit,
+    modifier: Modifier = Modifier,
+    formattedEquivalentAmount: Long? = null,
+    percent: Float? = null,
+    highlight: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) = SumRowV2(
+    label = stringResource(label),
+    amount = amount,
+    currency = currency,
+    modifier = modifier,
+    formattedEquivalentAmount = formattedEquivalentAmount,
+    percent = percent,
+    highlight = highlight,
+    onClick = onClick
+)
 
 @Composable
 fun Modifier.drawSumLine(): Modifier {

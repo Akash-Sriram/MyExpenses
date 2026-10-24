@@ -145,9 +145,11 @@ import org.totschnig.myexpenses.util.convAmount
 import org.totschnig.myexpenses.util.enumValueOrDefault
 import org.totschnig.myexpenses.viewmodel.MyExpensesV2ViewModel
 import org.totschnig.myexpenses.viewmodel.data.AggregateAccount
+import org.totschnig.myexpenses.viewmodel.data.BalancePeriod
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.FullAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
+import org.totschnig.myexpenses.viewmodel.data.PeriodBalanceSummary
 import timber.log.Timber
 import java.math.RoundingMode
 import kotlin.math.absoluteValue
@@ -307,7 +309,8 @@ fun TransactionScreen(
                                     { onEvent(AppEvent.MenuItemClicked(R.id.NEW_BALANCE_COMMAND)) }
                                 },
                                 bankIcon = bankIcon,
-                                onAccountEvent = onAccountEvent
+                                onAccountEvent = onAccountEvent,
+                                onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) }
                             )
                         },
                         actions = {
@@ -566,8 +569,17 @@ private fun BalanceHeader(
     onCopyBalance: (String) -> Unit = {},
     onSetNewBalance: (() -> Unit)? = null,
     onAccountEvent: AccountEventHandler,
+    onLoadPeriodSummary: (suspend (BaseAccount, BalancePeriod) -> PeriodBalanceSummary)? = null,
 ) {
     var isSummaryPopupVisible by rememberSaveable { mutableStateOf(false) }
+    var selectedPeriod by rememberSaveable { mutableStateOf(BalancePeriod.THIS_MONTH) }
+    var periodSummary by remember { mutableStateOf<PeriodBalanceSummary?>(null) }
+
+    LaunchedEffect(currentAccount, selectedPeriod, isSummaryPopupVisible) {
+        if (isSummaryPopupVisible && onLoadPeriodSummary != null) {
+            periodSummary = onLoadPeriodSummary(currentAccount, selectedPeriod)
+        }
+    }
 
     val rotationAngle by animateFloatAsState(
         targetValue = if (isSummaryPopupVisible) 0F else 180F
@@ -661,9 +673,12 @@ private fun BalanceHeader(
                                 )
                             ) {
                                 AccountSummaryV2(
-                                    currentAccount,
-                                    onDisplayBalanceTypeChange,
-                                    onAccountEvent = onAccountEvent
+                                    account = currentAccount,
+                                    onDisplayBalanceTypeChange = onDisplayBalanceTypeChange,
+                                    onAccountEvent = onAccountEvent,
+                                    periodSummary = periodSummary,
+                                    selectedPeriod = selectedPeriod,
+                                    onPeriodSelected = { selectedPeriod = it }
                                 )
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -673,9 +688,10 @@ private fun BalanceHeader(
                                     horizontalArrangement = Arrangement.End
                                 ) {
                                     TextButton(onClick = {
+                                        val balanceToCopy = periodSummary?.closingBalance ?: displayBalance
                                         onCopyBalance(
                                             currencyFormatter.convAmount(
-                                                displayBalance,
+                                                balanceToCopy,
                                                 currentAccount.currencyUnit
                                             )
                                         )

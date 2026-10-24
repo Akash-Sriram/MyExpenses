@@ -189,6 +189,11 @@
     </plurals>
     <string name="numbered">numbered</string>
     <string name="opening_balance">Opening balance</string>
+    <string name="period_this_month">This Month</string>
+    <string name="period_last_month">Last Month</string>
+    <string name="period_all_time">All Time</string>
+    <string name="opening_balance_with_date">Opening balance (%1$s)</string>
+    <string name="closing_balance_with_date">Closing balance (%1$s)</string>
     <string name="parse_error_file_not_found">Could not find file %1$s</string>
     <string name="parse_error_other_exception">An error occurred: %1$s</string>
     <string name="parse_error_parse_exception">Could not parse file</string>
