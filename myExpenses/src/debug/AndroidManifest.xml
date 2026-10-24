@@ -54,5 +54,10 @@
             android:name=".activity.TestMyExpenses"
             android:launchMode="singleTop"
             android:theme="@style/MyTheme" />
+
+        <activity
+            android:name=".activity.OnboardingActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
     </application>
 </manifest>

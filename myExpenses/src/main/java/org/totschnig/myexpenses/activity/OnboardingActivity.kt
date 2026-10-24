@@ -3,32 +3,29 @@ package org.totschnig.myexpenses.activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
-import android.view.ViewGroup.MarginLayoutParams
-import androidx.activity.OnBackPressedCallback
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updateLayoutParams
-import androidx.fragment.app.FragmentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
-import androidx.viewpager2.adapter.FragmentStateAdapter
-import androidx.viewpager2.widget.ViewPager2
+import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.databinding.OnboardingBinding
-import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment
+import org.totschnig.myexpenses.compose.AppTheme
+import org.totschnig.myexpenses.compose.onboarding.ModernOnboardingScreen
 import org.totschnig.myexpenses.dialog.RestoreFromCloudDialogFragment
-import org.totschnig.myexpenses.fragment.OnBoardingPrivacyFragment
-import org.totschnig.myexpenses.fragment.OnboardingDataFragment
-import org.totschnig.myexpenses.fragment.OnboardingUiFragment
+import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.KEY_SYNC_ACCOUNT_NAME
+import org.totschnig.myexpenses.service.PREF_KEY_RESOLVE_CONTACTS_PAYEE
+import org.totschnig.myexpenses.service.PREF_KEY_SMS_LOGGING_ENABLED
 import org.totschnig.myexpenses.sync.json.AccountMetaData
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.distrib.DistributionHelper.versionNumber
 import org.totschnig.myexpenses.util.safeMessage
+import org.totschnig.myexpenses.viewmodel.OnBoardingDataViewModel
 import org.totschnig.myexpenses.viewmodel.RestoreViewModel.Companion.KEY_BACKUP_FROM_SYNC
 import org.totschnig.myexpenses.viewmodel.RestoreViewModel.Companion.KEY_PASSWORD
 import org.totschnig.myexpenses.viewmodel.SyncViewModel.SyncAccountData
@@ -36,14 +33,12 @@ import org.totschnig.myexpenses.viewmodel.SyncViewModel.SyncAccountData
 private const val KEY_ACCOUNT_NAME = "key_account_name"
 
 class OnboardingActivity : SyncBackendSetupActivity() {
-    private lateinit var binding: OnboardingBinding
-    private lateinit var pagerAdapter: MyPagerAdapter
-    private lateinit var onBackPressedCallback: OnBackPressedCallback
+
+    private val viewModel: OnBoardingDataViewModel by viewModels()
 
     var accountName: String? = null
 
     override val drawToTopEdge = true
-
     override val drawToBottomEdge = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,39 +46,47 @@ class OnboardingActivity : SyncBackendSetupActivity() {
             try {
                 prefHandler.setDefaultValues(this)
             } catch (e: Exception) {
-                //According to report, setDefaultValues fails in some scenario
-                //where there is a value of the wrong type already present
-                //java.lang.ClassCastException: java.lang.Boolean cannot be cast to java.lang.String
-                //maybe when data is restored via Play Store app backup
                 CrashHandler.report(e)
             }
         } else {
             accountName = savedInstanceState.getString(KEY_ACCOUNT_NAME)
         }
         super.onCreate(savedInstanceState)
-        binding = OnboardingBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        pagerAdapter = MyPagerAdapter(this)
-        binding.viewPager.adapter = pagerAdapter
-        binding.viewPager.offscreenPageLimit = 2
-        onBackPressedCallback = object : OnBackPressedCallback(false) {
-            override fun handleOnBackPressed() {
-                val currentItem = binding.viewPager.currentItem
-                if (currentItem > 0) {
-                    binding.viewPager.currentItem = currentItem - 1
-                } else {
-                    onBackPressedDispatcher.onBackPressed()
 
-                }
+        (application as MyApplication).appComponent.inject(viewModel)
+
+        viewModel.accountSave.observe(this) { result ->
+            result.onSuccess {
+                start()
+            }.onFailure {
+                CrashHandler.report(it)
+                showSnackBar(it.safeMessage)
             }
         }
-        onBackPressedDispatcher.addCallback(this, onBackPressedCallback)
-        binding.viewPager.registerOnPageChangeCallback(object :
-            ViewPager2.OnPageChangeCallback() {
-            override fun onPageSelected(position: Int) {
-                onBackPressedCallback.isEnabled = position > 0
+
+        setContent {
+            AppTheme {
+                val accountTypes by viewModel.accountTypes.collectAsState(AccountType.initialAccountTypes)
+                ModernOnboardingScreen(
+                    availableAccountTypes = accountTypes,
+                    onSaveAndFinish = { account, enableSms, enableContacts ->
+                        doWithEncryptionCheck {
+                            prefHandler.putString(PrefKey.HOME_CURRENCY, "INR")
+                            prefHandler.putBoolean(PREF_KEY_SMS_LOGGING_ENABLED, enableSms)
+                            prefHandler.putBoolean(PREF_KEY_RESOLVE_CONTACTS_PAYEE, enableContacts)
+                            viewModel.saveAccount(account)
+                        }
+                    },
+                    onRestoreBackup = {
+                        withResultCallbackLauncher.launch(
+                            Intent(this@OnboardingActivity, BackupRestoreActivity::class.java).apply {
+                                action = BackupRestoreActivity.ACTION_RESTORE
+                            }
+                        )
+                    }
+                )
             }
-        })
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -91,21 +94,9 @@ class OnboardingActivity : SyncBackendSetupActivity() {
         outState.putString(KEY_ACCOUNT_NAME, accountName)
     }
 
-    override fun onCreateOptionsMenu(menu: Menu) = false //skip help
+    override fun onCreateOptionsMenu(menu: Menu) = false
 
-    fun navigateNext() {
-        val currentItem = binding.viewPager.currentItem
-        binding.viewPager.setCurrentItem(currentItem + 1, true)
-    }
-
-    private val dataFragment: OnboardingDataFragment?
-        get() = getFragmentAtPosition(2) as? OnboardingDataFragment
-
-    private val privacyFragment: OnBoardingPrivacyFragment?
-        get() = getFragmentAtPosition(1) as? OnBoardingPrivacyFragment
-
-    private fun getFragmentAtPosition(pos: Int) =
-        supportFragmentManager.findFragmentByTag(pagerAdapter.getFragmentName(pos))
+    fun navigateNext() {}
 
     fun start() {
         prefHandler.putInt(PrefKey.CURRENT_VERSION, versionNumber)
@@ -116,13 +107,11 @@ class OnboardingActivity : SyncBackendSetupActivity() {
     }
 
     override val createAccountTaskShouldReturnBackups = true
-
     override val createAccountTaskShouldQueryLocalAccounts = false
 
     override fun onReceiveSyncAccountData(data: SyncAccountData) {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                dataFragment?.setupMenu()
                 accountName = data.accountName
                 if (data.backups.isNotEmpty() || data.remoteAccounts.isNotEmpty()) {
                     if (checkForDuplicateUuids(data.remoteAccounts)) {
@@ -168,32 +157,6 @@ class OnboardingActivity : SyncBackendSetupActivity() {
         }
     }
 
-    private class MyPagerAdapter(activity: FragmentActivity) :
-        FragmentStateAdapter(activity) {
-        fun getFragmentName(currentPosition: Int): String {
-            //https://stackoverflow.com/a/61178226/1199911
-            return "f" + getItemId(currentPosition)
-        }
-
-
-        override fun createFragment(position: Int) = when (position) {
-            0 -> OnboardingUiFragment.newInstance()
-            1 -> OnBoardingPrivacyFragment.newInstance()
-            else -> OnboardingDataFragment.newInstance()
-        }
-
-        override fun getItemCount() = 3
-    }
-
-    override fun onNegative(args: Bundle) {
-        if (args.getInt(ConfirmationDialogFragment.KEY_COMMAND_NEGATIVE) == R.id.ENCRYPT_CANCEL_COMMAND) {
-            prefHandler.putBoolean(PrefKey.ENCRYPT_DATABASE, false)
-            privacyFragment?.setupMenu()
-        }
-    }
-
     override val snackBarContainerId: Int
-        get() {
-            return binding.viewPager.id
-        }
+        get() = android.R.id.content
 }
