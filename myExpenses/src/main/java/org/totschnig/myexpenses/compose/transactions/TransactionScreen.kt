@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,6 +24,9 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -38,6 +42,7 @@ import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
@@ -45,10 +50,13 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
@@ -76,7 +84,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
@@ -106,9 +117,11 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.StartScreen
+import org.totschnig.myexpenses.provider.filter.UniversalSearchCriterion
 import org.totschnig.myexpenses.compose.ColoredAmountText
 import org.totschnig.myexpenses.compose.LocalCurrencyFormatter
 import org.totschnig.myexpenses.compose.OverFlowMenu
@@ -220,6 +233,35 @@ fun TransactionScreen(
 
     val accountColor = Color(currentAccount.color(LocalResources.current))
     var showTradeScreen by rememberSaveable { mutableStateOf<Action?>(null) }
+    var isSearchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedTypeFilter by rememberSaveable { mutableStateOf<String?>(null) }
+
+    if (isSearchOpen) {
+        BackHandler {
+            isSearchOpen = false
+            searchQuery = ""
+            selectedTypeFilter = null
+            coroutineScope.launch {
+                viewModel.filterPersistence.getValue(currentAccount.id).persist(null)
+            }
+        }
+    }
+
+    LaunchedEffect(searchQuery, selectedTypeFilter, isSearchOpen, currentAccount.id) {
+        if (isSearchOpen) {
+            delay(200)
+            val trimmed = searchQuery.trim()
+            if (trimmed.isEmpty() && selectedTypeFilter == null) {
+                viewModel.filterPersistence.getValue(currentAccount.id).persist(null)
+            } else {
+                viewModel.filterPersistence.getValue(currentAccount.id).persist(
+                    UniversalSearchCriterion(trimmed, selectedTypeFilter)
+                )
+            }
+        }
+    }
+
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -272,92 +314,238 @@ fun TransactionScreen(
                         }
                     )
                 } else {
-                    @Composable
-                    fun isChecked(menuItem: MenuItem): Boolean = when (menuItem) {
-                        MenuItem.Search -> viewModel.filterPersistence.getValue(selectedAccountId)
-                            .whereFilter
-                            .collectAsState(null).value != null
-
-                        MenuItem.ShowStatusHandle -> viewModel.showStatusHandle.flow.collectAsState(
-                            initial = false
-                        ).value
-
-                        else -> false
-                    }
-
-                    TopAppBar(
-                        windowInsets = windowInsets.only(
-                            WindowInsetsSides.Horizontal + WindowInsetsSides.Top
-                        ),
-                        scrollBehavior = scrollBehavior,
-                        modifier = Modifier.height(height),
-                        navigationIcon = navigationIcon,
-                        title = {
-                            val isPortfolio = (currentAccount as? FullAccount)?.isPortfolio == true
-                            BalanceHeader(
-                                modifier = Modifier.conditional(isFramed) {
-                                    padding(start = 4.dp, top = 4.dp)
-                                },
-                                currentAccount = currentAccount,
-                                onDisplayBalanceTypeChange = if (isPortfolio) null else { newType ->
-                                    viewModel.persistBalanceType(newType)
-                                },
-                                onCopyBalance = {
-                                    onEvent(AppEvent.CopyToClipBoard(it))
-                                },
-                                onSetNewBalance = if (isPortfolio) null else {
-                                    { onEvent(AppEvent.MenuItemClicked(R.id.NEW_BALANCE_COMMAND)) }
-                                },
-                                bankIcon = bankIcon,
-                                onAccountEvent = onAccountEvent,
-                                onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) }
-                            )
-                        },
-                        actions = {
-                            val menuConfig = viewModel.transactionMenuAccessor.statefulFlow
-                                .collectAsState(PreferenceState.Loading).value
-
-                            if (menuConfig is PreferenceState.Loaded) {
-
-                                val filteredItems = menuConfig.value.filter {
-                                    onPrepareMenuItem(it.id)
-                                }
-
-                                //no need to show overflow menu if there is only one item
-                                val quickItems = if (filteredItems.size > 1) filteredItems.take(
-                                    visibleActionItems
-                                ) else filteredItems
-                                val overflowItems = filteredItems - quickItems.toSet()
-
-                                quickItems.forEach { menuItem ->
-                                    if (menuItem == MenuItem.Tune) {
-                                        ViewOptionsMenu(
-                                            currentAccount = currentAccount,
-                                            onEvent = onEvent
+                    Crossfade(
+                        targetState = isSearchOpen,
+                        label = "SearchTransition"
+                    ) { searchOpen ->
+                        if (searchOpen) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surface,
+                                tonalElevation = 3.dp
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .windowInsetsPadding(
+                                            windowInsets.only(
+                                                WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                                            )
                                         )
-                                    } else {
-                                        val isChecked =
-                                            if (menuItem.isCheckable) isChecked(menuItem) else null
-                                        TooltipIconButton(menuItem, isChecked == true) {
-                                            onEvent(
-                                                AppEvent.MenuItemClicked(
-                                                    menuItem.id,
-                                                    isChecked?.not()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(56.dp)
+                                            .padding(horizontal = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(onClick = {
+                                            isSearchOpen = false
+                                            searchQuery = ""
+                                            selectedTypeFilter = null
+                                            coroutineScope.launch {
+                                                viewModel.filterPersistence.getValue(currentAccount.id).persist(null)
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                                                contentDescription = stringResource(R.string.menu_close)
+                                            )
+                                        }
+
+                                        val focusRequester = remember { FocusRequester() }
+                                        LaunchedEffect(Unit) {
+                                            try {
+                                                focusRequester.requestFocus()
+                                            } catch (_: Exception) {}
+                                        }
+
+                                        BasicTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(horizontal = 8.dp)
+                                                .focusRequester(focusRequester),
+                                            singleLine = true,
+                                            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            ),
+                                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                            decorationBox = { innerTextField ->
+                                                Box(contentAlignment = Alignment.CenterStart) {
+                                                    if (searchQuery.isEmpty()) {
+                                                        Text(
+                                                            text = "Search payees, notes, amounts...",
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                                        )
+                                                    }
+                                                    innerTextField()
+                                                }
+                                            }
+                                        )
+
+                                        if (searchQuery.isNotEmpty()) {
+                                            IconButton(onClick = { searchQuery = "" }) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Clear search"
+                                                )
+                                            }
+                                        }
+
+                                        IconButton(onClick = {
+                                            onEvent(AppEvent.MenuItemClicked(R.id.SEARCH_COMMAND))
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Tune,
+                                                contentDescription = "Advanced Filter",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    // Quick Filter Chips Row
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState())
+                                            .padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val typeChips = listOf(
+                                            Triple("INCOME", "🟢 Income", Color(0xFF2E7D32)),
+                                            Triple("EXPENSE", "🔴 Expense", Color(0xFFC62828)),
+                                            Triple("TRANSFER", "🔁 Transfer", Color(0xFF1565C0))
+                                        )
+                                        typeChips.forEach { (typeKey, label, chipColor) ->
+                                            val isSelected = selectedTypeFilter == typeKey
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = {
+                                                    selectedTypeFilter = if (isSelected) null else typeKey
+                                                },
+                                                label = {
+                                                    Text(
+                                                        text = label,
+                                                        style = MaterialTheme.typography.labelMedium.copy(
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                        )
+                                                    )
+                                                },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = chipColor.copy(alpha = 0.15f),
+                                                    selectedLabelColor = chipColor
                                                 )
                                             )
                                         }
                                     }
                                 }
-
-                                ActionMenu(
-                                    currentAccount = currentAccount,
-                                    items = overflowItems,
-                                    onEvent = onEvent,
-                                    isChecked = ::isChecked
-                                )
                             }
-                        },
-                    )
+                        } else {
+                            @Composable
+                            fun isChecked(menuItem: MenuItem): Boolean = when (menuItem) {
+                                MenuItem.Search -> viewModel.filterPersistence.getValue(currentAccount.id)
+                                    .whereFilter
+                                    .collectAsState(null).value != null
+
+                                MenuItem.ShowStatusHandle -> viewModel.showStatusHandle.flow.collectAsState(
+                                    initial = false
+                                ).value
+
+                                else -> false
+                            }
+
+                            TopAppBar(
+                                windowInsets = windowInsets.only(
+                                    WindowInsetsSides.Horizontal + WindowInsetsSides.Top
+                                ),
+                                scrollBehavior = scrollBehavior,
+                                modifier = Modifier.height(height),
+                                navigationIcon = navigationIcon,
+                                title = {
+                                    val isPortfolio = (currentAccount as? FullAccount)?.isPortfolio == true
+                                    BalanceHeader(
+                                        modifier = Modifier.conditional(isFramed) {
+                                            padding(start = 4.dp, top = 4.dp)
+                                        },
+                                        currentAccount = currentAccount,
+                                        onDisplayBalanceTypeChange = if (isPortfolio) null else { newType ->
+                                            viewModel.persistBalanceType(newType)
+                                        },
+                                        onCopyBalance = {
+                                            onEvent(AppEvent.CopyToClipBoard(it))
+                                        },
+                                        onSetNewBalance = if (isPortfolio) null else {
+                                            { onEvent(AppEvent.MenuItemClicked(R.id.NEW_BALANCE_COMMAND)) }
+                                        },
+                                        bankIcon = bankIcon,
+                                        onAccountEvent = onAccountEvent,
+                                        onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) }
+                                    )
+                                },
+                                actions = {
+                                    val menuConfig = viewModel.transactionMenuAccessor.statefulFlow
+                                        .collectAsState(PreferenceState.Loading).value
+
+                                    if (menuConfig is PreferenceState.Loaded) {
+
+                                        val filteredItems = menuConfig.value.filter {
+                                            onPrepareMenuItem(it.id)
+                                        }
+
+                                        //no need to show overflow menu if there is only one item
+                                        val quickItems = if (filteredItems.size > 1) filteredItems.take(
+                                            visibleActionItems
+                                        ) else filteredItems
+                                        val overflowItems = filteredItems - quickItems.toSet()
+
+                                        quickItems.forEach { menuItem ->
+                                            if (menuItem == MenuItem.Tune) {
+                                                ViewOptionsMenu(
+                                                    currentAccount = currentAccount,
+                                                    onEvent = onEvent
+                                                )
+                                            } else {
+                                                val isChecked =
+                                                    if (menuItem.isCheckable) isChecked(menuItem) else null
+                                                TooltipIconButton(menuItem, isChecked == true) {
+                                                    if (menuItem == MenuItem.Search) {
+                                                        isSearchOpen = true
+                                                    } else {
+                                                        onEvent(
+                                                            AppEvent.MenuItemClicked(
+                                                                menuItem.id,
+                                                                isChecked?.not()
+                                                            )
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        ActionMenu(
+                                            currentAccount = currentAccount,
+                                            items = overflowItems,
+                                            onEvent = object : AppEventHandler {
+                                                override fun invoke(event: AppEvent) {
+                                                    if (event is AppEvent.MenuItemClicked && event.itemId == R.id.SEARCH_COMMAND) {
+                                                        isSearchOpen = true
+                                                    } else {
+                                                        onEvent(event)
+                                                    }
+                                                }
+                                            },
+                                            isChecked = ::isChecked
+                                        )
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         },

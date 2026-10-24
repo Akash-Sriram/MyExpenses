@@ -2,6 +2,8 @@ package org.totschnig.myexpenses.provider.filter
 
 import android.content.Context
 import android.os.Parcelable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.serialization.Serializable
 import org.totschnig.myexpenses.R
@@ -21,6 +23,7 @@ sealed interface Criterion : Parcelable {
         get() = when (this) {
             is SimpleCriterion<*> -> displayInfo.title
             is NotCriterion -> criterion.displayTitle
+            is UniversalSearchCriterion -> R.string.menu_search
             else -> throw NotImplementedError("Nested complex not supported")
         }
 
@@ -28,6 +31,7 @@ sealed interface Criterion : Parcelable {
         get() = when (this) {
             is SimpleCriterion<*> -> displayInfo.icon
             is NotCriterion -> criterion.displayIcon
+            is UniversalSearchCriterion -> Icons.Default.Search
             else -> throw NotImplementedError("Nested complex not supported")
         }
 
@@ -45,6 +49,8 @@ sealed interface Criterion : Parcelable {
                 else
                     '≠' to R.string.filter_is_not
             }
+
+            is UniversalSearchCriterion -> '∋' to R.string.contains
 
             else -> throw NotImplementedError("Nested complex not supported")
         }

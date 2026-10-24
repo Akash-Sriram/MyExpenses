@@ -86,6 +86,7 @@ fun CommitmentSubscriptionsView(
 ) {
     val commitmentItems by viewModel.commitmentItems.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
+    val mobilePlanTracker by viewModel.mobilePlanTracker.collectAsState()
 
     // Filter to purely digital subscriptions (excluding variable-amount utilities)
     val regularSubscriptions = commitmentItems.filterIsInstance<CommitmentItem.SubscriptionItem>()
@@ -119,6 +120,12 @@ fun CommitmentSubscriptionsView(
                 subsCount = regularSubscriptions.size,
                 onAddSubscription = { showAddSubDialog = true }
             )
+        }
+
+        mobilePlanTracker?.let { tracker ->
+            item {
+                MobilePlanTrackerCard(tracker = tracker)
+            }
         }
 
         if (regularSubscriptions.isEmpty()) {

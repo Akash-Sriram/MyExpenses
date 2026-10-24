@@ -1503,7 +1503,7 @@ abstract class BaseTransactionDatabase(
                 )
             )
         }
-        append(" SELECT $tableName.*, $TABLE_PAYEES.$KEY_SHORT_NAME, $TABLE_PAYEES.$KEY_PAYEE_NAME, ")
+        append(" SELECT $tableName.*, $TABLE_PAYEES.$KEY_SHORT_NAME, $TABLE_PAYEES.$KEY_PAYEE_NAME, $TABLE_PAYEES.$KEY_IBAN, ")
         append("$TABLE_METHODS.$KEY_LABEL AS $KEY_METHOD_LABEL, ")
         append("$TABLE_METHODS.$KEY_ICON AS $KEY_METHOD_ICON")
         if (tableName != TABLE_CHANGES) {
@@ -1515,8 +1515,7 @@ abstract class BaseTransactionDatabase(
         if (tableName == TABLE_TRANSACTIONS) {
             append(", $TABLE_PLAN_INSTANCE_STATUS.$KEY_TEMPLATEID, ")
             append(KEY_TAGLIST)
-            append(", $KEY_ATTACHMENT_COUNT, ")
-            append(KEY_IBAN)
+            append(", $KEY_ATTACHMENT_COUNT")
         }
         append(" FROM $tableName")
         append(" LEFT JOIN $TABLE_PAYEES ON $KEY_PAYEEID = $TABLE_PAYEES.$KEY_ROWID")

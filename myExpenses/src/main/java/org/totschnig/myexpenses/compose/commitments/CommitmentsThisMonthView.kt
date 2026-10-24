@@ -152,12 +152,6 @@ fun CommitmentsThisMonthView(
             )
         }
 
-        mobilePlanTracker?.let { tracker ->
-            item {
-                MobilePlanTrackerCard(tracker = tracker)
-            }
-        }
-
         // Section: Upcoming / Due This Month
         item {
             Row(

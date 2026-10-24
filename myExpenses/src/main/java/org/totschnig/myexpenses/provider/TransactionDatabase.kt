@@ -338,6 +338,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
     if (!db.isReadOnly) {
       db.execSQL("PRAGMA foreign_keys=ON;");
       db.execSQL("PRAGMA recursive_triggers = ON;");
+      createOrRefreshViews(db);
       db.checkDefaultTransferCategory();
       db.ensurePreDefinedPaymentMethods();
       runCatching {
