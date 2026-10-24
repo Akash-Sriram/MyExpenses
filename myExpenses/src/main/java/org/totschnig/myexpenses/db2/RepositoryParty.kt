@@ -66,34 +66,65 @@ fun ContentResolver.createParty(party: Party) =
         }
     }
 
-fun ContentResolver.findParty(party: String, iban: String? = null) = query(
-    PAYEES_URI,
-    arrayOf(KEY_ROWID),
-    KEY_PAYEE_NAME + " = ? AND " + KEY_IBAN + if (iban == null) " IS NULL" else " = ?",
-    if (iban == null) arrayOf(party.trim()) else arrayOf(party, iban),
-    null
-)?.use { if (it.moveToFirst()) it.getLong(0) else null }
+fun ContentResolver.findParty(party: String, iban: String? = null): Long? {
+    val trimmedParty = party.trim()
+    if (trimmedParty.isEmpty()) return null
+    val cleanIban = iban?.trim()?.takeIf { it.isNotEmpty() }
+
+    // 1. Direct match with COLLATE NOCASE
+    query(
+        PAYEES_URI,
+        arrayOf(KEY_ROWID),
+        "$KEY_PAYEE_NAME = ? COLLATE NOCASE AND $KEY_IBAN " + if (cleanIban == null) "IS NULL" else "= ? COLLATE NOCASE",
+        if (cleanIban == null) arrayOf(trimmedParty) else arrayOf(trimmedParty, cleanIban),
+        null
+    )?.use { if (it.moveToFirst()) return it.getLong(0) }
+
+    // 2. Space-normalized match (e.g. "Hunger Box" vs "Hungerbox")
+    val noSpaces = trimmedParty.replace(" ", "")
+    query(
+        PAYEES_URI,
+        arrayOf(KEY_ROWID),
+        "REPLACE($KEY_PAYEE_NAME, ' ', '') = ? COLLATE NOCASE AND $KEY_IBAN " + if (cleanIban == null) "IS NULL" else "= ? COLLATE NOCASE",
+        if (cleanIban == null) arrayOf(noSpaces) else arrayOf(noSpaces, cleanIban),
+        null
+    )?.use { if (it.moveToFirst()) return it.getLong(0) }
+
+    return null
+}
 
 fun ContentResolver.requireRootParty(name: String): Long? {
     val trimmed = name.trim()
     if (trimmed.isEmpty()) return null
 
-    // 1. Look for root party (parent_id IS NULL) with this name
+    // 1. Look for root party (parent_id IS NULL) with this name (case-insensitive)
     val rootId = query(
         PAYEES_URI,
         arrayOf(KEY_ROWID),
-        "$KEY_PAYEE_NAME = ? AND $KEY_PARENTID IS NULL",
+        "$KEY_PAYEE_NAME = ? COLLATE NOCASE AND $KEY_PARENTID IS NULL",
         arrayOf(trimmed),
         null
     )?.use { if (it.moveToFirst()) it.getLong(0) else null }
 
     if (rootId != null) return rootId
 
-    // 2. If no root party, check if any party exists with this name (legacy)
+    // 2. Space-normalized match for root party (e.g. "Hunger Box" vs "Hungerbox")
+    val noSpaces = trimmed.replace(" ", "")
+    val noSpaceId = query(
+        PAYEES_URI,
+        arrayOf(KEY_ROWID),
+        "REPLACE($KEY_PAYEE_NAME, ' ', '') = ? COLLATE NOCASE AND $KEY_PARENTID IS NULL",
+        arrayOf(noSpaces),
+        null
+    )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+
+    if (noSpaceId != null) return noSpaceId
+
+    // 3. If no root party, check if any party exists with this name (case-insensitive)
     val anyId = findParty(trimmed)
     if (anyId != null) return anyId
 
-    // 3. Create a new root party
+    // 4. Create a new root party
     return Party.create(name = trimmed)?.let { createParty(it) }?.id
 }
 
@@ -101,29 +132,63 @@ fun ContentResolver.requireBranchParty(rootId: Long, name: String, iban: String?
     val cleanIban = iban?.trim()?.takeIf { it.isNotEmpty() } ?: return rootId
     val trimmedName = name.trim()
 
-    // 1. Check if a branch under rootId already exists with this IBAN/UPI ID
+    // 1. If ANY payee in the database already has this IBAN/UPI ID (case-insensitive), return its ID immediately!
+    val existingIbanPartyId = query(
+        PAYEES_URI,
+        arrayOf(KEY_ROWID),
+        "$KEY_IBAN = ? COLLATE NOCASE",
+        arrayOf(cleanIban),
+        null
+    )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+
+    if (existingIbanPartyId != null) return existingIbanPartyId
+
+    // 2. Check if a branch under rootId already exists with this IBAN/UPI ID
     val branchId = query(
         PAYEES_URI,
         arrayOf(KEY_ROWID),
-        "$KEY_PARENTID = ? AND $KEY_IBAN = ?",
+        "$KEY_PARENTID = ? AND $KEY_IBAN = ? COLLATE NOCASE",
         arrayOf(rootId.toString(), cleanIban),
         null
     )?.use { if (it.moveToFirst()) it.getLong(0) else null }
 
     if (branchId != null) return branchId
 
-    // 2. Check if the root party itself already has this exact IBAN
-    val rootHasIban = query(
-        PAYEES_URI,
+    // 3. Check if the root party itself already has this exact IBAN or has NO IBAN yet
+    val rootPartyIban = query(
+        ContentUris.withAppendedId(PAYEES_URI, rootId),
         arrayOf(KEY_ROWID, KEY_IBAN),
-        "$KEY_ROWID = ?",
-        arrayOf(rootId.toString()),
+        null,
+        null,
         null
-    )?.use { if (it.moveToFirst()) it.getStringOrNull(1) == cleanIban else false }
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val ibanIndex = cursor.getColumnIndex(KEY_IBAN)
+            if (ibanIndex != -1 && !cursor.isNull(ibanIndex)) cursor.getString(ibanIndex) else null
+        } else null
+    }
 
-    if (rootHasIban == true) return rootId
+    if (rootPartyIban == null) {
+        // Root has no IBAN yet! Attach this IBAN directly to the root party instead of creating an extra branch
+        val values = ContentValues().apply { put(KEY_IBAN, cleanIban) }
+        update(ContentUris.withAppendedId(PAYEES_URI, rootId), values, null, null)
+        return rootId
+    } else if (rootPartyIban.equals(cleanIban, ignoreCase = true)) {
+        return rootId
+    }
 
-    // 3. Create a new child branch payee linked to rootId
+    // 4. Guard against UNIQUE constraint failure: check if (trimmedName, cleanIban) already exists
+    val duplicatePairId = query(
+        PAYEES_URI,
+        arrayOf(KEY_ROWID),
+        "$KEY_PAYEE_NAME = ? COLLATE NOCASE AND $KEY_IBAN = ? COLLATE NOCASE",
+        arrayOf(trimmedName, cleanIban),
+        null
+    )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+
+    if (duplicatePairId != null) return duplicatePairId
+
+    // 5. Create a new child branch payee linked to rootId
     val branchParty = Party.create(
         name = trimmedName,
         iban = cleanIban,

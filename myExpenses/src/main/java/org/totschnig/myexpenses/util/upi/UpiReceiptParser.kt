@@ -36,15 +36,16 @@ object UpiReceiptParser {
     )
 
     private val BANK_HINT_PATTERNS = listOf(
-        Pattern.compile("""(?i)\b(?:i\s*)?([1li]?c[1li]c[1li](?:\s*bank)?|HDFC(?:\s+Bank)?|State Bank of India|SBI(?:[\s_]+Payments)?|Axis(?:\s+Bank)?|Kotak(?:\s+Bank)?|Yes Bank|Canara(?:\s+Bank)?|Bank of Baroda|PNB|Punjab National Bank|Union Bank|Samsung Walet|Samsung Wallet|Paytm Payments Bank|Airtel Payments Bank|iMobile)\b"""),
+        Pattern.compile("""(?i)(?:sent\s+from|paid\s+from|debited\s+from)\s*[:\-]?\s*([1li]?c[1li]c[1li](?:\s*bank)?|HDFC(?:\s+Bank)?|State Bank of India|SBI(?:[\s_]+Payments)?|Axis(?:\s+Bank)?|Kotak(?:\s+Bank)?|Yes Bank|Canara(?:\s+Bank)?|Bank of Baroda|PNB|Punjab National Bank|Union Bank|[A-Za-z ]+?Bank)"""),
         Pattern.compile("""(?i)from[:\s]+.*?\(([A-Za-z ]+?Bank)\)"""),
-        Pattern.compile("""(?i)(?:paid\s+from|debited\s+from)\s+([A-Za-z ]+?Bank)"""),
+        Pattern.compile("""(?i)\b(?:i\s*)?([1li]?c[1li]c[1li](?:\s*bank)?|HDFC(?:\s+Bank)?|State Bank of India|SBI(?:[\s_]+Payments)?|Axis(?:\s+Bank)?|Kotak(?:\s+Bank)?|Yes Bank|Canara(?:\s+Bank)?|Bank of Baroda|PNB|Punjab National Bank|Union Bank|Paytm Payments Bank|Airtel Payments Bank|iMobile|Samsung Walet|Samsung Wallet)\b"""),
         Pattern.compile("""(?i)powered\s+by\s+([A-Za-z ]+?)\s*\|""")
     )
 
     private val PAYEE_LINE_PATTERNS = listOf(
-        Pattern.compile("""(?i)^\s*(?:biller\s+name|paid\s+to|payment\s+to)\s*[:\-]?\s*(.+)"""),
+        Pattern.compile("""(?i)^\s*(?:biller\s+name|paid\s+to|payment\s+to|sent\s+to)\s*[:\-]?\s*(.+)"""),
         Pattern.compile("""(?i)^\s*to\s*[:\-]\s*(.+)"""),
+        Pattern.compile("""(?i)^\s*to\s+(.+)"""),
         Pattern.compile("""(?i)^\s*customer\s+name\s*[:\-]?\s*(.+)"""),
         Pattern.compile("""(?i)^\s*beneficiary(?:\s+name)?\s*[:\-]?\s*(.+)"""),
         Pattern.compile("""(?i)^\s*notes?\s*[:\-]\s*(.+)""")
@@ -59,13 +60,16 @@ object UpiReceiptParser {
     )
 
     private val IGNORE_PAYEE_WORDS = setOf(
+        "sender", "sender:", "sent from", "sent from:", "paid from", "paid from:", "payer",
+        "to", "to:", "paid to", "payment to", "sent to", "biller", "biller name", "beneficiary",
+        "beneficiary name", "customer name", "notes", "notes:",
         "paid from", "payment completed", "transaction successful", "payment successful",
         "bill payment successful", "bill payment successful!", "bill paymentsuccessful!", "bill paymentsuccessful",
         "money sent", "money sent!", "biller id", "biller ld", "biller name", "bill amount", "transaction status",
         "payment mode", "transaction reference number", "registered contact number", "convenience fee", "total amount",
         "bill paid date and time", "pay from", "enable auto bill pay", "quick pay summary", "transaction id",
         "amount paid", "sent", "completed", "powered by", "upi", "axis bank", "icici bank", "1cici bank", "cici bank",
-        "samsung wallet", "google pay", "phonepe", "paytm", "bhim", "notes", "tax invoice", "retail invoice",
+        "samsung wallet", "samsung walet", "google pay", "phonepe", "paytm", "bhim", "tax invoice", "retail invoice",
         "customer copy", "thank you", "date", "time", "amount", "total", "vpa", "upi id", "upiid",
         "tovpa", "to vpa", "to upi id", "from upi id", "from vpa", "from account", "remarks", "when",
         "reference", "success", "success!", "home", "once in a while", "shopping desires", "give in to",
@@ -161,14 +165,43 @@ object UpiReceiptParser {
     }
 
     private fun cleanAmountCandidate(line: String): String {
-        // Strip leading OCR symbol misreads when followed by space and numbers (e.g. "7 618.00" -> "618.00", "? 1,250.00" -> "1,250.00", "३ 201.72" -> "201.72", "R600.00" -> "600.00")
-        var cleaned = line.trim().replace(Regex("""^(?:[₹\u20B9\u0969\u09B9\u0930\u0939?zZrR7#*F])\s+(?=\d)"""), "")
-        cleaned = cleaned.replace(Regex("""^(?:[₹\u20B9\u0969\u09B9\u0930\u0939]|Rs\.?|INR|Re\.?|R(?=[\d|:JỊ]))[\s|JỊ:\-]*"""), "")
+        // Strip leading OCR symbol misreads when followed by space or digits (e.g. "₹30.00" -> "30.00", "7 618.00" -> "618.00", "? 1,250.00" -> "1,250.00", "३ 201.72" -> "201.72", "R600.00" -> "600.00")
+        var cleaned = line.trim().replace(Regex("""^(?:[₹\u20B9\u0969\u09B9\u0930\u0939?zZrR#*F])\s*(?=\d)"""), "")
+        cleaned = cleaned.replace(Regex("""^(?:Rs\.?|INR|Re\.?|R(?=[\d|:JỊ]))[\s|JỊ:\-]*"""), "")
+        cleaned = cleaned.replace(Regex("""^(?:7)\s+(?=\d)"""), "")
         cleaned = cleaned.replace(Regex("""^[|:JỊ\-\s]+(?=\d)"""), "")
         return cleaned.trim()
     }
 
     private fun extractAmount(lines: List<String>, fullText: String): BigDecimal? {
+        // Priority 0: Status line (Sent / Completed / Successful) preceded by amount line
+        val statusIndex = lines.indexOfFirst {
+            it.matches(Regex("""(?i)^\s*(?:sent|completed|payment\s+successful!?|transaction\s+successful!?|successful!?)\s*$"""))
+        }
+        if (statusIndex > 0) {
+            val candidateLine = lines[statusIndex - 1].trim()
+            if (!isReferenceOrAccountLine(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}$"""))) {
+                var candidateCleaned = cleanAmountCandidate(candidateLine)
+                // If OCR misread '₹' as '7' with zero space (e.g. "730.00" -> "30.00"):
+                if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
+                    if (candidateCleaned.matches(Regex("""^7\d{2,}(?:\.\d{1,2})?$"""))) {
+                        val stripped = candidateCleaned.substring(1)
+                        val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
+                        if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
+                            candidateCleaned = stripped
+                        }
+                    }
+                }
+                val m = STANDALONE_AMOUNT_PATTERN.matcher(candidateCleaned)
+                if (m.matches()) {
+                    val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
+                    if (parsed != null && isValidAmount(parsed)) {
+                        return parsed
+                    }
+                }
+            }
+        }
+
         // Priority 1: Multi-line amount label followed by value on next line (e.g. ICICI: "Amount \n 618.00", "Amount \n ₹ 618.00", "Bill payment successful! \n 453")
         for (i in lines.indices) {
             val line = lines[i].trim()
@@ -249,18 +282,27 @@ object UpiReceiptParser {
     }
 
     private fun extractUpiId(lines: List<String>): String? {
-        for (line in lines) {
+        val candidates = mutableListOf<String>()
+        for (i in lines.indices) {
+            val line = lines[i]
+            // Skip lines that indicate sender / payer
+            if (line.contains("sender", ignoreCase = true) || line.contains("sent from", ignoreCase = true) || line.contains("paid from", ignoreCase = true)) {
+                continue
+            }
+            if (i > 0 && lines[i - 1].matches(Regex("""(?i)^\s*(?:sender|sent\s+from|paid\s+from|from)\s*[:\-]?\s*$"""))) {
+                continue
+            }
             val matcher = UPI_VPA_PATTERN.matcher(line)
             if (matcher.find()) {
                 val rawCandidate = matcher.group(1)?.replace(" ", "") ?: continue
                 val candidate = normalizeDevanagariDigits(rawCandidate)
                 // Filter out non-UPI email addresses if possible
-                if (!candidate.endsWith(".com") || candidate.contains("@pingpay") || candidate.contains("@axb") || candidate.contains("@upi")) {
-                    return candidate
+                if (!candidate.endsWith(".com") || candidate.contains("@axb") || candidate.contains("@upi") || candidate.contains("@hdfcbank") || candidate.contains("@icici") || candidate.contains("@sbi") || candidate.contains("@okhdfcbank") || candidate.contains("@okaxis") || candidate.contains("@okicici") || candidate.contains("@oksbi") || candidate.contains("@paytm") || candidate.contains("@ybl") || candidate.contains("@ibl")) {
+                    candidates.add(candidate)
                 }
             }
         }
-        return null
+        return candidates.firstOrNull { !it.contains("@pingpay", ignoreCase = true) } ?: candidates.firstOrNull()
     }
 
     private fun normalizeDevanagariDigits(s: String): String {
@@ -282,6 +324,28 @@ object UpiReceiptParser {
     }
 
     private fun extractPayee(lines: List<String>, foundUpiId: String?, fullText: String? = null): String? {
+        val isSamsung = fullText?.contains("Samsung Wallet", ignoreCase = true) == true ||
+                fullText?.contains("Samsung Walet", ignoreCase = true) == true ||
+                fullText?.contains("Paid from Samsung Wallet", ignoreCase = true) == true
+
+        // 0. Dedicated Samsung Wallet payee extraction:
+        // In Samsung Wallet, the merchant name is directly above the recipient VPA inside the card.
+        if (isSamsung && foundUpiId != null) {
+            val vpaIdx = lines.indexOfFirst { it.contains(foundUpiId, ignoreCase = true) }
+            if (vpaIdx > 0) {
+                var candidateIdx = vpaIdx - 1
+                while (candidateIdx >= 0 && (lines[candidateIdx].matches(Regex("""(?i)^\s*(?:to\s*vpa|to\s*upi\s*id|vpa|from\s*upi\s*id|upi\s*id)\s*[:\-]?$""")) || !isValidPayee(cleanPayee(lines[candidateIdx])))) {
+                    candidateIdx--
+                }
+                if (candidateIdx >= 0) {
+                    val candidate = cleanPayee(lines[candidateIdx])
+                    if (isValidPayee(candidate)) {
+                        return candidate
+                    }
+                }
+            }
+        }
+
         // 1. Multi-line "To", "Paid to", "Customer name", "Biller Name" followed by payee name on next line
         for (i in lines.indices) {
             val line = lines[i]
@@ -345,7 +409,7 @@ object UpiReceiptParser {
         }
 
         // 3. Line immediately preceding UPI VPA (e.g. in Samsung Wallet: BIGTREE ENTERTAINMENT is right above bookmyshow@axb)
-        val vpaLineIndex = lines.indexOfFirst { it.contains("@") }
+        val vpaLineIndex = lines.indexOfFirst { it.contains("@") && !it.contains("sender", ignoreCase = true) && !it.contains("@pingpay", ignoreCase = true) }
         if (vpaLineIndex > 0) {
             var candidateIdx = vpaLineIndex - 1
             while (candidateIdx >= 0 && (lines[candidateIdx].matches(Regex("""(?i)^\s*(?:to\s*vpa|to\s*upi\s*id|vpa|from\s*upi\s*id|upi\s*id)\s*[:\-]?$""")) || !isValidPayee(cleanPayee(lines[candidateIdx])))) {
@@ -360,7 +424,7 @@ object UpiReceiptParser {
                         if (isValidPayee(prevCandidate) &&
                             !prevCandidate.contains("bank", ignoreCase = true) &&
                             !BANK_HINT_PATTERNS.any { it.matcher(prevCandidate).find() } &&
-                            !prevCandidate.matches(Regex("""(?i)^\s*(?:paid\s+to|payment\s+to|to|amount|date|time|success|success!|from|txn|transaction|sent|bill|customer|retail).*""")) &&
+                            !prevCandidate.matches(Regex("""(?i)^\s*(?:paid\s+to|payment\s+to|to|amount|date|time|success|success!|from|txn|transaction|sent|bill|customer|retail|sender|notes?).*""")) &&
                             !containsDate(prevCandidate)
                         ) {
                             return "$prevCandidate $candidate"
@@ -393,19 +457,42 @@ object UpiReceiptParser {
         return null
     }
 
-    private fun cleanPayee(raw: String?): String {
+    @JvmStatic
+    fun cleanPayee(raw: String?): String {
         if (raw == null) return ""
-        return raw.replace(Regex("""(?i)\(verified merchant\)"""), "")
+        var cleaned = raw
+            .replace(Regex("""(?i)\(verified merchant\)"""), "")
+            .replace(Regex("""(?i)\[verified merchant\]"""), "")
+            .replace(Regex("""(?i)\(verified\)"""), "")
+            .replace(Regex("""(?i)\[verified\]"""), "")
             .replace(Regex("""(?i)\(upi id:.*\)"""), "")
             .replace(Regex("""[•*]+"""), "")
             .replace(Regex("""([a-z])([A-Z])"""), "$1 $2")
             .trim()
+
+        // Strip leading prefixes: Sender:, To:, To , Paid to , Payment to , Sent to , Biller name:, Beneficiary:, etc.
+        cleaned = cleaned.replace(
+            Regex("""^(?i)\s*(?:sender\s*[:\-]?\s*|sent\s+from\s*[:\-]?\s*|paid\s+from\s*[:\-]?\s*|paid\s+to\s*[:\-]?\s*|payment\s+to\s*[:\-]?\s*|sent\s+to\s*[:\-]?\s*|to\s*[:\-]\s*|to\s+|biller\s+name\s*[:\-]?\s*|beneficiary(?:\s+name)?\s*[:\-]?\s*|customer\s+name\s*[:\-]?\s*|notes?\s*[:\-]\s*)"""),
+            ""
+        ).trim()
+
+        // Strip any trailing punctuation or unwanted remnants
+        cleaned = cleaned.trim(' ', ':', '-', ',', '.', '•', '*')
+
+        // Strip embedded VPAs or emails if appended to the name (e.g. "Name (merchant@upi)" or "Name merchant@upi")
+        cleaned = cleaned.replace(Regex("""(?i)\s*[(\[]?[a-zA-Z0-9.\-_]+@[a-zA-Z]{2,}[)\]]?"""), "").trim()
+
+        return cleaned
     }
 
     private fun isValidPayee(candidate: String): Boolean {
         if (candidate.length < 2) return false
         val lower = candidate.lowercase(Locale.ROOT)
         if (IGNORE_PAYEE_WORDS.any { lower == it || lower.startsWith("$it ") || lower.endsWith(" $it") }) {
+            return false
+        }
+        if (lower.contains("@")) return false
+        if (candidate.matches(Regex("""(?i)^\s*(?:sender|sent\s+from|paid\s+from|paid\s+to|transaction\s+id|upi\s+ref|powered\s+by|notes?).*"""))) {
             return false
         }
         // If it's pure numbers or date, reject

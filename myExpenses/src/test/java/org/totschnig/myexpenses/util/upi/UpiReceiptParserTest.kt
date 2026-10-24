@@ -738,4 +738,52 @@ class UpiReceiptParserTest {
         assertEquals("", UpiReceiptParser.cleanComment(null))
         assertEquals("", UpiReceiptParser.cleanComment(""))
     }
+
+    @Test
+    fun testParseSamsungWalletWhiskAndSipCafe() {
+        val rawText = """
+            23 Oct 2026
+            10:26:36 pm
+            Paid from
+            Samsung Wallet
+            WHISK AND SIP CAFE
+            Vyapar.178345286643@hdfcbank
+            HDFC BANK
+            23 OCT 2026, 10:26 PM
+            730.00
+            Sent
+            Sender:
+            asg98@pingpay
+            Sent from:
+            ICICI Bank
+            Transaction ID:
+            948930342966
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("30.00"), result.amount)
+        assertEquals("WHISK AND SIP CAFE", result.payeeName)
+        assertEquals("Vyapar.178345286643@hdfcbank", result.upiId)
+        assertEquals(LocalDateTime.of(2026, 10, 23, 22, 26), result.dateTime)
+        assertEquals("948930342966", result.referenceNumber)
+        assertEquals("ICICI Bank", result.accountOrBankHint)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testCleanPayeePrefixes() {
+        assertEquals("WHISK AND SIP CAFE", UpiReceiptParser.cleanPayee("Sender: WHISK AND SIP CAFE"))
+        assertEquals("Hunger Box", UpiReceiptParser.cleanPayee("To Hunger Box"))
+        assertEquals("SRI LAKSHMI KAAIKANI ANGAADI", UpiReceiptParser.cleanPayee("To SRI LAKSHMI KAAIKANI ANGAADI"))
+        assertEquals("Govindhan R", UpiReceiptParser.cleanPayee("To Govindhan R"))
+        assertEquals("Akshaya R", UpiReceiptParser.cleanPayee("Paid to Akshaya R"))
+        assertEquals("Zomato", UpiReceiptParser.cleanPayee("Payment to Zomato"))
+        assertEquals("TNEB", UpiReceiptParser.cleanPayee("Biller Name: TNEB"))
+        assertEquals("WHISK AND SIP CAFE", UpiReceiptParser.cleanPayee("WHISK AND SIP CAFE (verified merchant)"))
+        assertEquals("WHISK AND SIP CAFE", UpiReceiptParser.cleanPayee("WHISK AND SIP CAFE [verified]"))
+        assertEquals("Hunger Box", UpiReceiptParser.cleanPayee("To: Hunger Box"))
+        assertEquals("Amazon", UpiReceiptParser.cleanPayee("To  Amazon"))
+    }
 }

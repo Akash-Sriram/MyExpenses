@@ -27,6 +27,7 @@ import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.os.Environment
 import android.provider.CalendarContract.Events
+import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQueryBuilder
@@ -342,8 +343,86 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       runCatching {
         db.execSQL("ALTER TABLE $TABLE_SUBSCRIPTIONS ADD COLUMN cancel_before_renewal INTEGER DEFAULT 0;")
       }
+      db.cleanupPayeePrefixesAndDuplicates()
     }
+  }
 
+  private fun SupportSQLiteDatabase.cleanupPayeePrefixesAndDuplicates() {
+    runCatching {
+      // 1. Find payees starting with Sender: or To: or To
+      query("SELECT _id, name, iban FROM $TABLE_PAYEES WHERE name LIKE 'Sender:%' OR name LIKE 'To %' OR name LIKE 'To:%'").use { cursor ->
+        val toClean = mutableListOf<Triple<Long, String, String?>>()
+        while (cursor.moveToNext()) {
+          val id = cursor.getLong(0)
+          val name = cursor.getString(1)
+          val iban = if (cursor.isNull(2)) null else cursor.getString(2)
+          toClean.add(Triple(id, name, iban))
+        }
+        for ((dirtyId, dirtyName, iban) in toClean) {
+          val clean = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(dirtyName)
+          if (clean.isBlank()) continue
+
+          // Check if a canonical payee with clean name already exists (or space-normalized)
+          var canonicalId: Long? = null
+          query(SimpleSQLiteQuery("SELECT _id FROM $TABLE_PAYEES WHERE name = ? COLLATE NOCASE AND _id != ?", arrayOf<Any>(clean, dirtyId))).use { c ->
+            if (c.moveToFirst()) canonicalId = c.getLong(0)
+          }
+          if (canonicalId == null) {
+            val noSpaces = clean.replace(" ", "")
+            query(SimpleSQLiteQuery("SELECT _id FROM $TABLE_PAYEES WHERE REPLACE(name, ' ', '') = ? COLLATE NOCASE AND _id != ?", arrayOf<Any>(noSpaces, dirtyId))).use { c ->
+              if (c.moveToFirst()) canonicalId = c.getLong(0)
+            }
+          }
+
+          if (canonicalId != null) {
+            // Re-link transactions, templates, debts, and branches from dirtyId to canonicalId
+            execSQL("UPDATE $TABLE_TRANSACTIONS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            execSQL("UPDATE $TABLE_TEMPLATES SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            execSQL("UPDATE $TABLE_DEBTS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            execSQL("UPDATE $TABLE_PAYEES SET $KEY_PARENTID = ? WHERE $KEY_PARENTID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            // If canonical payee has no iban, copy iban from dirtyId
+            if (iban != null) {
+              execSQL("UPDATE $TABLE_PAYEES SET $KEY_IBAN = ? WHERE _id = ? AND ($KEY_IBAN IS NULL OR $KEY_IBAN = '')", arrayOf<Any>(iban, canonicalId))
+            }
+            // Delete dirty duplicate payee
+            execSQL("DELETE FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dirtyId))
+          } else {
+            // No canonical duplicate exists yet, simply rename the dirty payee to its clean name!
+            execSQL("UPDATE $TABLE_PAYEES SET name = ? WHERE _id = ?", arrayOf<Any>(clean, dirtyId))
+          }
+        }
+      }
+
+      // 2. Merge case-insensitive duplicate payees
+      query("SELECT _id, name, iban FROM $TABLE_PAYEES WHERE $KEY_PARENTID IS NULL ORDER BY _id ASC").use { cursor ->
+        val seen = mutableMapOf<String, Long>()
+        val duplicates = mutableListOf<Pair<Long, Long>>() // dirtyId to canonicalId
+        while (cursor.moveToNext()) {
+          val id = cursor.getLong(0)
+          val name = cursor.getString(1).trim()
+          val key = name.lowercase(java.util.Locale.ROOT)
+          val canonical = seen[key]
+          if (canonical != null) {
+            duplicates.add(Pair(id, canonical))
+          } else {
+            seen[key] = id
+          }
+        }
+        for ((dupId, canonicalId) in duplicates) {
+          execSQL("UPDATE $TABLE_TRANSACTIONS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dupId))
+          execSQL("UPDATE $TABLE_TEMPLATES SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dupId))
+          execSQL("UPDATE $TABLE_DEBTS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dupId))
+          execSQL("UPDATE $TABLE_PAYEES SET $KEY_PARENTID = ? WHERE $KEY_PARENTID = ?", arrayOf<Any>(canonicalId, dupId))
+          query(SimpleSQLiteQuery("SELECT iban FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dupId))).use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) {
+              val dupIban = c.getString(0)
+              execSQL("UPDATE $TABLE_PAYEES SET $KEY_IBAN = ? WHERE _id = ? AND ($KEY_IBAN IS NULL OR $KEY_IBAN = '')", arrayOf<Any>(dupIban, canonicalId))
+            }
+          }
+          execSQL("DELETE FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dupId))
+        }
+      }
+    }
   }
 
   override fun onCreate(db: SupportSQLiteDatabase) {

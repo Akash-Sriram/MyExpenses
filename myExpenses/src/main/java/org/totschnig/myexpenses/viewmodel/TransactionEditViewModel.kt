@@ -79,10 +79,12 @@ import org.totschnig.myexpenses.provider.KEY_COMMENT
 import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.provider.KEY_DEBT_ID
 import org.totschnig.myexpenses.provider.KEY_DESCRIPTION
+import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_IS_PORTFOLIO
 import org.totschnig.myexpenses.provider.KEY_LABEL
 import org.totschnig.myexpenses.provider.KEY_METHODID
+import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_PLANID
 import org.totschnig.myexpenses.provider.KEY_ROWID
@@ -235,7 +237,8 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                     } else {
                         rootId
                     }
-                    DisplayParty(finalPartyId, party.name, party.shortName, party.iban)
+                    val finalName = getPayeeName(finalPartyId) ?: party.name
+                    DisplayParty(finalPartyId, finalName, party.shortName, party.iban)
                 } else {
                     party
                 }
@@ -670,8 +673,79 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
         }
     }
 
-    suspend fun resolvePayeeId(name: String): Long? = withContext(Dispatchers.IO) {
-        repository.requireParty(name)
+    suspend fun resolvePayeeId(name: String, upiId: String? = null): Long? = withContext(Dispatchers.IO) {
+        val cleanName = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(name)
+        if (cleanName.isBlank() && upiId.isNullOrBlank()) return@withContext null
+
+        try {
+            // 1. Direct case-insensitive match on cleanName
+            if (cleanName.isNotBlank()) {
+                contentResolver.query(
+                    TransactionProvider.PAYEES_URI,
+                    arrayOf(KEY_ROWID),
+                    "$KEY_PAYEE_NAME = ? COLLATE NOCASE",
+                    arrayOf(cleanName),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                }
+
+                // 2. Space-normalized match (e.g. "Hunger Box" vs "Hungerbox")
+                val noSpaces = cleanName.replace(" ", "")
+                contentResolver.query(
+                    TransactionProvider.PAYEES_URI,
+                    arrayOf(KEY_ROWID),
+                    "REPLACE($KEY_PAYEE_NAME, ' ', '') = ? COLLATE NOCASE",
+                    arrayOf(noSpaces),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                }
+            }
+
+            // 3. Match on UPI ID / IBAN if provided
+            val cleanUpi = upiId?.trim()?.takeIf { it.isNotEmpty() }
+            if (cleanUpi != null) {
+                contentResolver.query(
+                    TransactionProvider.PAYEES_URI,
+                    arrayOf(KEY_ROWID),
+                    "$KEY_IBAN = ? COLLATE NOCASE",
+                    arrayOf(cleanUpi),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                }
+            }
+
+            // 4. Fallback: find or create root party with cleanName if available
+            if (cleanName.isNotBlank()) {
+                repository.requireRootParty(cleanName)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error resolving payee id for %s", name)
+            if (cleanName.isNotBlank()) repository.requireRootParty(cleanName) else null
+        }
+    }
+
+    suspend fun getPayeeName(payeeId: Long): String? = withContext(Dispatchers.IO) {
+        try {
+            contentResolver.query(
+                ContentUris.withAppendedId(TransactionProvider.PAYEES_URI, payeeId),
+                arrayOf(KEY_PAYEE_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(KEY_PAYEE_NAME)
+                    if (idx != -1 && !cursor.isNull(idx)) cursor.getString(idx) else cursor.getString(0)
+                } else null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     suspend fun findMethodIdForLabel(label: String): Long? = withContext(Dispatchers.IO) {

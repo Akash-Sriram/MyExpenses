@@ -792,17 +792,19 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             dateEditBinding.Date2Button.date = dt.toLocalDate()
             dateEditBinding.TimeButton.visibility = View.VISIBLE
         }
-        val isPayeeUnset = rootBinding.Payee.party == null || rootBinding.Payee.party?.name.isNullOrBlank()
+        val isPayeeUnset = rootBinding.Payee.party == null || rootBinding.Payee.party?.name.isNullOrBlank() || rootBinding.Payee.party?.id == null
         if (isPayeeUnset) {
-            val candidateName = data.payeeName?.takeIf { it.isNotBlank() } ?: data.upiId
-            candidateName?.let { name ->
+            val candidateName = (data.payeeName?.takeIf { it.isNotBlank() })
+                ?: rootBinding.Payee.party?.name?.takeIf { it.isNotBlank() }
+            if (candidateName != null) {
                 lifecycleScope.launch {
-                    val payeeId = viewModel.resolvePayeeId(name)
+                    val payeeId = viewModel.resolvePayeeId(candidateName, data.upiId)
+                    val canonicalName = payeeId?.let { viewModel.getPayeeName(it) } ?: candidateName
                     if (payeeId != null) {
-                        rootBinding.Payee.party = DisplayParty(payeeId, name, null, data.upiId)
+                        rootBinding.Payee.party = DisplayParty(payeeId, canonicalName, null, null)
                         startAutoFill(payeeId, false)
                     } else {
-                        rootBinding.Payee.party = DisplayParty(null, name, null, data.upiId)
+                        rootBinding.Payee.party = DisplayParty(null, canonicalName, null, null)
                     }
                 }
             }
