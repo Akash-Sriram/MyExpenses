@@ -67,6 +67,16 @@ import javax.inject.Inject
 
 class RestoreViewModel(application: Application) : ContentResolvingAndroidViewModel(application) {
 
+    data class RestoreStats(
+        val accounts: Int = 0,
+        val transactions: Int = 0,
+        val attachments: Int = 0,
+        val preferencesRestored: Boolean = true
+    )
+
+    private val _restoreStats = MutableStateFlow<RestoreStats?>(null)
+    val restoreStats: StateFlow<RestoreStats?> = _restoreStats
+
     private val _publishProgress: MutableSharedFlow<String?> = MutableSharedFlow()
     private val _result: MutableStateFlow<Result<Unit>?> = MutableStateFlow(null)
     val publishProgress: SharedFlow<String?> = _publishProgress
@@ -114,6 +124,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
     }
 
     fun startRestore(args: Bundle) {
+        _restoreStats.value = null
         viewModelScope.launch(coroutineDispatcher) {
             val fileUri: Uri? = BundleCompat.getParcelable(args, KEY_FILE_PATH, Uri::class.java)
             val syncAccountName: String? =
@@ -367,10 +378,13 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                         PrefKey.PLANNER_LAST_EXECUTION_TIMESTAMP,
                         System.currentTimeMillis()
                     )
-                    publishProgress(
-                        R.string.restore_calendar_success,
-                        restorePlanner()
-                    )
+                    val plannerCount = restorePlanner()
+                    if (plannerCount > 0) {
+                        publishProgress(
+                            R.string.restore_calendar_success,
+                            plannerCount
+                        )
+                    }
                     application.settings
                         .registerOnSharedPreferenceChangeListener(application)
                     Timber.i("now emptying event cache")
@@ -447,6 +461,21 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
 
                     restoreSyncState().takeIf { it.isNotEmpty() }?.let { publishProgress(it) }
                     updateTransferShortcut()
+
+                    val accCount = runCatching {
+                        contentResolver.query(TransactionProvider.ACCOUNTS_URI, arrayOf(KEY_ROWID), null, null, null)?.use { it.count } ?: 0
+                    }.getOrDefault(0)
+                    val txCount = runCatching {
+                        contentResolver.query(TransactionProvider.TRANSACTIONS_URI, arrayOf(KEY_ROWID), null, null, null)?.use { it.count } ?: 0
+                    }.getOrDefault(0)
+
+                    _restoreStats.value = RestoreStats(
+                        accounts = accCount,
+                        transactions = txCount,
+                        attachments = backupFiles.size,
+                        preferencesRestored = true
+                    )
+
                     _result.update { Result.success(Unit) }
                 } else {
                     failureResult(R.string.restore_db_failure)

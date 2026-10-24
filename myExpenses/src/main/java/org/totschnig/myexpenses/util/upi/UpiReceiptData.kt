@@ -9,6 +9,7 @@ import java.time.LocalDateTime
 data class UpiReceiptData(
     val amount: BigDecimal? = null,
     val payeeName: String? = null,
+    val recipientName: String? = null,
     val upiId: String? = null,
     val dateTime: LocalDateTime? = null,
     val referenceNumber: String? = null,
@@ -17,6 +18,10 @@ data class UpiReceiptData(
     val isExpense: Boolean = true,
     val rawText: String? = null
 ) : Parcelable {
+    val isIncome: Boolean
+        get() = !isExpense
+
     val isValid: Boolean
-        get() = amount != null || !payeeName.isNullOrBlank() || !referenceNumber.isNullOrBlank()
+        get() = amount != null || !payeeName.isNullOrBlank() || !recipientName.isNullOrBlank() || !referenceNumber.isNullOrBlank()
 }
+

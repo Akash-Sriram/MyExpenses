@@ -7,6 +7,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -67,6 +70,8 @@ class OnboardingActivity : SyncBackendSetupActivity() {
         setContent {
             AppTheme {
                 val accountTypes by viewModel.accountTypes.collectAsState(AccountType.initialAccountTypes)
+                var showRestoreSheet by remember { mutableStateOf(false) }
+
                 ModernOnboardingScreen(
                     availableAccountTypes = accountTypes,
                     onSaveAndFinish = { account, enableSms, enableContacts ->
@@ -78,13 +83,16 @@ class OnboardingActivity : SyncBackendSetupActivity() {
                         }
                     },
                     onRestoreBackup = {
-                        withResultCallbackLauncher.launch(
-                            Intent(this@OnboardingActivity, BackupRestoreActivity::class.java).apply {
-                                action = BackupRestoreActivity.ACTION_RESTORE
-                            }
-                        )
+                        showRestoreSheet = true
                     }
                 )
+
+                if (showRestoreSheet) {
+                    org.totschnig.myexpenses.compose.backup.ModernRestoreBottomSheet(
+                        onDismissRequest = { showRestoreSheet = false },
+                        onRestartApp = { restartAfterRestore() }
+                    )
+                }
             }
         }
     }

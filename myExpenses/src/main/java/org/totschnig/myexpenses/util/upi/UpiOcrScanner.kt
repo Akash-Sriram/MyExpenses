@@ -27,13 +27,26 @@ object UpiOcrScanner {
                         cont.resumeWithException(e)
                     }
             }
-            val parsed = UpiReceiptParser.parse(textResult)
+            val app = context.applicationContext as? org.totschnig.myexpenses.MyApplication
+            val prefHandler = app?.prefHandler
+            val userName = prefHandler?.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_NAME, UpiReceiptParser.DEFAULT_USER_NAME) ?: UpiReceiptParser.DEFAULT_USER_NAME
+            val userPhone = prefHandler?.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_PHONE, UpiReceiptParser.DEFAULT_USER_PHONE) ?: UpiReceiptParser.DEFAULT_USER_PHONE
+            val userVpa = prefHandler?.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_VPA, UpiReceiptParser.DEFAULT_USER_VPA) ?: UpiReceiptParser.DEFAULT_USER_VPA
+
+            val parsed = UpiReceiptParser.parse(
+                rawText = textResult,
+                userName = userName,
+                userPhone = userPhone,
+                userVpa = userVpa
+            )
             Timber.d(
-                "UPI receipt parsed successfully: hasAmount=%b, hasPayee=%b, hasUpiId=%b, hasUtr=%b",
-                parsed.amount != null,
-                parsed.payeeName != null,
-                parsed.upiId != null,
-                parsed.referenceNumber != null
+                "UPI receipt parsed: isExpense=%b, amount=%s, payee=%s, recipient=%s, upiId=%s, utr=%s",
+                parsed.isExpense,
+                parsed.amount,
+                parsed.payeeName,
+                parsed.recipientName,
+                parsed.upiId,
+                parsed.referenceNumber
             )
             Result.success(parsed)
         } catch (e: Exception) {

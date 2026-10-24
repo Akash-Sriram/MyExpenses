@@ -62,7 +62,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import org.totschnig.myexpenses.activity.MyExpensesV2
+import org.totschnig.myexpenses.compose.backup.ModernRestoreBottomSheet
+import org.totschnig.myexpenses.util.upi.UpiReceiptParser
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -120,6 +131,19 @@ fun SettingsScreen(
         if (uri != null) {
             viewModel.setBackupFolder(uri)
         }
+    }
+
+    var showRestoreSheet by remember { mutableStateOf(false) }
+    var restoreSheetUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var showUpiIdentityDialog by remember { mutableStateOf(false) }
+
+    val app = context.applicationContext as org.totschnig.myexpenses.MyApplication
+    val prefHandler = app.prefHandler
+    var userNamePref by remember {
+        mutableStateOf(prefHandler.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_NAME, UpiReceiptParser.DEFAULT_USER_NAME) ?: UpiReceiptParser.DEFAULT_USER_NAME)
+    }
+    var userPhonePref by remember {
+        mutableStateOf(prefHandler.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_PHONE, UpiReceiptParser.DEFAULT_USER_PHONE) ?: UpiReceiptParser.DEFAULT_USER_PHONE)
     }
 
     Scaffold(
@@ -262,6 +286,15 @@ fun SettingsScreen(
                         subtitle = "Automatically match mobile-number UPI IDs (e.g. 9876543210@paytm) with your contact names",
                         checked = resolveContacts,
                         onCheckedChange = { viewModel.setResolveContactsPayee(it) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+
+                    NavigationSettingTile(
+                        icon = Icons.Default.Person,
+                        title = "Your UPI Identity Profile",
+                        subtitle = "$userNamePref • $userPhonePref\nUsed to identify payments sent TO you (Income) vs BY you (Expense)",
+                        onClick = { showUpiIdentityDialog = true }
                     )
                 }
             }
@@ -475,14 +508,36 @@ fun SettingsScreen(
                     } else {
                         snapshots.forEach { snapshot ->
                             SnapshotItemCard(snapshot = snapshot, onRestore = {
-                                val restoreIntent = Intent(context, BackupRestoreActivity::class.java).apply {
-                                    action = "RESTORE"
-                                    data = snapshot.uri
-                                }
-                                context.startActivity(restoreIntent)
+                                restoreSheetUri = snapshot.uri
+                                showRestoreSheet = true
                             })
                             Spacer(modifier = Modifier.height(6.dp))
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            restoreSheetUri = null
+                            showRestoreSheet = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Restore from Storage / Google Drive...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -565,6 +620,81 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+
+    if (showUpiIdentityDialog) {
+        var tempName by remember { mutableStateOf(userNamePref) }
+        var tempPhone by remember { mutableStateOf(userPhonePref) }
+
+        AlertDialog(
+            onDismissRequest = { showUpiIdentityDialog = false },
+            title = {
+                Text(
+                    text = "Your UPI Identity Profile",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Used to identify when a payment receipt or SMS was sent TO you (Income) vs BY you (Expense).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = tempName,
+                        onValueChange = { tempName = it },
+                        label = { Text("Your Full / Bank Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = tempPhone,
+                        onValueChange = { tempPhone = it },
+                        label = { Text("Your 10-Digit Mobile / UPI Number") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    prefHandler.putString(UpiReceiptParser.PREF_KEY_USER_PROFILE_NAME, tempName.trim())
+                    prefHandler.putString(UpiReceiptParser.PREF_KEY_USER_PROFILE_PHONE, tempPhone.trim())
+                    userNamePref = tempName.trim()
+                    userPhonePref = tempPhone.trim()
+                    showUpiIdentityDialog = false
+                }) {
+                    Text("Save Identity")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpiIdentityDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showRestoreSheet) {
+        ModernRestoreBottomSheet(
+            onDismissRequest = {
+                showRestoreSheet = false
+                restoreSheetUri = null
+            },
+            onRestartApp = {
+                (context as? android.app.Activity)?.let { activity ->
+                    (activity.application as? org.totschnig.myexpenses.MyApplication)?.invalidateHomeCurrency()
+                    activity.finishAffinity()
+                    val mainClass = (activity.application as? org.totschnig.myexpenses.MyApplication)?.prefHandler?.mainScreenClass
+                        ?: MyExpensesV2::class.java
+                    activity.startActivity(android.content.Intent(activity, mainClass).apply {
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    })
+                }
+            },
+            initialUri = restoreSheetUri
+        )
     }
 }
 

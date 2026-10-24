@@ -777,12 +777,13 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             timber.log.Timber.d("Suppressing UPI receipt autofill for existing transaction")
             return
         }
+        val isIncome = !data.isExpense
         val isAmountUnset = amountInput.getUntypedValue(false).getOrNull() == null || amountInput.typedValue.compareTo(BigDecimal.ZERO) == 0
         if (isAmountUnset) {
             data.amount?.let { amt ->
                 val expenseAmt = if (data.isExpense) amt.negate() else amt
                 delegate.fillAmount(expenseAmt)
-                delegate.setType(!data.isExpense)
+                delegate.setType(isIncome)
                 delegate.configureType()
             }
         }
@@ -841,13 +842,19 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             rootBinding.Comment.setText(cleanedComment)
         }
         val amountStr = data.amount?.let { "₹$it" } ?: ""
-        val payeeStr = data.payeeName ?: ""
-        val msg = getString(R.string.upi_receipt_detected, amountStr, payeeStr)
+        val targetEntity = if (isIncome) {
+            data.accountOrBankHint?.let { "into $it" } ?: "into Account"
+        } else {
+            data.payeeName?.takeIf { it.isNotBlank() }?.let { "to $it" } ?: "Expense"
+        }
+        val typeLabel = if (isIncome) "Income" else "Expense"
+        val msg = "UPI $typeLabel: $amountStr $targetEntity"
+        val actionLabel = if (isIncome) "Record Income" else "Record Expense"
         com.google.android.material.snackbar.Snackbar.make(
             rootBinding.root,
             msg,
             com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE
-        ).setAction(R.string.action_record_now) {
+        ).setAction(actionLabel) {
             doSave(false)
         }.show()
     }

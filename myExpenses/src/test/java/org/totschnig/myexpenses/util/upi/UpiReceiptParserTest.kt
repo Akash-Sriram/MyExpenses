@@ -1,7 +1,9 @@
 package org.totschnig.myexpenses.util.upi
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
@@ -786,4 +788,87 @@ class UpiReceiptParserTest {
         assertEquals("Hunger Box", UpiReceiptParser.cleanPayee("To: Hunger Box"))
         assertEquals("Amazon", UpiReceiptParser.cleanPayee("To  Amazon"))
     }
+
+    @Test
+    fun testReceiptPaidToUserIsIncome() {
+        val rawText = """
+            ₹1,000
+            Paid to
+            MRG AKASH SRIRAM
+            8680878355@icici
+            24 October 2026, 2:29 pm
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("1000"), result.amount)
+        assertFalse(result.isExpense)
+        assertTrue(result.isIncome)
+        assertEquals("MRG AKASH SRIRAM", result.recipientName)
+        assertNull(result.payeeName)
+        assertEquals("8680878355@icici", result.upiId)
+        assertEquals("ICICI Bank", result.accountOrBankHint)
+        assertEquals(LocalDateTime.of(2026, 10, 24, 14, 29), result.dateTime)
+    }
+
+    @Test
+    fun testReceiptPaidToUserWithOcrDigitConfusionRepaired() {
+        val rawText = """
+            ₹1,000
+            Paid to
+            MRG AKASH SRIRAM
+            4640478355@icici
+            24 October 2026, 2:29 pm
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("1000"), result.amount)
+        assertFalse(result.isExpense)
+        assertEquals("8680878355@icici", result.upiId)
+    }
+
+    @Test
+    fun testReceiptReceivedFromSenderIsIncome() {
+        val rawText = """
+            ₹2,500
+            Received from
+            Rahul Sharma
+            rahul.sharma@okaxis
+            24 October 2026, 11:15 am
+            Credited to ICICI Bank
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("2500"), result.amount)
+        assertFalse(result.isExpense)
+        assertTrue(result.isIncome)
+        assertEquals("Rahul Sharma", result.payeeName)
+        assertEquals("ICICI Bank", result.accountOrBankHint)
+    }
+
+    @Test
+    fun testReceiptPaidToMerchantIsExpense() {
+        val rawText = """
+            ₹350
+            Paid to
+            Swiggy
+            swiggy@icici
+            24 October 2026, 8:45 pm
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("350"), result.amount)
+        assertTrue(result.isExpense)
+        assertEquals("Swiggy", result.payeeName)
+    }
 }
+

@@ -43,7 +43,7 @@ object UpiReceiptParser {
     )
 
     private val PAYEE_LINE_PATTERNS = listOf(
-        Pattern.compile("""(?i)^\s*(?:biller\s+name|paid\s+to|payment\s+to|sent\s+to)\s*[:\-]?\s*(.+)"""),
+        Pattern.compile("""(?i)^\s*(?:biller\s+name|paid\s+to|payment\s+to|sent\s+to|received\s+from)\s*[:\-]?\s*(.+)"""),
         Pattern.compile("""(?i)^\s*to\s*[:\-]\s*(.+)"""),
         Pattern.compile("""(?i)^\s*to\s+(.+)"""),
         Pattern.compile("""(?i)^\s*customer\s+name\s*[:\-]?\s*(.+)"""),
@@ -101,31 +101,75 @@ object UpiReceiptParser {
         return t
     }
 
-    fun parse(rawText: String): UpiReceiptData {
-        val normalized = normalizeOcrText(rawText)
-        val lines = normalized.lines()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-        return parse(lines, normalized)
+    const val PREF_KEY_USER_PROFILE_NAME = "pref_user_profile_name"
+    const val PREF_KEY_USER_PROFILE_PHONE = "pref_user_profile_phone"
+    const val PREF_KEY_USER_PROFILE_VPA = "pref_user_profile_vpa"
+
+    const val DEFAULT_USER_NAME = "Akash Sriram"
+    const val DEFAULT_USER_PHONE = "8680878355"
+    const val DEFAULT_USER_VPA = "8680878355@icici"
+
+    @JvmOverloads
+    fun parse(
+        rawText: String,
+        userName: String? = null,
+        userPhone: String? = null,
+        userVpa: String? = null
+    ): UpiReceiptData {
+        val lines = rawText.lines()
+        return parse(lines, rawText, userName, userPhone, userVpa)
     }
 
-    fun parse(lines: List<String>, fullText: String? = null): UpiReceiptData {
+    @JvmOverloads
+    fun parse(
+        lines: List<String>,
+        fullText: String? = null,
+        userName: String? = null,
+        userPhone: String? = null,
+        userVpa: String? = null
+    ): UpiReceiptData {
         val rawJoined = fullText ?: lines.joinToString("\n")
         val joined = normalizeOcrText(rawJoined)
         val normalizedLines = lines.map { normalizeOcrText(it).trim() }.filter { it.isNotEmpty() }
 
+        val effectiveUserNames = buildList {
+            add(userName ?: DEFAULT_USER_NAME)
+            add("Akash Sriram")
+            add("AkashSriram")
+            add("MRG AKASH SRIRAM")
+            add("G AKASH SRIRAM")
+            add("AKASH SRIRAM G")
+            add("Akash")
+        }.distinct()
+
+        val effectiveUserPhones = buildList {
+            add(userPhone ?: DEFAULT_USER_PHONE)
+            add("8680878355")
+        }.distinct()
+
         val amount = extractAmount(normalizedLines, joined)
-        val upiId = extractUpiId(normalizedLines)
-        val payeeName = extractPayee(normalizedLines, upiId, joined)
+        val upiId = extractUpiId(normalizedLines, effectiveUserPhones)
+        val rawPayee = extractPayee(normalizedLines, upiId, joined)
         val dateTime = extractDateTime(normalizedLines, joined)
         val utr = extractUtr(normalizedLines, joined)
         val bankHint = extractBankHint(normalizedLines, joined)
         val paymentMethod = detectPaymentMethod(joined)
-        val isExpense = !containsRefundOrIncome(joined)
+
+        val isRecipientMe = isUserRecipient(rawPayee, upiId, effectiveUserNames, effectiveUserPhones)
+        val isIncome = containsRefundOrIncome(joined) || isRecipientMe
+        val isExpense = !isIncome
+
+        val payeeName = if (isRecipientMe) {
+            extractSender(normalizedLines, joined)?.takeIf { !isUserRecipient(it, null, effectiveUserNames, effectiveUserPhones) }
+        } else {
+            rawPayee
+        }
+        val recipientName = if (isRecipientMe) rawPayee else null
 
         return UpiReceiptData(
             amount = amount,
             payeeName = payeeName,
+            recipientName = recipientName,
             upiId = upiId,
             dateTime = dateTime,
             referenceNumber = utr,
@@ -281,7 +325,7 @@ object UpiReceiptParser {
         return amount > BigDecimal.ZERO
     }
 
-    private fun extractUpiId(lines: List<String>): String? {
+    private fun extractUpiId(lines: List<String>, userPhones: List<String> = emptyList()): String? {
         val candidates = mutableListOf<String>()
         for (i in lines.indices) {
             val line = lines[i]
@@ -295,7 +339,8 @@ object UpiReceiptParser {
             val matcher = UPI_VPA_PATTERN.matcher(line)
             if (matcher.find()) {
                 val rawCandidate = matcher.group(1)?.replace(" ", "") ?: continue
-                val candidate = normalizeDevanagariDigits(rawCandidate)
+                val normalizedCandidate = normalizeDevanagariDigits(rawCandidate)
+                val candidate = repairIndianPhoneUpiId(normalizedCandidate, userPhones)
                 // Filter out non-UPI email addresses if possible
                 if (!candidate.endsWith(".com") || candidate.contains("@axb") || candidate.contains("@upi") || candidate.contains("@hdfcbank") || candidate.contains("@icici") || candidate.contains("@sbi") || candidate.contains("@okhdfcbank") || candidate.contains("@okaxis") || candidate.contains("@okicici") || candidate.contains("@oksbi") || candidate.contains("@paytm") || candidate.contains("@ybl") || candidate.contains("@ibl")) {
                     candidates.add(candidate)
@@ -346,10 +391,10 @@ object UpiReceiptParser {
             }
         }
 
-        // 1. Multi-line "To", "Paid to", "Customer name", "Biller Name" followed by payee name on next line
+        // 1. Multi-line "To", "Paid to", "Received from", "Customer name", "Biller Name" followed by payee name on next line
         for (i in lines.indices) {
             val line = lines[i]
-            if (line.matches(Regex("""(?i)^\s*(?:paid\s+to|payment\s+to|to|beneficiary(?:\s+name)?|customer\s*name|biller\s*name)\s*[:\-]?$"""))) {
+            if (line.matches(Regex("""(?i)^\s*(?:paid\s+to|payment\s+to|received\s+from|to|beneficiary(?:\s+name)?|customer\s*name|biller\s*name)\s*[:\-]?$"""))) {
                 if (i + 1 < lines.size) {
                     val candidate = cleanPayee(lines[i + 1])
                     if (isValidPayee(candidate) && !candidate.matches(Regex("""(?i)^\s*(?:to\s+vpa|to\s+upi\s+id|vpa|from\s+upi\s+id|upi\s*id|from|amount|when|date|remarks|biller|payment|transaction|registered).*"""))) {
@@ -470,9 +515,9 @@ object UpiReceiptParser {
             .replace(Regex("""([a-z])([A-Z])"""), "$1 $2")
             .trim()
 
-        // Strip leading prefixes: Sender:, To:, To , Paid to , Payment to , Sent to , Biller name:, Beneficiary:, etc.
+        // Strip leading prefixes: Sender:, To:, To , Paid to , Payment to , Received from , Sent to , Biller name:, Beneficiary:, etc.
         cleaned = cleaned.replace(
-            Regex("""^(?i)\s*(?:sender\s*[:\-]?\s*|sent\s+from\s*[:\-]?\s*|paid\s+from\s*[:\-]?\s*|paid\s+to\s*[:\-]?\s*|payment\s+to\s*[:\-]?\s*|sent\s+to\s*[:\-]?\s*|to\s*[:\-]\s*|to\s+|biller\s+name\s*[:\-]?\s*|beneficiary(?:\s+name)?\s*[:\-]?\s*|customer\s+name\s*[:\-]?\s*|notes?\s*[:\-]\s*)"""),
+            Regex("""^(?i)\s*(?:sender\s*[:\-]?\s*|sent\s+from\s*[:\-]?\s*|paid\s+from\s*[:\-]?\s*|paid\s+to\s*[:\-]?\s*|payment\s+to\s*[:\-]?\s*|received\s+from\s*[:\-]?\s*|sent\s+to\s*[:\-]?\s*|to\s*[:\-]\s*|to\s+|biller\s+name\s*[:\-]?\s*|beneficiary(?:\s+name)?\s*[:\-]?\s*|customer\s+name\s*[:\-]?\s*|notes?\s*[:\-]\s*)"""),
             ""
         ).trim()
 
@@ -754,10 +799,105 @@ object UpiReceiptParser {
     private fun containsRefundOrIncome(text: String): Boolean {
         val lower = text.lowercase(Locale.ROOT)
         return lower.contains("received from") ||
+                lower.contains("payment received") ||
+                lower.contains("money received") ||
+                lower.contains("amount received") ||
                 lower.contains("credited to") ||
+                lower.contains("credited") ||
+                lower.contains("credit to") ||
+                lower.contains("deposit") ||
+                lower.contains("cashback received") ||
+                lower.contains("cashback") ||
                 lower.contains("refund") ||
-                lower.contains("cashback received")
+                lower.contains("reward") ||
+                lower.contains("received with google pay") ||
+                lower.contains("received on phonepe") ||
+                lower.contains("received in paytm") ||
+                lower.contains("incoming payment")
     }
+
+    fun isUserRecipient(
+        payeeName: String?,
+        upiId: String?,
+        userNames: List<String>,
+        userPhones: List<String>
+    ): Boolean {
+        if (payeeName != null) {
+            val clean = payeeName.lowercase(Locale.ROOT).replace(Regex("""[^a-z0-9]"""), "")
+            for (uName in userNames) {
+                val uClean = uName.lowercase(Locale.ROOT).replace(Regex("""[^a-z0-9]"""), "")
+                if (uClean.length >= 4 && (clean.contains(uClean) || uClean.contains(clean))) {
+                    return true
+                }
+            }
+        }
+        if (upiId != null) {
+            val userPart = upiId.substringBefore("@").filter { it.isDigit() }
+            for (uPhone in userPhones) {
+                val digitsOnly = uPhone.filter { it.isDigit() }
+                if (digitsOnly.length >= 8 && userPart.contains(digitsOnly)) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun extractSender(lines: List<String>, fullText: String): String? {
+        val senderPatterns = listOf(
+            Regex("""(?i)^\s*(?:received\s+from|from|sender|payer|sent\s+by)\s*[:\-]?\s*(.+)"""),
+            Regex("""(?i)^\s*from\s+[:\-]\s*(.+)""")
+        )
+        for (i in lines.indices) {
+            val line = lines[i]
+            for (pattern in senderPatterns) {
+                val match = pattern.find(line)
+                if (match != null) {
+                    val candidate = cleanPayee(match.groupValues[1])
+                    if (isValidPayee(candidate)) return candidate
+                }
+            }
+            if (line.matches(Regex("""(?i)^\s*(?:received\s+from|from|sender|payer)\s*[:\-]?\s*$""")) && i + 1 < lines.size) {
+                val candidate = cleanPayee(lines[i + 1])
+                if (isValidPayee(candidate)) return candidate
+            }
+        }
+        return null
+    }
+
+    fun repairIndianPhoneUpiId(candidate: String, userPhones: List<String>): String {
+        val parts = candidate.split("@")
+        if (parts.size != 2) return candidate
+        var userPart = parts[0]
+        val domain = parts[1]
+
+        if (userPart.length == 10 && userPart.all { it.isDigit() }) {
+            for (uPhone in userPhones) {
+                val uDigits = uPhone.filter { it.isDigit() }
+                if (uDigits.length == 10) {
+                    var diffCount = 0
+                    var allDiffsAre4and8 = true
+                    for (i in 0 until 10) {
+                        if (userPart[i] != uDigits[i]) {
+                            diffCount++
+                            if (!((userPart[i] == '4' && uDigits[i] == '8') || (userPart[i] == '8' && uDigits[i] == '4'))) {
+                                allDiffsAre4and8 = false
+                            }
+                        }
+                    }
+                    if ((allDiffsAre4and8 && diffCount in 1..4) || diffCount in 1..3) {
+                        return "$uDigits@$domain"
+                    }
+                }
+            }
+            if (userPart.startsWith("4")) {
+                userPart = "8" + userPart.substring(1)
+                return "$userPart@$domain"
+            }
+        }
+        return candidate
+    }
+
 
     @JvmStatic
     fun cleanComment(comment: String?): String {

@@ -18,8 +18,11 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.TextUtils
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.core.os.BundleCompat
+import org.totschnig.myexpenses.compose.AppTheme
+import org.totschnig.myexpenses.compose.backup.ModernRestoreBottomSheet
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -211,9 +214,15 @@ class BackupRestoreActivity : RestoreActivity(), ConfirmationDialogListener,
                 backupViewModel.prepare()
             }
             ACTION_RESTORE, Intent.ACTION_VIEW -> {
-                BackupSourcesDialogFragment.newInstance(intent.data).show(
-                    supportFragmentManager, FRAGMENT_TAG_RESTORE
-                )
+                setContent {
+                    AppTheme {
+                        ModernRestoreBottomSheet(
+                            onDismissRequest = { finish() },
+                            onRestartApp = { restartAfterRestore() },
+                            initialUri = intent.data
+                        )
+                    }
+                }
             }
         }
     }
