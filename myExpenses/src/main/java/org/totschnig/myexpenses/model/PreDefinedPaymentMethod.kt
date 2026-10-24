@@ -14,13 +14,13 @@ enum class PreDefinedPaymentMethod(
     CREDITCARD(-1, false, R.string.pm_creditcard, "credit-card"),
     DEPOSIT(1, false, R.string.pm_deposit, "down-long"),
     DIRECTDEBIT(-1, false, R.string.pm_directdebit, "up-long"),
-    UPI(-1, false, R.string.pm_upi, "mobile"),
-    NETBANKING(-1, false, R.string.pm_netbanking, "globe"),
+    UPI(0, false, R.string.pm_upi, "mobile"),
+    NETBANKING(0, false, R.string.pm_netbanking, "globe"),
     DEBITCARD(-1, false, R.string.pm_debitcard, "credit-card"),
     PAYLATER(-1, false, R.string.pm_paylater, "gratipay"),
     AUTODEBIT(-1, false, R.string.pm_autodebit, "rotate"),
-    WALLET(-1, false, R.string.pm_wallet, "wallet"),
-    CASH(-1, false, R.string.pm_cash, "money-bill");
+    WALLET(0, false, R.string.pm_wallet, "wallet"),
+    CASH(0, false, R.string.pm_cash, "money-bill");
 
     fun getLocalizedLabel(context: Context): String = context.getString(resId)
 

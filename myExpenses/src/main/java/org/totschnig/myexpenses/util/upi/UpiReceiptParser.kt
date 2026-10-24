@@ -27,8 +27,12 @@ object UpiReceiptParser {
         """(?i)\b([a-zA-Z0-9.\-_\u0966-\u096F\u09E6-\u09EF]{2,}(?:\s+[a-zA-Z0-9.\-_\u0966-\u096F\u09E6-\u09EF]+)*\s*@\s*[a-zA-Z]{2,})\b"""
     )
 
+    private val UTR_LABEL_LINE_PATTERN = Regex(
+        """(?i)^\s*(?:b-connect(?:\s*txn)?\s*id|transaction\s*reference\s*(?:no\.?|num(?:ber)?|id)?|transaction\s*id|txn\s*id|upi\s*(?:ref(?:erence)?|txn|transaction)\s*(?:no\.?|id|num(?:ber)?)?|(?:bank\s*)?ref(?:erence)?\s*(?:#|no\.?|id)?|utr|rrn(?:\s*no)?|urn)\s*[:\-#]?\s*${'$'}"""
+    )
+
     private val UTR_EXPLICIT_PATTERN = Pattern.compile(
-        """(?i)(?:b-connect(?:\s*txn)?\s*id|transaction\s*reference\s*(?:no\.?|num(?:ber)?|id)?|transaction\s*id|upi\s*(?:ref(?:erence)?|txn|transaction)\s*(?:no\.?|id|num(?:ber)?)?|reference\s*(?:#|no\.?|id)?|utr|rrn(?:\s*no)?)\s*[:\-#]?\s*([0-9A-Za-z]{10,24})"""
+        """(?i)(?:b-connect(?:\s*txn)?\s*id|transaction\s*reference\s*(?:no\.?|num(?:ber)?|id)?|transaction\s*id|txn\s*id|upi\s*(?:ref(?:erence)?|txn|transaction)\s*(?:no\.?|id|num(?:ber)?)?|(?:bank\s*)?ref(?:erence)?\s*(?:#|no\.?|id)?|utr|rrn(?:\s*no)?|urn)\s*[:\-#]?\s*([0-9A-Za-z]{10,24})"""
     )
 
     private val UTR_STANDALONE_PATTERN = Pattern.compile(
@@ -747,19 +751,38 @@ object UpiReceiptParser {
     }
 
     private fun extractUtr(lines: List<String>, fullText: String): String? {
-        // Priority 1: explicitly labeled "Transaction ID", "UPI Ref No", "UTR"
+        // Priority 1: explicitly labeled "Transaction ID", "Ref No", "UPI Ref No", "UTR" inline
         val m = UTR_EXPLICIT_PATTERN.matcher(fullText)
         if (m.find()) {
-            return m.group(1)?.trim()
+            val candidate = m.group(1)?.replace(" ", "")?.replace("-", "")?.trim()
+            if (candidate != null && candidate.length in 10..24 && candidate.count { it.isDigit() } >= 6 && !candidate.matches(Regex("""(?i)^[xX*]+.*"""))) {
+                return candidate
+            }
         }
 
-        // Priority 2: ICICI specific transaction reference format (e.g. IC3143060000000XH7UP, IC31503200000010GBHN)
+        // Priority 2: Multi-line label followed by reference number on next line (e.g. ICICI: "Ref No." \n "429712345678" or "Transaction ID" \n "427102071017")
+        for (i in lines.indices) {
+            val line = lines[i].trim()
+            if (UTR_LABEL_LINE_PATTERN.matches(line)) {
+                if (i + 1 < lines.size) {
+                    val candidateLine = lines[i + 1].trim().replace(" ", "").replace("-", "")
+                    if (candidateLine.matches(Regex("""^[0-9A-Za-z]{10,24}$""")) &&
+                        candidateLine.count { it.isDigit() } >= 6 &&
+                        !candidateLine.matches(Regex("""(?i)^[xX*]+.*""")) &&
+                        !isReferenceOrAccountLine(lines[i + 1])) {
+                        return candidateLine
+                    }
+                }
+            }
+        }
+
+        // Priority 3: ICICI specific transaction reference format (e.g. IC3143060000000XH7UP, IC31503200000010GBHN)
         val iciciRef = Regex("""\b(IC[0-9]{6,}[A-Za-z0-9]{4,})\b""").find(fullText)
         if (iciciRef != null) {
             return iciciRef.groupValues[1]
         }
 
-        // Priority 3: standalone 12-digit number (NPCI standard UTR) excluding accounts
+        // Priority 4: standalone 12-digit number (NPCI standard UTR) excluding accounts
         for (i in lines.indices) {
             val line = lines[i].trim()
             if (line.contains("pay from", ignoreCase = true) || line.contains("a/c", ignoreCase = true) || line.contains("account", ignoreCase = true)) continue

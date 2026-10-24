@@ -203,7 +203,8 @@ data class Transaction(
             KEY_STATUS,
             KEY_ICON,
             KEY_METHOD_LABEL,
-            KEY_TYPE
+            KEY_TYPE,
+            KEY_IBAN
         )
 
         val projectionExtended = projection + arrayOf(KEY_ACCOUNT_LABEL, KEY_IS_PORTFOLIO)

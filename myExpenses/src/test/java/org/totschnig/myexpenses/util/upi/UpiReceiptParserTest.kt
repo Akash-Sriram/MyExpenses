@@ -870,5 +870,51 @@ class UpiReceiptParserTest {
         assertTrue(result.isExpense)
         assertEquals("Swiggy", result.payeeName)
     }
+
+    @Test
+    fun testIciciPaymentReceiptWithRefNo() {
+        val rawText = """
+            iIcICIBank
+            Paid successfully!
+            ₹5,000
+            To
+            SIVAPRAKASAM R
+            To UPI ID
+            siva07071972@oksbi
+            Ref No.
+            429812345678
+            24 October 2026, 2:29 pm
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("5000"), result.amount)
+        assertEquals("SIVAPRAKASAM R", result.payeeName)
+        assertEquals("siva07071972@oksbi", result.upiId)
+        assertEquals("429812345678", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testIciciPaymentReceiptWithInlineRefNo() {
+        val rawText = """
+            ICICI Bank
+            Paid successfully! ₹5,000
+            To SIVAPRAKASAM R
+            siva07071972@oksbi
+            Ref No. 429812345678
+            From ICICI Bank Account XX1234
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("5000"), result.amount)
+        assertEquals("SIVAPRAKASAM R", result.payeeName)
+        assertEquals("siva07071972@oksbi", result.upiId)
+        assertEquals("429812345678", result.referenceNumber)
+    }
 }
 

@@ -1673,6 +1673,15 @@ abstract class BaseTransactionDatabase(
                             put(KEY_ICON, pm.icon)
                         }
                     )
+                } else {
+                    update(
+                        TABLE_METHODS, SQLiteDatabase.CONFLICT_NONE,
+                        ContentValues().apply {
+                            put(KEY_TYPE, pm.paymentType)
+                        },
+                        "$KEY_ROWID = ? AND $KEY_TYPE != ?",
+                        arrayOf(methodId.toString(), pm.paymentType.toString())
+                    )
                 }
                 if (bankTypeId != null && methodId > 0) {
                     val alreadyLinked = query(

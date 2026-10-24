@@ -171,7 +171,8 @@ abstract class MainDelegate(
                 amount = amount,
                 party = if (!isSplitPart) {
                     val upiText = viewBinding.UpiId.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-                    viewBinding.Payee.partyForSave?.let { p ->
+                    val baseParty = viewBinding.Payee.partyForSave ?: upiText?.let { DisplayParty(null, it, null, it) }
+                    baseParty?.let { p ->
                         if (upiText != null) p.copy(iban = upiText) else p.copy(iban = null)
                     }
                 } else null,
