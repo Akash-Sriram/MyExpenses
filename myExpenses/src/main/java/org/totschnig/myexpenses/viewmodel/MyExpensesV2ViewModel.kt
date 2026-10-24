@@ -1390,12 +1390,12 @@ open class MyExpensesV2ViewModel(
         val query = """
             SELECT t.$KEY_DATE FROM $TABLE_TRANSACTIONS t
             LEFT JOIN $TABLE_CATEGORIES c ON t.$KEY_CATID = c.$KEY_ROWID
-            LEFT JOIN $TABLE_PAYEES p ON t.$KEY_PAYEEID = p.$KEY_ROWID
             WHERE $accClause
               AND $WHERE_NOT_SPLIT
               AND $WHERE_NOT_ARCHIVED
               AND t.$KEY_CR_STATUS != '${CrStatus.VOID.name}'
-              AND (c.$KEY_LABEL LIKE '%Salary%' OR t.$KEY_COMMENT LIKE '%Salary%' OR p.$KEY_PAYEE_NAME LIKE '%Accenture%')
+              AND (c.$KEY_LABEL LIKE '%Salary%' OR t.$KEY_COMMENT LIKE '%Salary%')
+              AND (c.$KEY_LABEL NOT LIKE '%Reimbursement%' OR c.$KEY_LABEL IS NULL)
               AND t.$KEY_AMOUNT > 0
             ORDER BY t.$KEY_DATE DESC
             LIMIT 1
