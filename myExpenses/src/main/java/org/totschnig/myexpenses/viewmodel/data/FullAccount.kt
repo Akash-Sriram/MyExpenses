@@ -130,6 +130,8 @@ data class AggregateAccount(
     val isPortfolio: Boolean = false,
     override val accountGrouping: AccountGrouping<*>,
     override val balanceType: BalanceType = BalanceType.CURRENT,
+    val liquidAssets: Long = 0L,
+    val creditLiabilities: Long = 0L,
 ) : BaseAccount() {
     override val id: Long = 0
     override val currency: String = currencyUnit.code
@@ -138,7 +140,7 @@ data class AggregateAccount(
         AccountGrouping.TYPE -> type.title(context) + " ($SIGMA)"
         AccountGrouping.CURRENCY -> currencyUnit.code + " ($SIGMA)"
         AccountGrouping.FLAG -> flag.title(context) + " ($SIGMA)"
-        AccountGrouping.NONE -> context.getString(R.string.grand_total)
+        AccountGrouping.NONE -> context.getString(R.string.all_accounts)
     }
 
     override val isAggregate = true

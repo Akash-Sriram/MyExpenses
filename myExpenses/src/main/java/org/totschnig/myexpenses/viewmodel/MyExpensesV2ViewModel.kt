@@ -330,7 +330,7 @@ open class MyExpensesV2ViewModel(
                     filteredByVisibility
                 } else {
                     val filteredForTotals = filteredByGroupFilter.filter { !it.excludeFromTotals }
-                    filteredByVisibility + AggregateAccount(
+                    val aggregate = AggregateAccount(
                         currencyUnit = activeFilter as? CurrencyUnit
                             ?: currencyContext.homeCurrencyUnit,
                         type = activeFilter as? AccountType ?: AccountType.CASH,
@@ -351,6 +351,8 @@ open class MyExpensesV2ViewModel(
                                 it.equivalentTotal ?: it.equivalentCurrentBalance
                             }
                         else null,
+                        liquidAssets = filteredForTotals.filter { it.type.isAsset }.sumOf { it.equivalentEffectiveBalance },
+                        creditLiabilities = filteredForTotals.filter { !it.type.isAsset }.sumOf { it.equivalentEffectiveBalance },
                     ).let { aggregateAccount ->
                         if (aggregateAccountGrouping == AccountGrouping.CURRENCY) aggregateAccount.copy(
                             openingBalance = filteredForTotals.sumOf { it.openingBalance },
@@ -361,8 +363,11 @@ open class MyExpensesV2ViewModel(
                             total = if (filteredForTotals.any { it.total != null }) filteredForTotals.sumOf {
                                 it.total ?: it.currentBalance
                             } else null,
+                            liquidAssets = filteredForTotals.filter { it.type.isAsset }.sumOf { it.effectiveBalance },
+                            creditLiabilities = filteredForTotals.filter { !it.type.isAsset }.sumOf { it.effectiveBalance },
                         ) else aggregateAccount
                     }
+                    listOf(aggregate) + filteredByVisibility
                 }
                 if (result.none { it.accountId == selectedAccountId.value }) {
                     result.firstOrNull()?.let {

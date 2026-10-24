@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
@@ -149,6 +151,7 @@ sealed class AppEvent {
     object ToggleNavigation : AppEvent()
     data class SaveTrade(val intent: TradeIntent) : AppEvent()
     data class ShowUpgrade(val feature: ContribFeature) : AppEvent()
+    object ManageAccounts : AppEvent()
 }
 
 interface AppEventHandler {
@@ -250,6 +253,21 @@ fun MainScreenAdaptive(
         }
     }
 
+    val wrappedAppEvent: AppEventHandler = remember(onAppEvent, navigator, scope) {
+        object : AppEventHandler {
+            override fun invoke(event: AppEvent) {
+                when (event) {
+                    AppEvent.ManageAccounts -> {
+                        scope.launch {
+                            navigator.navigateTo(ListDetailPaneScaffoldRole.List)
+                        }
+                    }
+                    else -> onAppEvent(event)
+                }
+            }
+        }
+    }
+
     val menuConfig = mainMenuLoadingState.value
 
     val is2Pane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
@@ -297,7 +315,7 @@ fun MainScreenAdaptive(
 
             else -> null
         }
-        onAppEvent(
+        wrappedAppEvent(
             AppEvent.MenuItemClicked(id, tag)
         )
     }
@@ -329,7 +347,7 @@ fun MainScreenAdaptive(
                 if (toggleableRail && isNavigationVisible) {
                     item(
                         icon = {
-                            IconButton(onClick = { onAppEvent(AppEvent.ToggleNavigation) }) {
+                            IconButton(onClick = { wrappedAppEvent(AppEvent.ToggleNavigation) }) {
                                 Icon(
                                     Icons.Default.Close,
                                     contentDescription = stringResource(R.string.drawer_close)
@@ -344,7 +362,6 @@ fun MainScreenAdaptive(
                 }
                 if (!is2Pane) {
                     listOfNotNull(
-                        Screen.Accounts,
                         Screen.Transactions.takeIf { accounts.isNotEmpty() }
                     ).forEach { screen ->
                         item(
@@ -408,7 +425,7 @@ fun MainScreenAdaptive(
                 if (toggleableRail && !isNavigationVisible) {
                     @Composable
                     {
-                        IconButton(onClick = { onAppEvent(AppEvent.ToggleNavigation) }) {
+                        IconButton(onClick = { wrappedAppEvent(AppEvent.ToggleNavigation) }) {
                             Icon(
                                 imageVector = Icons.Default.Menu,
                                 contentDescription = stringResource(R.string.drawer_open)
@@ -418,6 +435,23 @@ fun MainScreenAdaptive(
                 } else {
                     {}
                 }
+
+            val accountsNavigationIcon: @Composable () -> Unit = {
+                if (!is2Pane && navigator.canNavigateBack()) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            navigator.navigateBack()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.menu_back)
+                        )
+                    }
+                } else {
+                    navigationIcon()
+                }
+            }
 
             ListDetailPaneScaffold(
                 directive = navigator.scaffoldDirective,
@@ -430,12 +464,12 @@ fun MainScreenAdaptive(
                         AnimatedPane {
                             AccountsScreen(
                                 containerColor = Color.Transparent,
-                                navigationIcon = navigationIcon,
+                                navigationIcon = accountsNavigationIcon,
                                 accounts = accounts,
                                 accountGrouping = accountGrouping,
                                 selectedAccountId = selectedAccountId,
                                 viewModel = viewModel,
-                                onEvent = onAppEvent,
+                                onEvent = wrappedAppEvent,
                                 onAccountEvent = onAccountEvent,
                                 flags = flags,
                                 bankIcon = bankIcon,
@@ -481,7 +515,7 @@ fun MainScreenAdaptive(
                                 selectedAccountId = selectedAccountId,
                                 accounts = accounts,
                                 viewModel = viewModel,
-                                onEvent = onAppEvent,
+                                onEvent = wrappedAppEvent,
                                 onAccountEvent = onAccountEvent,
                                 onPrepareContextMenuItem = onPrepareContextMenuItem,
                                 onPrepareMenuItem = onPrepareMenuItem,
@@ -542,6 +576,44 @@ fun MainScreenAdaptive(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = stringResource(R.string.accounts),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 4.dp)
+                )
+                ListItem(
+                    modifier = Modifier
+                        .clickable {
+                            showBottomSheet = false
+                            scope.launch {
+                                navigator.navigateTo(ListDetailPaneScaffoldRole.List)
+                            }
+                        },
+                    headlineContent = { Text(stringResource(R.string.manage_accounts)) },
+                    supportingContent = { Text("View balance sheet, reorder, and edit accounts") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.AccountBalance,
+                            contentDescription = null
+                        )
+                    }
+                )
+                ListItem(
+                    modifier = Modifier
+                        .clickable {
+                            showBottomSheet = false
+                            wrappedAppEvent(AppEvent.CreateAccount)
+                        },
+                    headlineContent = { Text(stringResource(R.string.create_account)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null
+                        )
+                    }
+                )
 
                 val reports = overflowItems.filter { it is MenuItem.Distribution || it is MenuItem.Budget }
                 val manage = overflowItems.filter { it is MenuItem.Parties || it is MenuItem.Loans || it is MenuItem.Templates }

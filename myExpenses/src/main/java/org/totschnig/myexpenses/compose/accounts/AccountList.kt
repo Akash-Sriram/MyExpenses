@@ -1250,6 +1250,22 @@ fun AccountSummaryV2(
         )
     }
 
+    if (account.liquidAssets != 0L) {
+        SumRowV2(
+            label = R.string.liquid_assets,
+            amount = account.liquidAssets,
+            currency = account.currencyUnit
+        )
+    }
+
+    if (account.creditLiabilities != 0L) {
+        SumRowV2(
+            label = R.string.credit_liabilities,
+            amount = account.creditLiabilities,
+            currency = account.currencyUnit
+        )
+    }
+
     val displayTotal = account.total ?: account.equivalentTotal.takeIf { it != 0L }
 
     val hasMultipleBalanceTypeOptions = displayTotal != null

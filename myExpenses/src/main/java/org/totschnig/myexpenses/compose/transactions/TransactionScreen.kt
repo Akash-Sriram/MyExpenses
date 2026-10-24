@@ -3,12 +3,15 @@ package org.totschnig.myexpenses.compose.transactions
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -21,14 +24,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +54,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
@@ -130,6 +144,7 @@ import org.totschnig.myexpenses.preference.PreferenceState
 import org.totschnig.myexpenses.util.convAmount
 import org.totschnig.myexpenses.util.enumValueOrDefault
 import org.totschnig.myexpenses.viewmodel.MyExpensesV2ViewModel
+import org.totschnig.myexpenses.viewmodel.data.AggregateAccount
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.FullAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
@@ -432,67 +447,29 @@ fun TransactionScreen(
                 .nestedScroll(tabRowState.nestedScrollConnection)
         ) {
             if (availableFilters.size > 1 || accountList.size > 1) {
-                Row(
+                AccountSwitcherCarousel(
+                    accountList = accountList,
+                    selectedTabIndex = pagerState.currentPage.coerceAtMost(accountList.lastIndex),
+                    availableFilters = availableFilters,
+                    activeFilter = activeFilter,
+                    onFilterChange = viewModel::setFilter,
+                    onSelectAccount = { index ->
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    },
+                    onCreateAccount = { onEvent(AppEvent.CreateAccount) },
+                    onManageAccounts = { onEvent(AppEvent.ManageAccounts) },
                     modifier = Modifier
                         .optional(tabRowState.heightPx) {
                             height(with(LocalDensity.current) { it.toDp() })
-                        },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (availableFilters.size > 1) {
-                        AccountFilterMenu(
-                            activeFilter = activeFilter,
-                            availableFilters = availableFilters,
-                            onFilterChange = viewModel::setFilter,
-                        )
-                    }
-                    val selectedTabIndex =
-                        pagerState.currentPage.coerceAtMost(accountList.lastIndex)
-                    Timber.d("selectedTabIndex: $selectedTabIndex")
-                    SecondaryScrollableTabRow(
-                        selectedTabIndex = selectedTabIndex,
-                        modifier = Modifier
-                            .onSizeChanged { size ->
-                                if (size.height > (tabRowState.maxHeightPx ?: 0f)) {
-                                    tabRowState.maxHeightPx = size.height.toFloat()
-                                }
-                            },
-                        edgePadding = 0.dp,
-                        indicator = {
-                            TabRowDefaults.SecondaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(
-                                    selectedTabIndex,
-                                    matchContentSize = false
-                                ),
-                                color = accountColor
-                            )
                         }
-                    ) {
-                        val density = LocalDensity.current
-                        val maxTabWidth =
-                            with(density) { MaterialTheme.typography.labelLarge.fontSize.toDp() } * 10
-                        Timber.d("maxTabWidth: $maxTabWidth")
-                        accountList.forEachIndexed { index, account ->
-                            Tab(
-                                selected = selectedTabIndex == index,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
-                                    }
-                                },
-                                modifier = Modifier.height(40.dp),
-                                text = {
-                                    Text(
-                                        modifier = Modifier.widthIn(max = maxTabWidth),
-                                        text = account.labelV2(LocalContext.current),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            )
+                        .onSizeChanged { size ->
+                            if (size.height > (tabRowState.maxHeightPx ?: 0f)) {
+                                tabRowState.maxHeightPx = size.height.toFloat()
+                            }
                         }
-                    }
-                }
+                )
             }
             if (accountList.size > 1) {
                 HorizontalPager(
@@ -712,17 +689,43 @@ private fun BalanceHeader(
                                         Text(stringResource(R.string.copy_text))
                                     }
 
-                                    if (currentAccount is FullAccount && onSetNewBalance != null) {
+                                    if (currentAccount is FullAccount) {
+                                        if (onSetNewBalance != null) {
+                                            TextButton(onClick = {
+                                                onSetNewBalance()
+                                                isSummaryPopupVisible = false
+                                            }) {
+                                                Icon(
+                                                    Icons.Default.Edit,
+                                                    contentDescription = null
+                                                )
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(stringResource(R.string.new_balance))
+                                            }
+                                        }
+
                                         TextButton(onClick = {
-                                            onSetNewBalance()
+                                            onAccountEvent(AccountEvent.Edit, currentAccount)
                                             isSummaryPopupVisible = false
                                         }) {
                                             Icon(
-                                                Icons.Default.Edit,
+                                                Icons.Default.Tune,
                                                 contentDescription = null
                                             )
                                             Spacer(Modifier.width(8.dp))
-                                            Text(stringResource(R.string.new_balance))
+                                            Text(stringResource(R.string.menu_edit))
+                                        }
+
+                                        TextButton(onClick = {
+                                            onAccountEvent(AccountEvent.ToggleSealed, currentAccount)
+                                            isSummaryPopupVisible = false
+                                        }) {
+                                            Icon(
+                                                if (currentAccount.sealed) Icons.Default.LockOpen else Icons.Default.Lock,
+                                                contentDescription = null
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(stringResource(if (currentAccount.sealed) R.string.menu_reopen else R.string.menu_close))
                                         }
                                     }
                                 }
@@ -815,4 +818,176 @@ fun HeaderPreview() {
             override fun invoke(event: AccountEvent, account: FullAccount) {}
         }
     )
+}
+
+@Composable
+private fun AccountSwitcherCarousel(
+    accountList: List<BaseAccount>,
+    selectedTabIndex: Int,
+    availableFilters: List<AccountGroupingKey>,
+    activeFilter: AccountGroupingKey?,
+    onFilterChange: (AccountGroupingKey?) -> Unit,
+    onSelectAccount: (Int) -> Unit,
+    onCreateAccount: () -> Unit,
+    onManageAccounts: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val lazyListState = rememberLazyListState()
+    val resources = LocalResources.current
+    val context = LocalContext.current
+    val currencyFormatter = LocalCurrencyFormatter.current
+
+    LaunchedEffect(selectedTabIndex) {
+        if (selectedTabIndex in accountList.indices) {
+            lazyListState.animateScrollToItem(selectedTabIndex)
+        }
+    }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (availableFilters.size > 1) {
+            AccountFilterMenu(
+                activeFilter = activeFilter,
+                availableFilters = availableFilters,
+                onFilterChange = onFilterChange,
+            )
+        }
+
+        LazyRow(
+            state = lazyListState,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            itemsIndexed(
+                items = accountList,
+                key = { _, account -> account.id }
+            ) { index, account ->
+                val isSelected = index == selectedTabIndex
+                val color = Color(account.color(resources))
+                val balanceAmount = if (account is AggregateAccount) {
+                    account.currentBalance ?: account.equivalentCurrentBalance
+                } else {
+                    account.balanceForType
+                }
+
+                Surface(
+                    onClick = { onSelectAccount(index) },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerLow
+                    },
+                    border = BorderStroke(
+                        width = if (isSelected) 1.5.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                    ),
+                    tonalElevation = if (isSelected) 2.dp else 0.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (account.isAggregate) {
+                            Icon(
+                                imageVector = Icons.Default.AllInclusive,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(color, CircleShape)
+                            )
+                        }
+
+                        Text(
+                            text = account.labelV2(context),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Text(
+                            text = currencyFormatter.convAmount(balanceAmount, account.currencyUnit),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (balanceAmount < 0) {
+                                MaterialTheme.colorScheme.error
+                            } else if (isSelected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+
+            item(key = "add_account_action") {
+                Surface(
+                    onClick = onCreateAccount,
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = stringResource(R.string.create_account),
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = stringResource(R.string.create_account),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            item(key = "manage_accounts_action") {
+                Surface(
+                    onClick = onManageAccounts,
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.manage_accounts),
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = stringResource(R.string.manage_accounts),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

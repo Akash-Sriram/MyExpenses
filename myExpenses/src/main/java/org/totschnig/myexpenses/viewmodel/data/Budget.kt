@@ -80,7 +80,7 @@ data class Budget(
     override fun label(context: Context, currencyContext: CurrencyContext) = label(context)
 
     fun label(context: Context) = accountName
-        ?: if (accountId == HOME_AGGREGATE_ID) context.getString(R.string.grand_total)
+        ?: if (accountId == HOME_AGGREGATE_ID) context.getString(R.string.all_accounts)
         else currency
 
     override val typeId: Long?

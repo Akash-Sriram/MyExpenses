@@ -1294,4 +1294,9 @@
     <string name="insights_top_merchants_title">Top Merchants &amp; Payees</string>
     <string name="insights_all_accounts">All Accounts (Consolidated)</string>
     <string name="insights_no_transactions">No expenses recorded for this period.</string>
+    <string name="all_accounts">All Accounts</string>
+    <string name="liquid_assets">Spendable (Bank &amp; Cash)</string>
+    <string name="credit_liabilities">Credit &amp; Due Liabilities</string>
+    <string name="manage_accounts">Manage Accounts</string>
+    <string name="create_account">Create Account</string>
 </resources>

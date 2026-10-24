@@ -387,6 +387,8 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                             event.feature,
                                             true
                                         )
+
+                                        AppEvent.ManageAccounts -> {}
                                     }
                                 }
                             },

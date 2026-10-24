@@ -30,7 +30,7 @@ data class AccountMinimal(
             return AccountMinimal(
                 id = id,
                 label = if (id == HOME_AGGREGATE_ID)
-                    context.getString(R.string.grand_total)
+                    context.getString(R.string.all_accounts)
                 else
                     cursor.getString(KEY_LABEL),
                 currency = cursor.getString(KEY_CURRENCY),
