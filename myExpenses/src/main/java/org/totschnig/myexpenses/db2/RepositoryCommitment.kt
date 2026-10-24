@@ -58,6 +58,7 @@ import org.totschnig.myexpenses.provider.KEY_CATID
 import org.totschnig.myexpenses.provider.KEY_COMMENT
 import org.totschnig.myexpenses.provider.KEY_COMMITMENT_ID
 import org.totschnig.myexpenses.provider.KEY_COMMITMENT_TYPE
+import org.totschnig.myexpenses.provider.KEY_REFERENCE_NUMBER
 import org.totschnig.myexpenses.provider.KEY_DATE
 import org.totschnig.myexpenses.provider.KEY_DUE_DATE
 import org.totschnig.myexpenses.provider.KEY_DUE_DAY_OF_MONTH
@@ -2099,30 +2100,73 @@ class RepositoryCommitment @Inject constructor(
         result.sortedByDescending { it.paidDate }
     }.flowOn(coroutineDispatcher)
 
-    fun getMobilePlanTracker(startOfMonthMillis: Long, endOfMonthMillis: Long): Flow<MobilePlanTracker?> = flow<MobilePlanTracker?> {
-        val db = openHelper.readableDatabase
+    fun getMobilePlanTrackers(startOfMonthMillis: Long, endOfMonthMillis: Long): Flow<List<MobilePlanTracker>> = _commitmentsInvalidation
+        .onStart { emit(Unit) }
+        .map {
+            withContext(coroutineDispatcher) {
+                calculateMobilePlanTrackers(startOfMonthMillis, endOfMonthMillis)
+            }
+        }.flowOn(coroutineDispatcher)
 
-        val latestRechargeQuery = """
-            SELECT tr._id, tr.date, tr.amount, p.name, tr.comment
+    fun getMobilePlanTracker(startOfMonthMillis: Long, endOfMonthMillis: Long): Flow<MobilePlanTracker?> =
+        getMobilePlanTrackers(startOfMonthMillis, endOfMonthMillis).map { it.firstOrNull() }
+
+    private fun calculateMobilePlanTrackers(startOfMonthMillis: Long, endOfMonthMillis: Long): List<MobilePlanTracker> {
+        val db = openHelper.readableDatabase
+        val result = mutableListOf<MobilePlanTracker>()
+
+        val rechargesQuery = """
+            SELECT tr._id, tr.date, tr.amount, p.name, tr.comment, tr.number
             FROM $TABLE_TRANSACTIONS tr
             LEFT JOIN $TABLE_PAYEES p ON tr.$KEY_PAYEEID = p._id
             WHERE tr.$KEY_CATID = 164 AND tr.amount <= -10000
             ORDER BY tr.date DESC
-            LIMIT 1
         """.trimIndent()
 
-        var tracker: MobilePlanTracker? = null
+        val seenKeys = mutableSetOf<String>()
+        val nowMillis = System.currentTimeMillis()
+        val startSecs = startOfMonthMillis / 1000L
+        val endSecs = endOfMonthMillis / 1000L
 
         try {
-            db.query(latestRechargeQuery, emptyArray()).use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val dateSecs = cursor.getLong(1)
-                    val rechargeDateMillis = dateSecs * 1000L
-                    val amtPaise = kotlin.math.abs(cursor.getLong(2))
-                    val payeeName = if (cursor.isNull(3)) "Jio Recharge" else cursor.getString(3)
-                    val operator = if (payeeName.contains("Vi", ignoreCase = true)) "Vi" else "Jio"
+            db.query(rechargesQuery, emptyArray()).use { cursor ->
+                val idIdx = cursor.getColumnIndexOrThrow("_id")
+                val dateIdx = cursor.getColumnIndexOrThrow("date")
+                val amtIdx = cursor.getColumnIndexOrThrow("amount")
+                val nameIdx = cursor.getColumnIndexOrThrow("name")
+                val commentIdx = cursor.getColumnIndexOrThrow("comment")
+                val numberIdx = cursor.getColumnIndexOrThrow("number")
 
-                    val comment = if (cursor.isNull(4)) "" else cursor.getString(4)
+                while (cursor.moveToNext()) {
+                    val txnId = cursor.getLong(idIdx)
+                    val dateSecs = cursor.getLong(dateIdx)
+                    val rechargeDateMillis = dateSecs * 1000L
+                    val amtPaise = kotlin.math.abs(cursor.getLong(amtIdx))
+                    val payeeName = if (cursor.isNull(nameIdx)) "Mobile Recharge" else cursor.getString(nameIdx)
+                    val comment = if (cursor.isNull(commentIdx)) "" else cursor.getString(commentIdx)
+                    val numberCol = if (cursor.isNull(numberIdx)) "" else cursor.getString(numberIdx)
+
+                    val operator = when {
+                        payeeName.contains("Vi", ignoreCase = true) ||
+                        payeeName.contains("Vodafone", ignoreCase = true) ||
+                        payeeName.contains("Idea", ignoreCase = true) ||
+                        comment.contains("Vi", ignoreCase = true) -> "Vi"
+                        payeeName.contains("Airtel", ignoreCase = true) || comment.contains("Airtel", ignoreCase = true) -> "Airtel"
+                        payeeName.contains("Bsnl", ignoreCase = true) || comment.contains("Bsnl", ignoreCase = true) -> "BSNL"
+                        payeeName.contains("Jio", ignoreCase = true) || comment.contains("Jio", ignoreCase = true) -> "Jio"
+                        else -> "Mobile"
+                    }
+
+                    val phoneRegex = Regex("""\b([6-9]\d{9})\b""")
+                    val rawPhone = phoneRegex.find(comment)?.value
+                        ?: phoneRegex.find(numberCol)?.value
+                        ?: phoneRegex.find(payeeName)?.value
+
+                    val groupKey = if (rawPhone != null) "PHONE_$rawPhone" else "OP_$operator"
+                    if (seenKeys.contains(groupKey)) {
+                        continue
+                    }
+
                     val customDays = if (comment.contains("booster", ignoreCase = true) || comment.contains("add-on", ignoreCase = true)) {
                         0
                     } else {
@@ -2139,26 +2183,31 @@ class RepositoryCommitment @Inject constructor(
                     }
 
                     val expiryDateMillis = rechargeDateMillis + (validityDays * 86400000L)
-                    val nowMillis = System.currentTimeMillis()
                     val daysRemaining = ((expiryDateMillis - nowMillis) / 86400000L).toInt()
                     val isActive = daysRemaining >= 0
                     val rechargedThisMonth = rechargeDateMillis in startOfMonthMillis..endOfMonthMillis
 
-                    val startSecs = startOfMonthMillis / 1000L
-                    val endSecs = endOfMonthMillis / 1000L
+                    // Keep plans that are active or expired within last 30 days or recharged this month
+                    if (daysRemaining < -30 && !rechargedThisMonth) {
+                        continue
+                    }
+
+                    seenKeys.add(groupKey)
 
                     var addonsCount = 0
                     var addonsTotal = 0L
 
+                    val opPattern = "%$operator%"
                     val addonsQuery = """
                         SELECT count(*), sum(abs(tr.amount))
                         FROM $TABLE_TRANSACTIONS tr
                         LEFT JOIN $TABLE_PAYEES p ON tr.$KEY_PAYEEID = p._id
                         WHERE tr.date BETWEEN ? AND ? AND tr.amount < 0
-                          AND (p.name LIKE '%Addon%' OR (tr.$KEY_CATID = 64 AND tr.amount >= -10000))
+                          AND (p.name LIKE ? OR tr.comment LIKE ?)
+                          AND (p.name LIKE '%Addon%' OR tr.comment LIKE '%booster%' OR tr.comment LIKE '%add-on%' OR (tr.$KEY_CATID = 64 AND tr.amount >= -10000))
                     """.trimIndent()
 
-                    db.query(addonsQuery, arrayOf(startSecs.toString(), endSecs.toString())).use { addCursor ->
+                    db.query(addonsQuery, arrayOf(startSecs.toString(), endSecs.toString(), opPattern, opPattern)).use { addCursor ->
                         if (addCursor.moveToFirst() && !addCursor.isNull(0)) {
                             addonsCount = addCursor.getInt(0)
                             addonsTotal = if (addCursor.isNull(1)) 0L else addCursor.getLong(1)
@@ -2167,27 +2216,70 @@ class RepositoryCommitment @Inject constructor(
 
                     val totalSpendThisMonth = (if (rechargedThisMonth) amtPaise else 0L) + addonsTotal
 
-                    tracker = MobilePlanTracker(
-                        operator = operator,
-                        lastRechargeDate = rechargeDateMillis,
-                        lastRechargeAmount = amtPaise,
-                        validityDays = validityDays,
-                        expiryDate = expiryDateMillis,
-                        daysRemaining = daysRemaining,
-                        isActive = isActive,
-                        rechargedThisMonth = rechargedThisMonth,
-                        addonsCountThisMonth = addonsCount,
-                        addonsTotalThisMonth = addonsTotal,
-                        totalSpendThisMonth = totalSpendThisMonth
+                    result.add(
+                        MobilePlanTracker(
+                            transactionId = txnId,
+                            operator = operator,
+                            phoneNumber = rawPhone,
+                            lastRechargeDate = rechargeDateMillis,
+                            lastRechargeAmount = amtPaise,
+                            validityDays = validityDays,
+                            expiryDate = expiryDateMillis,
+                            daysRemaining = daysRemaining,
+                            isActive = isActive,
+                            rechargedThisMonth = rechargedThisMonth,
+                            addonsCountThisMonth = addonsCount,
+                            addonsTotalThisMonth = addonsTotal,
+                            totalSpendThisMonth = totalSpendThisMonth
+                        )
                     )
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error calculating MobilePlanTracker")
+            Timber.e(e, "Error calculating MobilePlanTrackers")
         }
 
-        emit(tracker)
-    }.flowOn(coroutineDispatcher)
+        return result
+    }
+
+    suspend fun updateMobilePlan(transactionId: Long, validityDays: Int, phoneNumber: String?) =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            var currentComment = ""
+            db.query(
+                "SELECT $KEY_COMMENT FROM $TABLE_TRANSACTIONS WHERE _id = ?",
+                arrayOf(transactionId.toString())
+            ).use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    currentComment = cursor.getString(0)
+                }
+            }
+
+            val cleaned = currentComment
+                .replace(Regex("""(?i)\b\d+\s*d(?:ays)?\b"""), "")
+                .replace(Regex("""\b[6-9]\d{9}\b"""), "")
+                .trim()
+
+            val newParts = mutableListOf<String>()
+            val trimmedPhone = phoneNumber?.trim()?.takeIf { it.isNotBlank() }
+            if (trimmedPhone != null) {
+                newParts.add(trimmedPhone)
+            }
+            newParts.add("${validityDays}d")
+            if (cleaned.isNotBlank()) {
+                newParts.add(cleaned)
+            }
+            val newComment = newParts.joinToString(" ")
+
+            val cv = ContentValues().apply {
+                put(KEY_COMMENT, newComment)
+                if (trimmedPhone != null) {
+                    put(KEY_REFERENCE_NUMBER, trimmedPhone)
+                }
+            }
+            db.update(TABLE_TRANSACTIONS, SQLiteDatabase.CONFLICT_NONE, cv, "_id = ?", arrayOf(transactionId.toString()))
+            invalidate()
+        }
 
     fun getSuggestedTagsForContext(payeeId: Long?, catId: Long?): List<Tag> {
         val results = LinkedHashMap<Long, Tag>()

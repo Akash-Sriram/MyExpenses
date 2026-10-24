@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -429,7 +430,7 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
             .stateIn(viewModelScope, SharingStarted.WhileSubscribedWithTimeout, emptyList())
     }
 
-    val mobilePlanTracker: StateFlow<MobilePlanTracker?> by lazy {
+    val mobilePlanTrackers: StateFlow<List<MobilePlanTracker>> by lazy {
         val calendar = java.util.Calendar.getInstance()
         calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
         calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
@@ -440,8 +441,25 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
         calendar.add(java.util.Calendar.MONTH, 1)
         val endOfMonth = calendar.timeInMillis - 1
 
-        repositoryCommitment.getMobilePlanTracker(startOfMonth, endOfMonth)
+        repositoryCommitment.getMobilePlanTrackers(startOfMonth, endOfMonth)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribedWithTimeout, emptyList())
+    }
+
+    val mobilePlanTracker: StateFlow<MobilePlanTracker?> by lazy {
+        mobilePlanTrackers.map { it.firstOrNull() }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribedWithTimeout, null)
+    }
+
+    fun updateMobilePlan(
+        transactionId: Long,
+        validityDays: Int,
+        phoneNumber: String?,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            repositoryCommitment.updateMobilePlan(transactionId, validityDays, phoneNumber)
+            onComplete()
+        }
     }
 
     fun createInsurancePolicy(

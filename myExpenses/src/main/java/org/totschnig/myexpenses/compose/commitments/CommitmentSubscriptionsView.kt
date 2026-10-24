@@ -76,6 +76,7 @@ import org.totschnig.myexpenses.domain.commitment.BillingCycle
 import org.totschnig.myexpenses.domain.commitment.CommitmentItem
 import org.totschnig.myexpenses.domain.commitment.CommitmentStatus
 import org.totschnig.myexpenses.domain.commitment.Subscription
+import org.totschnig.myexpenses.domain.commitment.MobilePlanTracker
 import org.totschnig.myexpenses.viewmodel.LoanViewModel
 import org.totschnig.myexpenses.viewmodel.data.AccountMinimal
 
@@ -86,7 +87,7 @@ fun CommitmentSubscriptionsView(
 ) {
     val commitmentItems by viewModel.commitmentItems.collectAsState()
     val accounts by viewModel.accounts.collectAsState()
-    val mobilePlanTracker by viewModel.mobilePlanTracker.collectAsState()
+    val mobilePlanTrackers by viewModel.mobilePlanTrackers.collectAsState()
 
     // Filter to purely digital subscriptions (excluding variable-amount utilities)
     val regularSubscriptions = commitmentItems.filterIsInstance<CommitmentItem.SubscriptionItem>()
@@ -96,6 +97,7 @@ fun CommitmentSubscriptionsView(
     var documentTarget by remember { mutableStateOf<Subscription?>(null) }
     var showAddSubDialog by remember { mutableStateOf(false) }
     var editingSubTarget by remember { mutableStateOf<Subscription?>(null) }
+    var editingTrackerTarget by remember { mutableStateOf<MobilePlanTracker?>(null) }
 
     val totalAnnualSpend = regularSubscriptions.sumOf { item ->
         when (item.subscription.billingCycle) {
@@ -122,10 +124,11 @@ fun CommitmentSubscriptionsView(
             )
         }
 
-        mobilePlanTracker?.let { tracker ->
-            item {
-                MobilePlanTrackerCard(tracker = tracker)
-            }
+        items(mobilePlanTrackers) { tracker ->
+            MobilePlanTrackerCard(
+                tracker = tracker,
+                onEditPlan = { editingTrackerTarget = it }
+            )
         }
 
         if (regularSubscriptions.isEmpty()) {
@@ -256,6 +259,19 @@ fun CommitmentSubscriptionsView(
                 viewModel.deleteSubscription(sub.id) {
                     editingSubTarget = null
                     viewModel.resyncAllCommitments()
+                }
+            }
+        )
+    }
+
+    // Edit Mobile Plan Dialog
+    editingTrackerTarget?.let { tracker ->
+        EditMobilePlanDialog(
+            tracker = tracker,
+            onDismiss = { editingTrackerTarget = null },
+            onSave = { validity, phone ->
+                viewModel.updateMobilePlan(tracker.transactionId, validity, phone) {
+                    editingTrackerTarget = null
                 }
             }
         )
@@ -931,3 +947,115 @@ fun AddEditSubscriptionDialog(
         }
     )
 }
+
+@Composable
+fun EditMobilePlanDialog(
+    tracker: MobilePlanTracker,
+    onDismiss: () -> Unit,
+    onSave: (validityDays: Int, phoneNumber: String?) -> Unit
+) {
+    var phoneNumberText by remember(tracker.phoneNumber) {
+        mutableStateOf(tracker.phoneNumber ?: "")
+    }
+    var validityText by remember(tracker.validityDays) {
+        mutableStateOf(tracker.validityDays.toString())
+    }
+
+    val rechargeDateFormatted = remember(tracker.lastRechargeDate) {
+        java.time.Instant.ofEpochMilli(tracker.lastRechargeDate)
+            .atZone(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy"))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Edit Plan (${tracker.operator})",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Base Recharge: ${tracker.lastRechargeAmount.toRupeeString()} on $rechargeDateFormatted",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedTextField(
+                    value = phoneNumberText,
+                    onValueChange = { phoneNumberText = it.filter { char -> char.isDigit() }.take(10) },
+                    label = { Text("Mobile Phone Number") },
+                    placeholder = { Text("e.g. 9876543210") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = validityText,
+                    onValueChange = { validityText = it.filter { char -> char.isDigit() }.take(4) },
+                    label = { Text("Validity (Days)") },
+                    placeholder = { Text("e.g. 84, 180, 365") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val presets = listOf(28, 56, 84, 180, 365)
+                    presets.forEach { days ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (validityText == days.toString()) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { validityText = days.toString() }
+                        ) {
+                            Text(
+                                text = "${days}d",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (validityText == days.toString()) {
+                                    MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.padding(vertical = 6.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val days = validityText.toIntOrNull() ?: tracker.validityDays
+                    val phone = phoneNumberText.trim().takeIf { it.isNotBlank() }
+                    onSave(days, phone)
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+

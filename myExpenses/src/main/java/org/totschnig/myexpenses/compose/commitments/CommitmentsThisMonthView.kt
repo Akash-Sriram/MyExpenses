@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ArrowForward
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalDrink
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Payment
@@ -49,6 +51,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -1016,7 +1019,8 @@ fun getCommitmentPaidIcon(item: PaidCommitmentInfo): ImageVector {
 @Composable
 fun MobilePlanTrackerCard(
     tracker: MobilePlanTracker,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onEditPlan: ((MobilePlanTracker) -> Unit)? = null
 ) {
     val expiryDateFormatted = remember(tracker.expiryDate) {
         java.time.Instant.ofEpochMilli(tracker.expiryDate)
@@ -1027,6 +1031,12 @@ fun MobilePlanTrackerCard(
         java.time.Instant.ofEpochMilli(tracker.lastRechargeDate)
             .atZone(java.time.ZoneId.systemDefault())
             .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy"))
+    }
+
+    val formattedPhone = remember(tracker.phoneNumber) {
+        tracker.phoneNumber?.takeIf { it.isNotBlank() }?.let { raw ->
+            if (raw.length == 10) "+91 ${raw.substring(0, 5)} ${raw.substring(5)}" else raw
+        }
     }
 
     val (badgeText, badgeBgColor, badgeTextColor) = when {
@@ -1085,16 +1095,70 @@ fun MobilePlanTrackerCard(
                         )
                     }
                     Column {
-                        Text(
-                            text = "Mobile & Data (${tracker.operator})",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Base Recharge: ${tracker.lastRechargeAmount.toRupeeString()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Mobile & Data (${tracker.operator})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (onEditPlan != null) {
+                                IconButton(
+                                    onClick = { onEditPlan(tracker) },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit Plan",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (formattedPhone != null) {
+                                Text(
+                                    text = formattedPhone,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "•",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else if (onEditPlan != null) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                    modifier = Modifier.clickable { onEditPlan(tracker) }
+                                ) {
+                                    Text(
+                                        text = "+ Add Number",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "•",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "Base Recharge: ${tracker.lastRechargeAmount.toRupeeString()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 

@@ -323,7 +323,9 @@ data class CommitmentAttachment(
 )
 
 data class MobilePlanTracker(
+    val transactionId: Long = 0L,
     val operator: String = "Jio",
+    val phoneNumber: String? = null,
     val lastRechargeDate: Long,
     val lastRechargeAmount: Long,
     val validityDays: Int = 84,
