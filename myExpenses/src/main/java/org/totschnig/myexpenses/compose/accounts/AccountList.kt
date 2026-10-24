@@ -1155,14 +1155,17 @@ fun AccountSummaryV2(
     }
 
     val hasMultipleBalanceTypeOptions =
-        account.total != null || account.type.supportsReconciliation || account.criterion != null
+        account.total != null || account.criterion != null
 
     account.total?.let {
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
         SumRowV2(
             label = R.string.menu_aggregates,
             amount = account.total,
             currency = account.currencyUnit,
-            modifier = Modifier.drawSumLine(),
             formattedEquivalentAmount = account.equivalentTotal
                 .takeIf { showEquivalentValues },
             highlight = balanceType == BalanceType.TOTAL,
@@ -1170,16 +1173,20 @@ fun AccountSummaryV2(
         )
     }
 
+    if (account.total == null) {
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+    }
+
     SumRowV2(
         label = R.string.current_balance,
         amount = account.currentBalance,
         currency = account.currencyUnit,
-        modifier = Modifier.conditional(account.total == null) {
-            drawSumLine()
-        },
         formattedEquivalentAmount = account.equivalentCurrentBalance
             .takeIf { showEquivalentValues },
-        highlight = balanceType == BalanceType.CURRENT,
+        highlight = balanceType == BalanceType.CURRENT || !hasMultipleBalanceTypeOptions,
         onClick = if (hasMultipleBalanceTypeOptions) {
             onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
         } else null
@@ -1271,14 +1278,24 @@ fun AccountSummaryV2(
     val hasMultipleBalanceTypeOptions = displayTotal != null
 
     displayTotal?.let {
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
         SumRowV2(
             label = R.string.menu_aggregates,
             amount = it,
             currency = account.currencyUnit,
-            modifier = Modifier.drawSumLine(),
             formattedEquivalentAmount = account.equivalentTotal.takeIf { isFx },
             highlight = balanceType == BalanceType.TOTAL,
             onClick = onDisplayBalanceTypeChange?.let { { it(BalanceType.TOTAL) } }
+        )
+    }
+
+    if (displayTotal == null) {
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            color = MaterialTheme.colorScheme.outlineVariant
         )
     }
 
@@ -1286,11 +1303,8 @@ fun AccountSummaryV2(
         label = R.string.current_balance,
         amount = account.currentBalance ?: account.equivalentCurrentBalance,
         currency = account.currencyUnit,
-        modifier = Modifier.conditional(displayTotal == null) {
-            drawSumLine()
-        },
         formattedEquivalentAmount = account.equivalentCurrentBalance.takeIf { isFx },
-        highlight = balanceType == BalanceType.CURRENT,
+        highlight = balanceType == BalanceType.CURRENT || !hasMultipleBalanceTypeOptions,
         onClick = if (hasMultipleBalanceTypeOptions) {
             onDisplayBalanceTypeChange?.let { { it(BalanceType.CURRENT) } }
         } else null
@@ -1388,17 +1402,20 @@ fun SumRowV2(
     highlight: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
-    val fontWeight = if (highlight) FontWeight.Bold else null
+    val fontWeight = if (highlight) FontWeight.Bold else FontWeight.Normal
     val auxiliaryTextStyle = MaterialTheme.typography.labelSmall
+    val contentColor = if (highlight) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(vertical = 3.dp)
             .optional(onClick) { clickable(onClick = it) },
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         if (onClick != null) {
             RadioButton(
-                modifier = Modifier.padding(end = 2.dp),
+                modifier = Modifier.padding(end = 6.dp),
                 selected = highlight,
                 onClick = null // handled by Surface
             )
@@ -1408,14 +1425,21 @@ fun SumRowV2(
             modifier = Modifier.weight(1f),
             maxLines = 1,
             fontWeight = fontWeight,
+            color = contentColor,
         )
         Column(modifier, horizontalAlignment = Alignment.End) {
-            AmountText(amount, currency)
+            AmountText(
+                amount,
+                currency,
+                fontWeight = fontWeight,
+                color = contentColor
+            )
             formattedEquivalentAmount?.let {
                 AmountText(
                     it,
                     LocalCurrencyContext.current.homeCurrencyUnit,
-                    fontSize = auxiliaryTextStyle.fontSize
+                    fontSize = auxiliaryTextStyle.fontSize,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             percent?.let { Percent(it, style = auxiliaryTextStyle) }

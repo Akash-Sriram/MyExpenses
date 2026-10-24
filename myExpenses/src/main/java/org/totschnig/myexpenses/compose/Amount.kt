@@ -56,6 +56,7 @@ fun AmountText(
     val money = Money(currency, amount)
     Text(
         modifier = modifier.amountSemantics(amount),
+        style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"),
         fontWeight = fontWeight,
         fontSize = fontSize,
         textAlign = textAlign,
