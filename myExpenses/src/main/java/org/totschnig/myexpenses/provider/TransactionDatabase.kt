@@ -344,6 +344,15 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
         db.execSQL("ALTER TABLE $TABLE_SUBSCRIPTIONS ADD COLUMN cancel_before_renewal INTEGER DEFAULT 0;")
       }
       db.cleanupPayeePrefixesAndDuplicates()
+      if (!prefHandler.getBoolean(PrefKey.SEEDED_DEFAULT_INCOME_CATEGORIES, false)) {
+        runCatching {
+          setupIncomeCategories(db, context.resources)
+          db.execSQL("UPDATE $TABLE_CATEGORIES SET $KEY_LABEL = 'Bank Interest', $KEY_LABEL_NORMALIZED = 'bank interest' WHERE $KEY_LABEL = 'Interest' AND $KEY_UUID = '6e75f783-9732-4838-921f-4531b3ae1ba0'")
+          prefHandler.putBoolean(PrefKey.SEEDED_DEFAULT_INCOME_CATEGORIES, true)
+        }.onFailure {
+          Timber.e(it, "Failed to seed default income categories")
+        }
+      }
     }
   }
 

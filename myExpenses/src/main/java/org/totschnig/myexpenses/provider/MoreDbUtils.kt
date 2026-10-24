@@ -294,7 +294,9 @@ val incomeCategories = arrayOf(
     Triple(R.array.Cat_I_2, R.array.Cat_I_2_Icons, R.array.Cat_I_2_Uuids),
     Triple(R.array.Cat_I_3, R.array.Cat_I_3_Icons, R.array.Cat_I_3_Uuids),
     Triple(R.array.Cat_I_4, R.array.Cat_I_4_Icons, R.array.Cat_I_4_Uuids),
-    Triple(R.array.Cat_I_5, R.array.Cat_I_5_Icons, R.array.Cat_I_5_Uuids)
+    Triple(R.array.Cat_I_5, R.array.Cat_I_5_Icons, R.array.Cat_I_5_Uuids),
+    Triple(R.array.Cat_I_6, R.array.Cat_I_6_Icons, R.array.Cat_I_6_Uuids),
+    Triple(R.array.Cat_I_7, R.array.Cat_I_7_Icons, R.array.Cat_I_7_Uuids)
 )
 
 val expenseCategories = arrayOf(
@@ -455,6 +457,10 @@ fun setupDefaultCategories(database: SupportSQLiteDatabase, resources: Resources
     val expense = setupCategoriesInternal(database, resources, expenseCategories, FLAG_EXPENSE)
     val income = setupCategoriesInternal(database, resources, incomeCategories, FLAG_INCOME)
     return expense.first + income.first to expense.second + income.second
+}
+
+fun setupIncomeCategories(database: SupportSQLiteDatabase, resources: Resources): Pair<Int, Int> {
+    return setupCategoriesInternal(database, resources, incomeCategories, FLAG_INCOME)
 }
 
 fun insertUuidsForDefaultCategories(database: SupportSQLiteDatabase, resources: Resources) {

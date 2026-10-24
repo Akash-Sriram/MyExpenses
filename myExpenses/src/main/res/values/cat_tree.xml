@@ -12,7 +12,7 @@
     <string-array name="Cat_I_2">
         <item>@string/Main_2</item>
         <item>@string/Sub_2_1</item>
-        <item>@string/Sub_2_1</item>
+        <item>@string/Sub_2_2</item>
         <item>@string/Sub_2_3</item>
     </string-array>
     <string-array name="Cat_I_3">
@@ -28,12 +28,25 @@
         <item>@string/Sub_4_3</item>
         <item>@string/Sub_4_4</item>
         <item>@string/Sub_4_5</item>
+        <item>@string/Sub_4_6</item>
+        <item>@string/Sub_4_7</item>
     </string-array>
     <string-array name="Cat_I_5">
         <item>@string/Main_5</item>
         <item>@string/Sub_5_1</item>
         <item>@string/Sub_5_2</item>
         <item>@string/Sub_5_3</item>
+    </string-array>
+    <string-array name="Cat_I_6">
+        <item>@string/Main_23</item>
+        <item>@string/Sub_23_1</item>
+        <item>@string/Sub_23_2</item>
+        <item>@string/Sub_23_3</item>
+    </string-array>
+    <string-array name="Cat_I_7">
+        <item>@string/Main_24</item>
+        <item>@string/Sub_24_1</item>
+        <item>@string/Sub_24_2</item>
     </string-array>
     <string-array name="Cat_E_1">
         <item>@string/Main_6</item>

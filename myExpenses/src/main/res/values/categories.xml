@@ -27,7 +27,7 @@
     <!-- Subcategory under "Investment income" -->
     <string name="Sub_3_1">Dividend</string>
     <!-- Subcategory under "Investment income" -->
-    <string name="Sub_3_2">Interest</string>
+    <string name="Sub_3_2">Bank Interest</string>
     <!-- Subcategory under "Investment income" -->
     <string name="Sub_3_3">Capital gain</string>
     <!-- Main category -->
@@ -42,6 +42,10 @@
     <string name="Sub_4_4">Success fee</string>
     <!-- Subcategory under "Salary" -->
     <string name="Sub_4_5">Net salary</string>
+    <!-- Subcategory under "Salary" -->
+    <string name="Sub_4_6">Bonus &amp; Incentives</string>
+    <!-- Subcategory under "Salary" -->
+    <string name="Sub_4_7">Reimbursements</string>
     <!-- Main category -->
     <string name="Main_5">Misc. income</string>
     <!-- Subcategory under "Misc. income" -->
@@ -258,4 +262,18 @@
     <string name="Sub_22_2">Visits</string>
     <!-- Subcategory under "Holidays" -->
     <string name="Sub_22_3">Travels</string>
+    <!-- Main category -->
+    <string name="Main_23">Rental income</string>
+    <!-- Subcategory under "Rental income" -->
+    <string name="Sub_23_1">Rent</string>
+    <!-- Subcategory under "Rental income" -->
+    <string name="Sub_23_2">EB / Electricity bill</string>
+    <!-- Subcategory under "Rental income" -->
+    <string name="Sub_23_3">Maintenance &amp; water</string>
+    <!-- Main category -->
+    <string name="Main_24">Cashback &amp; Rewards</string>
+    <!-- Subcategory under "Cashback &amp; Rewards" -->
+    <string name="Sub_24_1">Cashback</string>
+    <!-- Subcategory under "Cashback &amp; Rewards" -->
+    <string name="Sub_24_2">Refunds</string>
 </resources>

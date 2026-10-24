@@ -28,12 +28,25 @@
         <item>award</item>
         <item>thumbs-up</item>
         <item>envelope</item>
+        <item>award</item>
+        <item>receipt</item>
     </string-array>
     <string-array name="Cat_I_5_Icons">
         <item>right-to-bracket</item>
         <item>gift</item>
         <item>retweet</item>
         <item>recycle</item>
+    </string-array>
+    <string-array name="Cat_I_6_Icons">
+        <item>house-user</item>
+        <item>house</item>
+        <item>bolt</item>
+        <item>wrench</item>
+    </string-array>
+    <string-array name="Cat_I_7_Icons">
+        <item>gift</item>
+        <item>coins</item>
+        <item>retweet</item>
     </string-array>
     <string-array name="Cat_E_1_Icons">
         <item>pizza-slice</item>

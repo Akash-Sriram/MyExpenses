@@ -916,5 +916,59 @@ class UpiReceiptParserTest {
         assertEquals("siva07071972@oksbi", result.upiId)
         assertEquals("429812345678", result.referenceNumber)
     }
+
+    @Test
+    fun testCategoryXmlArraysConsistency() {
+        val baseDir = java.io.File("src/main/res/values")
+        val catTreeFile = java.io.File(baseDir, "cat_tree.xml")
+        val iconsFile = java.io.File(baseDir, "icons.xml")
+        val uuidsFile = java.io.File(baseDir, "category_uuids.xml")
+
+        assertTrue("cat_tree.xml exists", catTreeFile.exists())
+        assertTrue("icons.xml exists", iconsFile.exists())
+        assertTrue("category_uuids.xml exists", uuidsFile.exists())
+
+        fun parseStringArrayCounts(file: java.io.File): Map<String, Int> {
+            val docBuilder = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            val doc = docBuilder.parse(file)
+            val stringArrays = doc.getElementsByTagName("string-array")
+            val result = mutableMapOf<String, Int>()
+
+            for (i in 0 until stringArrays.length) {
+                val node = stringArrays.item(i)
+                val name = node.attributes.getNamedItem("name")?.nodeValue ?: continue
+                var itemCount = 0
+                val children = node.childNodes
+                for (j in 0 until children.length) {
+                    if (children.item(j).nodeName == "item") {
+                        itemCount++
+                    }
+                }
+                result[name] = itemCount
+            }
+            return result
+        }
+
+        val catTreeCounts = parseStringArrayCounts(catTreeFile)
+        val iconsCounts = parseStringArrayCounts(iconsFile)
+        val uuidsCounts = parseStringArrayCounts(uuidsFile)
+
+        for (i in 1..7) {
+            val catKey = "Cat_I_$i"
+            val iconKey = "${catKey}_Icons"
+            val uuidKey = "${catKey}_Uuids"
+
+            assertTrue("cat_tree contains $catKey", catTreeCounts.containsKey(catKey))
+            assertTrue("icons contains $iconKey", iconsCounts.containsKey(iconKey))
+            assertTrue("uuids contains $uuidKey", uuidsCounts.containsKey(uuidKey))
+
+            val catCount = catTreeCounts[catKey]!!
+            val iconCount = iconsCounts[iconKey]!!
+            val uuidCount = uuidsCounts[uuidKey]!!
+
+            assertEquals("Mismatch between $catKey and $iconKey", catCount, iconCount)
+            assertEquals("Mismatch between $catKey and $uuidKey", catCount, uuidCount)
+        }
+    }
 }
 
