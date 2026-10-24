@@ -14,9 +14,38 @@ class BalancePeriodTest {
 
     @Test
     fun testBalancePeriodEnumLabels() {
+        assertEquals(R.string.period_salary_cycle, BalancePeriod.SALARY_CYCLE.labelRes)
         assertEquals(R.string.period_this_month, BalancePeriod.THIS_MONTH.labelRes)
         assertEquals(R.string.period_last_month, BalancePeriod.LAST_MONTH.labelRes)
         assertEquals(R.string.period_all_time, BalancePeriod.ALL_TIME.labelRes)
+    }
+
+    @Test
+    fun testSalaryCycleReconciliationFormula() {
+        val opening = 273285L // Rs 2,732.85 (leftover balance before salary)
+        val salaryIncome = 4646000L // Rs 46,460.00 (Accenture net salary)
+        val otherIncome = 1451200L // Rs 14,512.00 (reimbursements & misc)
+        val sumIncome = salaryIncome + otherIncome // Rs 60,972.00
+        val expense = -4606601L // -Rs 46,066.01
+        val transfer = -1751149L // -Rs 17,511.49
+        val closing = opening + sumIncome + expense + transfer // Rs 127.35 (12735L)
+
+        val summary = PeriodBalanceSummary(
+            period = BalancePeriod.SALARY_CYCLE,
+            openingBalance = opening,
+            sumIncome = sumIncome,
+            sumExpense = expense,
+            sumTransfer = transfer,
+            closingBalance = closing,
+            startLabel = "Opening balance (29 Sep)",
+            endLabel = "Current balance"
+        )
+
+        assertEquals(12735L, summary.closingBalance)
+        assertEquals(
+            summary.closingBalance,
+            summary.openingBalance + summary.sumIncome + summary.sumExpense + summary.sumTransfer
+        )
     }
 
     @Test

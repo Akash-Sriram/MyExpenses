@@ -48,15 +48,21 @@ import org.totschnig.myexpenses.provider.DatabaseConstants.WHERE_NOT_ARCHIVED
 import org.totschnig.myexpenses.provider.DatabaseConstants.WHERE_NOT_SPLIT
 import org.totschnig.myexpenses.provider.KEY_AMOUNT
 import org.totschnig.myexpenses.provider.KEY_CATID
+import org.totschnig.myexpenses.provider.KEY_COMMENT
 import org.totschnig.myexpenses.provider.KEY_CR_STATUS
 import org.totschnig.myexpenses.provider.KEY_EXCLUDE_FROM_TOTALS
+import org.totschnig.myexpenses.provider.KEY_PAYEEID
+import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
+import org.totschnig.myexpenses.provider.TABLE_PAYEES
 import org.totschnig.myexpenses.provider.TABLE_TRANSACTIONS
 import org.totschnig.myexpenses.viewmodel.data.BalancePeriod
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.PeriodBalanceSummary
+import androidx.sqlite.db.SupportSQLiteDatabase
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -1278,7 +1284,28 @@ open class MyExpensesV2ViewModel(
         val firstOfPrev = prevMonth.withDayOfMonth(1)
         val lastOfPrev = prevMonth.withDayOfMonth(prevMonth.lengthOfMonth())
 
+        val db = openHelper.readableDatabase
+
+        val (accClause, baseOpening) = when (account) {
+            is FullAccount -> {
+                "t.$KEY_ACCOUNTID = ${account.id}" to account.openingBalance
+            }
+            is AggregateAccount -> {
+                val base = account.openingBalance ?: account.equivalentOpeningBalance
+                "t.$KEY_ACCOUNTID IN (SELECT $KEY_ROWID FROM $TABLE_ACCOUNTS WHERE $KEY_EXCLUDE_FROM_TOTALS = 0)" to base
+            }
+        }
+
         val bounds = when (period) {
+            BalancePeriod.SALARY_CYCLE -> {
+                val salaryDate = getLatestSalaryDate(db, accClause)
+                val startDay = salaryDate ?: firstOfMonth
+                val start = startDay.atStartOfDay(zoneId).toEpochSecond()
+                val end = today.atTime(23, 59, 59).atZone(zoneId).toEpochSecond()
+                val sLabel = getString(R.string.opening_balance_with_date, startDay.format(dateFmt))
+                val eLabel = getString(R.string.current_balance)
+                PeriodBounds(start, end, sLabel, eLabel)
+            }
             BalancePeriod.THIS_MONTH -> {
                 val start = firstOfMonth.atStartOfDay(zoneId).toEpochSecond()
                 val end = today.atTime(23, 59, 59).atZone(zoneId).toEpochSecond()
@@ -1294,18 +1321,6 @@ open class MyExpensesV2ViewModel(
                 PeriodBounds(start, end, sLabel, eLabel)
             }
             BalancePeriod.ALL_TIME -> error("Handled above")
-        }
-
-        val db = openHelper.readableDatabase
-
-        val (accClause, baseOpening) = when (account) {
-            is FullAccount -> {
-                "t.$KEY_ACCOUNTID = ${account.id}" to account.openingBalance
-            }
-            is AggregateAccount -> {
-                val base = account.openingBalance ?: account.equivalentOpeningBalance
-                "t.$KEY_ACCOUNTID IN (SELECT $KEY_ROWID FROM $TABLE_ACCOUNTS WHERE $KEY_EXCLUDE_FROM_TOTALS = 0)" to base
-            }
         }
 
         val query = """
@@ -1352,7 +1367,7 @@ open class MyExpensesV2ViewModel(
         val periodOpening = baseOpening + priorAmount
         val periodClosing = periodOpening + periodIncome + periodExpense + periodTransfer
 
-        val finalClosing = if (period == BalancePeriod.THIS_MONTH && account.currentBalance != null) {
+        val finalClosing = if ((period == BalancePeriod.THIS_MONTH || period == BalancePeriod.SALARY_CYCLE) && account.currentBalance != null) {
             account.currentBalance!!
         } else {
             periodClosing
@@ -1369,6 +1384,32 @@ open class MyExpensesV2ViewModel(
             endLabel = bounds.endLabel,
             total = account.total
         )
+    }
+
+    private fun getLatestSalaryDate(db: SupportSQLiteDatabase, accClause: String): LocalDate? {
+        val query = """
+            SELECT t.$KEY_DATE FROM $TABLE_TRANSACTIONS t
+            LEFT JOIN $TABLE_CATEGORIES c ON t.$KEY_CATID = c.$KEY_ROWID
+            LEFT JOIN $TABLE_PAYEES p ON t.$KEY_PAYEEID = p.$KEY_ROWID
+            WHERE $accClause
+              AND $WHERE_NOT_SPLIT
+              AND $WHERE_NOT_ARCHIVED
+              AND t.$KEY_CR_STATUS != '${CrStatus.VOID.name}'
+              AND (c.$KEY_LABEL LIKE '%Salary%' OR t.$KEY_COMMENT LIKE '%Salary%' OR p.$KEY_PAYEE_NAME LIKE '%Accenture%')
+              AND t.$KEY_AMOUNT > 0
+            ORDER BY t.$KEY_DATE DESC
+            LIMIT 1
+        """.trimIndent()
+        return try {
+            db.query(query).use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val epochSecs = cursor.getLong(0)
+                    Instant.ofEpochSecond(epochSecs).atZone(ZoneId.systemDefault()).toLocalDate()
+                } else null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private data class PeriodBounds(

@@ -572,7 +572,7 @@ private fun BalanceHeader(
     onLoadPeriodSummary: (suspend (BaseAccount, BalancePeriod) -> PeriodBalanceSummary)? = null,
 ) {
     var isSummaryPopupVisible by rememberSaveable { mutableStateOf(false) }
-    var selectedPeriod by rememberSaveable { mutableStateOf(BalancePeriod.THIS_MONTH) }
+    var selectedPeriod by rememberSaveable { mutableStateOf(BalancePeriod.SALARY_CYCLE) }
     var periodSummary by remember { mutableStateOf<PeriodBalanceSummary?>(null) }
 
     LaunchedEffect(currentAccount, selectedPeriod, isSummaryPopupVisible) {
@@ -666,11 +666,7 @@ private fun BalanceHeader(
                             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                         ) {
                             Column(
-                                modifier = Modifier.padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    top = 16.dp
-                                )
+                                modifier = Modifier.padding(16.dp)
                             ) {
                                 AccountSummaryV2(
                                     account = currentAccount,
@@ -680,71 +676,6 @@ private fun BalanceHeader(
                                     selectedPeriod = selectedPeriod,
                                     onPeriodSelected = { selectedPeriod = it }
                                 )
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                                FlowRow(
-                                    modifier = Modifier
-                                        .fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(onClick = {
-                                        val balanceToCopy = periodSummary?.closingBalance ?: displayBalance
-                                        onCopyBalance(
-                                            currencyFormatter.convAmount(
-                                                balanceToCopy,
-                                                currentAccount.currencyUnit
-                                            )
-                                        )
-                                        isSummaryPopupVisible = false
-                                    }) {
-                                        Icon(
-                                            Icons.Default.ContentCopy,
-                                            contentDescription = null
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(stringResource(R.string.copy_text))
-                                    }
-
-                                    if (currentAccount is FullAccount) {
-                                        if (onSetNewBalance != null) {
-                                            TextButton(onClick = {
-                                                onSetNewBalance()
-                                                isSummaryPopupVisible = false
-                                            }) {
-                                                Icon(
-                                                    Icons.Default.Edit,
-                                                    contentDescription = null
-                                                )
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(stringResource(R.string.new_balance))
-                                            }
-                                        }
-
-                                        TextButton(onClick = {
-                                            onAccountEvent(AccountEvent.Edit, currentAccount)
-                                            isSummaryPopupVisible = false
-                                        }) {
-                                            Icon(
-                                                Icons.Default.Tune,
-                                                contentDescription = null
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(stringResource(R.string.menu_edit))
-                                        }
-
-                                        TextButton(onClick = {
-                                            onAccountEvent(AccountEvent.ToggleSealed, currentAccount)
-                                            isSummaryPopupVisible = false
-                                        }) {
-                                            Icon(
-                                                if (currentAccount.sealed) Icons.Default.LockOpen else Icons.Default.Lock,
-                                                contentDescription = null
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(stringResource(if (currentAccount.sealed) R.string.menu_reopen else R.string.menu_close))
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
