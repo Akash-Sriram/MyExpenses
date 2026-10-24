@@ -61,6 +61,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-project.txt")
             manifestPlaceholders["appName"] = "@string/app_name"
             applicationIdSuffix = ""
+            signingConfig = signingConfigs.getByName("debug")
         }
         debug {
             applicationIdSuffix = ".debug"
