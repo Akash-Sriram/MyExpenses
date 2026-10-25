@@ -34,7 +34,7 @@ android {
     useLibrary("android.test.mock")
 
     defaultConfig {
-        applicationId = "org.totschnig.myexpenses"
+        applicationId = "com.myexpenses"
         minSdk = (rootProject.extra["minSdkVersion"] as Int)
         targetSdk = (rootProject.extra["targetSdkVersion"] as Int)
         versionCode = (rootProject.extra["versionCode"] as Int)
@@ -64,8 +64,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         debug {
-            applicationIdSuffix = ".debug"
-            manifestPlaceholders["appName"] = "My Expenses Debug"
+            applicationIdSuffix = ""
+            manifestPlaceholders["appName"] = "@string/app_name"
             buildConfigField("int", "TEST_SCENARIO", getPropertyIfDefined("testScenario", "1"))
             buildConfigField("String", "OPEN_EXCHANGE_RATES_API_KEY", "\"${getPropertyIfDefined("OPEN_EXCHANGE_RATES_API_KEY", "")}\"")
             buildConfigField("String", "COIN_API_API_KEY", "\"${getPropertyIfDefined("COIN_API_API_KEY", "")}\"")

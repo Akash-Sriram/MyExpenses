@@ -67,7 +67,7 @@ object DistributionHelper {
         HUAWEI;
 
         val marketSelfUri: String
-            get() = marketPrefix + "org.totschnig.myexpenses"
+            get() = marketPrefix + BuildConfig.APPLICATION_ID
 
     }
 }

@@ -9,7 +9,7 @@ import androidx.annotation.IntDef
  * only adding new transactions via [android.content.Intent.ACTION_INSERT] is supported.
  */
 object TransactionsContract {
-    const val AUTHORITY = "org.totschnig.myexpenses"
+    const val AUTHORITY = "com.myexpenses"
 
     class Accounts : BaseColumns
 
@@ -34,7 +34,7 @@ object TransactionsContract {
         const val TYPE_SPLIT = 2
 
         @JvmField
-        val CONTENT_URI: Uri = Uri.parse("content://org.totschnig.myexpenses/transactions")
+        val CONTENT_URI: Uri = Uri.parse("content://com.myexpenses/transactions")
 
         const val OPERATION_TYPE = "operationType"
         const val ACCOUNT_LABEL = "accountLabel"
