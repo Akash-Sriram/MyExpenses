@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,18 +23,30 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -45,6 +58,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import org.totschnig.myexpenses.activity.getAccountTypeIcon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -295,7 +309,9 @@ fun AccountListV2(
                         onNavigate = if (group.size < 2) null else {
                             { onGroupSelected(groupKey) }
                         },
-                        isGrandTotal = grouping == AccountGrouping.NONE
+                        isGrandTotal = grouping == AccountGrouping.NONE,
+                        itemCount = group.size,
+                        isExpanded = !isGroupHidden
                     )
                 }
             }
@@ -316,38 +332,20 @@ fun AccountListV2(
                     }
                 }
             }
-            if (index != sortedGroupKeys.lastIndex) {
-                item {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 8.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 1.dp
-                    )
-                }
-            }
         }
         if (grouped.size > 1) {
             item {
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    thickness = 2.dp
+                HeaderV2(
+                    header = AccountGroupingKey.Ungrouped.title(context),
+                    currency = LocalCurrencyContext.current.homeCurrencyUnit,
+                    total = accountData.filter { !it.excludeFromTotals }.sumOf {
+                        it.equivalentEffectiveBalance
+                    },
+                    onToggleExpand = null,
+                    onNavigate = { onGroupSelected(null) },
+                    isGrandTotal = true,
+                    itemCount = accountData.size
                 )
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 2.dp
-                ) {
-                    HeaderV2(
-                        header = AccountGroupingKey.Ungrouped.title(context),
-                        currency = LocalCurrencyContext.current.homeCurrencyUnit,
-                        total = accountData.filter { !it.excludeFromTotals }.sumOf {
-                            it.equivalentEffectiveBalance
-                        },
-                        onToggleExpand = null,
-                        onNavigate = { onGroupSelected(null) },
-                        isGrandTotal = true
-                    )
-                }
             }
         }
     }
@@ -405,39 +403,131 @@ private fun HeaderV2(
     total: Long,
     currency: CurrencyUnit,
     isGrandTotal: Boolean,
+    itemCount: Int? = null,
+    isExpanded: Boolean = true,
 ) {
-
     val format = LocalCurrencyFormatter.current
 
-    Row(
-        modifier = Modifier
-            .clickable {
-                if (onToggleExpand != null) onToggleExpand() else onNavigate?.invoke()
-            }
-            .heightIn(min = 48.dp)
-            .semantics(mergeDescendants = true) {}
-            .padding(start = 16.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            modifier = Modifier.weight(1f),
-            text = header,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            fontWeight = if (isGrandTotal) FontWeight.Bold else null,
-            text = format.convAmount(total, currency),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (onNavigate == null) {
-            Spacer(Modifier.width(48.dp))
-        } else {
-            IconButton(onClick = onNavigate) {
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    "VIEW ALL"
+    if (isGrandTotal) {
+        ElevatedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            ),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .clickable { onNavigate?.invoke() }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBalanceWallet,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = header,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (itemCount != null) "$itemCount accounts combined" else "Total Combined Balance",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = format.convAmount(total, currency),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
+                if (onNavigate != null) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = "VIEW ALL",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .clickable {
+                    if (onToggleExpand != null) onToggleExpand() else onNavigate?.invoke()
+                }
+                .fillMaxWidth()
+                .heightIn(min = 44.dp)
+                .semantics(mergeDescendants = true) {}
+                .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = header,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (itemCount != null) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Text(
+                        text = "$itemCount",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
+            Text(
+                text = format.convAmount(total, currency),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (onToggleExpand != null) {
+                val rotationAngle by animateFloatAsState(
+                    targetValue = if (isExpanded) 0F else 180F
+                )
+                IconButton(onClick = onToggleExpand) {
+                    Icon(
+                        Icons.Default.ExpandLess,
+                        contentDescription = stringResource(if (isExpanded) R.string.collapse else R.string.expand),
+                        modifier = Modifier.rotate(rotationAngle)
+                    )
+                }
+            } else if (onNavigate != null) {
+                IconButton(onClick = onNavigate) {
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        "VIEW ALL"
+                    )
+                }
+            } else {
+                Spacer(Modifier.width(16.dp))
             }
         }
     }
@@ -575,19 +665,31 @@ fun AccountCardV2(
 
     val homeCurrency = LocalCurrencyContext.current.homeCurrencyUnit
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = if (isExpanded) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent,
-        tonalElevation = if (isExpanded) 1.dp else 0.dp
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 3.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                isExpanded -> MaterialTheme.colorScheme.surfaceContainerHigh
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
+            }
+        ),
+        border = if (isSelected) {
+            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        }
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .conditional(isSelected) { background(activatedBackgroundColor) }
+                    .heightIn(min = 52.dp)
                     .clickable(onClick = onToggleExpand)
-                    .padding(end = 4.dp, start = 16.dp),
+                    .padding(end = 4.dp, start = 12.dp, top = 4.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AccountIndicator(account = account, bankIcon = bankIcon)
@@ -601,6 +703,7 @@ fun AccountCardV2(
                     Text(
                         text = annotatedLabel,
                         style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                         inlineContent = inlineContent
                     )
 
@@ -626,19 +729,22 @@ fun AccountCardV2(
                                 homeCurrency
                             ),
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = format.convAmount(
                                 account.effectiveBalance,
                                 account.currencyUnit
                             ),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 } else {
                     Text(
                         text = format.convAmount(account.effectiveBalance, account.currencyUnit),
                         style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(start = 4.dp)
                     )
                 }
@@ -655,7 +761,7 @@ fun AccountCardV2(
                     modifier = Modifier
                         .fillMaxWidth()
                         .drawBehind {
-                            val x = 29.dp.toPx() // Align with center of AccountIndicator
+                            val x = 27.dp.toPx() // Align with center of AccountIndicator
                             drawLine(
                                 color = outlineColor,
                                 start = Offset(x, 0f),
@@ -663,7 +769,7 @@ fun AccountCardV2(
                                 strokeWidth = 2.dp.toPx()
                             )
                         }
-                        .padding(start = 48.dp, end = 4.dp, bottom = 8.dp)
+                        .padding(start = 44.dp, end = 4.dp, bottom = 8.dp)
                 ) {
                     Column(
                         modifier = Modifier.weight(1f),
@@ -803,15 +909,11 @@ fun AccountIndicator(
     bankIcon: @Composable ((Modifier, Long) -> Unit)? = null,
     reducedSizeIfPossible: Boolean = false,
 ) {
-    val fontSize =
-        if (reducedSizeIfPossible && account.progress == null && bankIcon == null) 9.sp else 13.sp
-
-    val size = with(LocalDensity.current) { (fontSize * 2).toDp() }
-
+    val size = if (reducedSizeIfPossible) 28.dp else 36.dp
     val color = Color(account.color(resources = LocalResources.current))
 
     val modifier = Modifier
-        .padding(end = 6.dp)
+        .padding(end = 8.dp)
         .size(size)
 
     account.progress?.let { (sign, progress) ->
@@ -826,13 +928,26 @@ fun AccountIndicator(
         )
     } ?: run {
         if (account.bankId == null || bankIcon == null) {
-            ColorCircle(
-                modifier,
-                color
+            Box(
+                modifier = modifier
+                    .background(color.copy(alpha = 0.15f), shape = CircleShape)
+                    .border(1.dp, color.copy(alpha = 0.35f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                //This is only used in V1
                 if (account.isAggregate) {
-                    Text(fontSize = fontSize, text = SIGMA, color = Color.White)
+                    Text(
+                        fontSize = if (reducedSizeIfPossible) 11.sp else 14.sp,
+                        text = SIGMA,
+                        color = color,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Icon(
+                        imageVector = getAccountTypeIcon(account.type.name, account.type.isAsset),
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(if (reducedSizeIfPossible) 16.dp else 20.dp)
+                    )
                 }
             }
         } else bankIcon.invoke(modifier, account.bankId)

@@ -7,6 +7,20 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.WindowInsetsSides.Companion
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.DropdownMenuItem
@@ -116,9 +130,11 @@ fun AccountsScreen(
                 navigationIcon = navigationIcon,
                 scrollBehavior = scrollBehavior,
                 title = {
-                    Title(selectedTab.value) {
-                        viewModel.setAccountsTab(it)
-                    }
+                    Text(
+                        text = "${stringResource(R.string.accounts)} & ${stringResource(R.string.balance_sheet_net_worth)}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 },
                 actions = {
                     when (selectedTab.value) {
@@ -173,10 +189,59 @@ fun AccountsScreen(
             )
         }
     ) { paddingValues ->
-        if (selectedTab.value == AccountsScreenTab.BALANCE_SHEET) {
-            val data =
-                viewModel.accountsForBalanceSheet.collectAsState(LocalDate.now() to emptyList()).value
-            Column(modifier = Modifier.padding(paddingValues)) {
+        val layoutDirection = LocalLayoutDirection.current
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = paddingValues.calculateTopPadding(),
+                    start = paddingValues.calculateStartPadding(layoutDirection),
+                    end = paddingValues.calculateEndPadding(layoutDirection)
+                )
+        ) {
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                AccountsScreenTab.entries.forEachIndexed { index, tab ->
+                    SegmentedButton(
+                        selected = selectedTab.value == tab,
+                        onClick = { viewModel.setAccountsTab(tab) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = AccountsScreenTab.entries.size
+                        ),
+                        icon = {
+                            SegmentedButtonDefaults.Icon(active = selectedTab.value == tab) {
+                                Icon(
+                                    imageVector = if (tab == AccountsScreenTab.LIST)
+                                        Icons.Default.AccountBalanceWallet
+                                    else
+                                        Icons.AutoMirrored.Filled.ShowChart,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                                )
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(tab.resourceId),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (selectedTab.value == tab) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    )
+                }
+            }
+
+            val remainingPadding = PaddingValues(
+                bottom = paddingValues.calculateBottomPadding()
+            )
+
+            if (selectedTab.value == AccountsScreenTab.BALANCE_SHEET) {
+                val data =
+                    viewModel.accountsForBalanceSheet.collectAsState(LocalDate.now() to emptyList()).value
                 BalanceSheetViewInner(
                     accounts = data.second,
                     debtSum = viewModel.debtSum.collectAsState(0).value,
@@ -198,35 +263,36 @@ fun AccountsScreen(
                         viewModel.setBalanceDate(it)
                     },
                     showChart = showChartState.value,
+                    onToggleChart = { showChartState.value = !showChartState.value },
                     highlight = highlight,
                     showHidden = showHiddenState.value,
                     showZero = showZeroState.value,
-                    bottomPadding = dimensionResource(R.dimen.fab_related_bottom_padding)
+                    bottomPadding = dimensionResource(R.dimen.fab_related_bottom_padding) + remainingPadding.calculateBottomPadding()
+                )
+            } else {
+                AccountListV2(
+                    accountData = accounts,
+                    scaffoldPadding = remainingPadding,
+                    grouping = accountGrouping,
+                    selectedAccount = selectedAccountId,
+                    listState = viewModel.listState,
+                    expansionHandlerGroups = viewModel.expansionHandler("collapsedHeadersDrawer_${accountGrouping}"),
+                    expansionHandlerAccounts = viewModel.expansionHandler("expandedAccounts_${accountGrouping}"),
+                    onSelected = {
+                        if (accountGrouping != AccountGrouping.NONE) {
+                            viewModel.maybeResetFilter(accountGrouping.getGroupKey(it))
+                        }
+                        navigateToAccount(it.id)
+                    },
+                    onGroupSelected = ::navigateToGroup,
+                    onEvent = onAccountEvent,
+                    flags = flags,
+                    bankIcon = bankIcon,
+                    showPremiumNudge = !canCreatePortfolio && !premiumNudgeDismissed,
+                    onUpgrade = { onEvent(AppEvent.ShowUpgrade(ContribFeature.PORTFOLIO)) },
+                    onDismissPremiumNudge = viewModel::dismissPremiumNudge
                 )
             }
-        } else {
-            AccountListV2(
-                accountData = accounts,
-                scaffoldPadding = paddingValues,
-                grouping = accountGrouping,
-                selectedAccount = selectedAccountId,
-                listState = viewModel.listState,
-                expansionHandlerGroups = viewModel.expansionHandler("collapsedHeadersDrawer_${accountGrouping}"),
-                expansionHandlerAccounts = viewModel.expansionHandler("expandedAccounts_${accountGrouping}"),
-                onSelected = {
-                    if (accountGrouping != AccountGrouping.NONE) {
-                        viewModel.maybeResetFilter(accountGrouping.getGroupKey(it))
-                    }
-                    navigateToAccount(it.id)
-                },
-                onGroupSelected = ::navigateToGroup,
-                onEvent = onAccountEvent,
-                flags = flags,
-                bankIcon = bankIcon,
-                showPremiumNudge = !canCreatePortfolio && !premiumNudgeDismissed,
-                onUpgrade = { onEvent(AppEvent.ShowUpgrade(ContribFeature.PORTFOLIO)) },
-                onDismissPremiumNudge = viewModel::dismissPremiumNudge
-            )
         }
     }
 }
