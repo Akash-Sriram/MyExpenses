@@ -7,6 +7,7 @@
 ![Kotlin](https://img.shields.io/badge/Language-Kotlin%20%2F%20Compose-purple.svg?style=flat-square)
 ![Privacy](https://img.shields.io/badge/Privacy-100%25%20Offline-orange.svg?style=flat-square)
 ![Unlocked](https://img.shields.io/badge/Status-100%25%20Unlocked-brightgreen.svg?style=flat-square)
+![Visibility](https://img.shields.io/badge/Visibility-Private-red.svg?style=flat-square)
 
 **A high-performance, privacy-first, and 100% unlocked personal finance manager for Android, tailored for the Indian financial ecosystem.**
 
