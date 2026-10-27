@@ -1,34 +1,56 @@
-/*   This file is part of My Expenses.
- *   My Expenses is free software: you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation, either version 3 of the License, or
- *   (at your option) any later version.
- *
- *   My Expenses is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with My Expenses.  If not, see <http://www.gnu.org/licenses/>.
-*/
 package org.totschnig.myexpenses.activity
 
+import android.content.Intent
 import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.fragment.StaleImagesList
+import org.totschnig.myexpenses.compose.AppTheme
+import org.totschnig.myexpenses.compose.images.StaleImagesScreen
+import org.totschnig.myexpenses.compose.images.toStaleImageList
+import org.totschnig.myexpenses.injector
+import org.totschnig.myexpenses.viewmodel.StaleImagesViewModel
 
 class ManageStaleImages : ProtectedFragmentActivity() {
-    public override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setupWithFragment(savedInstanceState == null) {
-            StaleImagesList()
-        }
-        setupToolbar()
-        title = "Stale images"
-    }
+    val viewModel: StaleImagesViewModel by viewModels()
 
-    override fun onPermissionsGranted(requestCode: Int, perms: List<String>) {
-        (supportFragmentManager.findFragmentById(R.id.fragment_container) as StaleImagesList).saveImageDo()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        injector.inject(viewModel)
+
+        setContent {
+            AppTheme {
+                val cursor by viewModel.imagesCursor.collectAsStateWithLifecycle(initialValue = null)
+                val images = remember(cursor) { cursor?.toStaleImageList() ?: emptyList() }
+                val resultMessage by viewModel.result.collectAsStateWithLifecycle()
+                val snackbarHostState = remember { SnackbarHostState() }
+
+                StaleImagesScreen(
+                    images = images,
+                    resultMessage = resultMessage,
+                    snackbarHostState = snackbarHostState,
+                    onBack = { finish() },
+                    onViewImage = { uri ->
+                        startActivity(Intent(this@ManageStaleImages, SimpleImageActivity::class.java).apply {
+                            data = uri
+                        })
+                    },
+                    onArchiveImages = { ids ->
+                        showSnackBar(R.string.saving)
+                        viewModel.saveImages(ids)
+                    },
+                    onDeleteImages = { ids ->
+                        showSnackBar(R.string.progress_dialog_deleting)
+                        viewModel.deleteImages(ids)
+                    }
+                )
+            }
+        }
     }
 }
