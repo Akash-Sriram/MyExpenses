@@ -1,38 +1,50 @@
-/*   This file is part of My Expenses.
- *   My Expenses is free software: you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation, either version 3 of the License, or
- *   (at your option) any later version.
- *
- *   My Expenses is distributed in the hope that it will be useful,
- *   but WITHOUT ANY WARRANTY; without even the implied warranty of
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *   GNU General Public License for more details.
- *
- *   You should have received a copy of the GNU General Public License
- *   along with My Expenses.  If not, see <http://www.gnu.org/licenses/>.
- */
 package org.totschnig.myexpenses.dialog
 
-import android.app.Dialog
-import android.content.DialogInterface
 import android.os.Bundle
-import android.text.Editable
-import android.text.InputFilter
-import android.text.Spanned
-import android.text.TextUtils
-import android.text.TextWatcher
-import android.view.View
-import android.widget.CompoundButton
-import android.widget.EditText
-import androidx.annotation.IdRes
-import androidx.appcompat.app.AlertDialog
-import androidx.core.text.HtmlCompat
-import androidx.core.view.isVisible
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.BaseMyExpenses
-import org.totschnig.myexpenses.databinding.ExportDialogBinding
+import org.totschnig.myexpenses.compose.ButtonRow
 import org.totschnig.myexpenses.export.AbstractExporter.Companion.ENCODING_LATIN_1
 import org.totschnig.myexpenses.export.AbstractExporter.Companion.ENCODING_UTF_8
 import org.totschnig.myexpenses.export.AbstractExporter.Companion.ENCODING_UTF_8_BOM
@@ -47,8 +59,6 @@ import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.timeFormatterPattern
-import org.totschnig.myexpenses.util.ui.configurePopupAnchor
-import org.totschnig.myexpenses.util.ui.postScrollToBottom
 import org.totschnig.myexpenses.viewmodel.ExportViewModel.Companion.EXPORT_HANDLE_DELETED_CREATE_HELPER
 import org.totschnig.myexpenses.viewmodel.ExportViewModel.Companion.EXPORT_HANDLE_DELETED_DO_NOTHING
 import org.totschnig.myexpenses.viewmodel.ExportViewModel.Companion.EXPORT_HANDLE_DELETED_UPDATE_BALANCE
@@ -71,104 +81,46 @@ import java.time.format.DateTimeFormatterBuilder
 import java.time.format.FormatStyle
 import java.util.Locale
 
-class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
-    DialogInterface.OnClickListener {
+class ExportDialogFragment : ComposeBaseDialogFragment3() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         (requireActivity().application as MyApplication).appComponent.inject(this)
     }
 
-    override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
+    override val title: CharSequence?
+        get() = getString(R.string.menu_export)
+
+    private val splitDateTimeActive: Boolean
+        get() = prefHandler.getBoolean(PrefKey.CSV_EXPORT_SPLIT_DATE_TIME, false)
+
+    @OptIn(ExperimentalLayoutApi::class)
+    @Composable
+    override fun ColumnScope.MainContent() {
         val accountInfo = requireArguments().getSerializable(KEY_DATA, AccountInfo::class.java)!!
-        var allP = false
-        var warningText: String
-        val fileName: String
+
         val now = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.US).format(LocalDateTime.now())
-        val builder = initBuilder {
-            ExportDialogBinding.inflate(it)
-        }
-
-        when (accountInfo.id) {
-            HOME_AGGREGATE_ID -> {
-                allP = true
-                warningText = getString(R.string.warning_reset_account_all, "")
-                fileName = "export-$now"
+        val defaultFileName = when (accountInfo.id) {
+            HOME_AGGREGATE_ID -> "export-$now"
+            0L -> when (AccountGrouping.valueOf(accountInfo.aggregate!!.first)) {
+                AccountGrouping.CURRENCY -> "export-${accountInfo.currency}-$now"
+                AccountGrouping.FLAG -> "export-FLAG-${accountInfo.aggregate.second!!.second}-$now"
+                AccountGrouping.NONE -> "export-$now"
+                AccountGrouping.TYPE -> "export-TYPE-${accountInfo.aggregate.second!!.second}-$now"
             }
-            0L -> {
-                allP = true
-                when(AccountGrouping.valueOf(accountInfo.aggregate!!.first)) {
-                    AccountGrouping.CURRENCY -> {
-                        fileName = "export-${accountInfo.currency}-$now"
-                        warningText =
-                            getString(R.string.warning_reset_account_all, " (${accountInfo.currency})")
-                    }
-                    AccountGrouping.FLAG -> {
-                        val (flag, id) = accountInfo.aggregate.second!!
-                        fileName = "export-FLAG-$id-$now"
-                        warningText =
-                            getString(R.string.warning_reset_account_all, " ($flag)")
-                    }
-                    AccountGrouping.NONE -> {
-                        warningText = getString(R.string.warning_reset_account_all, "")
-                        fileName = "export-$now"
-                    }
-                    AccountGrouping.TYPE -> {
-                        val (type, id) = accountInfo.aggregate.second!!
-                        fileName = "export-TYPE-$id-$now"
-                        warningText =
-                            getString(R.string.warning_reset_account_all, " ($type)")
-                    }
-                }
-
-            }
-            else -> {
-                if (accountInfo.id < 0L) {
-                    allP = true
-                    fileName = "export-${accountInfo.currency}-$now"
-                    warningText =
-                        getString(R.string.warning_reset_account_all, " (${accountInfo.currency})")
-                } else {
-                    fileName = Utils.escapeForFileName(accountInfo.label) + "-" + now
-                    warningText = getString(R.string.warning_reset_account)
-                }
+            else -> if (accountInfo.id < 0L) {
+                "export-${accountInfo.currency}-$now"
+            } else {
+                Utils.escapeForFileName(accountInfo.label) + "-" + now
             }
         }
-        if (accountInfo.isFiltered) {
-            dialogView.findViewById<View>(R.id.with_filter).isVisible = true
-            warningText = getString(R.string.warning_reset_account_matched)
+
+        var fileName by remember { mutableStateOf(defaultFileName) }
+        var format by remember {
+            mutableStateOf(prefHandler.enumValueOrDefault(PrefKey.EXPORT_FORMAT, ExportFormat.CSV))
         }
 
-        binding.format.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (checkedId == R.id.csv) {
-                binding.DelimiterRow.isVisible = isChecked
-                if (!isChecked && binding.Encoding.checkedButtonId == R.id.utf8_bom) {
-                    binding.Encoding.check(R.id.utf8)
-                }
-                binding.utf8Bom.isVisible = isChecked
-                configureDateTimeFormat()
-            }
-        }
-        val format = prefHandler.enumValueOrDefault(PrefKey.EXPORT_FORMAT, ExportFormat.CSV)
-        binding.format.check(format.resId)
-
-        class DateFormatWatcher(val editText: EditText) : TextWatcher {
-            override fun afterTextChanged(s: Editable) {
-                try {
-                    DateTimeFormatter.ofPattern(s.toString())
-                    editText.error = null
-                } catch (_: IllegalArgumentException) {
-                    editText.error = getString(R.string.date_format_illegal)
-                }
-                configureButton()
-            }
-
-            override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {}
-
-            override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {}
-        }
-
-        val dateFormat = prefHandler.getString(PREF_KEY_EXPORT_DATE_FORMAT, "")
+        val defaultDateFormat = prefHandler.getString(PREF_KEY_EXPORT_DATE_FORMAT, "")
             ?.takeIf {
                 it.isNotEmpty() && (try {
                     DateTimeFormatter.ofPattern(it)
@@ -180,10 +132,9 @@ class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
             null,
             IsoChronology.INSTANCE, Locale.getDefault()
         )
-        binding.dateFormat.setText(dateFormat)
-        binding.dateFormat.addTextChangedListener(DateFormatWatcher(binding.dateFormat))
+        var dateFormat by remember { mutableStateOf(defaultDateFormat) }
 
-        val timeFormat = prefHandler.getString(PREF_KEY_EXPORT_TIME_FORMAT, "")
+        val defaultTimeFormat = prefHandler.getString(PREF_KEY_EXPORT_TIME_FORMAT, "")
             ?.takeIf {
                 it.isNotEmpty() && (try {
                     DateTimeFormatter.ofPattern(it)
@@ -191,293 +142,429 @@ class ExportDialogFragment : DialogViewBinding<ExportDialogBinding>(),
                     null
                 }) != null
             } ?: requireContext().timeFormatterPattern
-        binding.timeFormat.setText(timeFormat)
-        binding.timeFormat.addTextChangedListener(DateFormatWatcher(binding.timeFormat))
-        configureDateTimeFormat()
+        var timeFormat by remember { mutableStateOf(defaultTimeFormat) }
 
-        binding.fileName.setText(fileName)
-        binding.fileName.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable) {
-                var error = 0
-                if (s.toString().isNotEmpty()) {
-                    if (s.toString().indexOf('/') > -1) {
-                        error = R.string.slash_forbidden_in_filename
-                    }
-                } else {
-                    error = R.string.required
-                }
-                binding.fileName.error = if (error != 0) getString(error) else null
-                configureButton()
-            }
+        var encoding by remember {
+            mutableStateOf(prefHandler.getString(PREF_KEY_EXPORT_ENCODING, ENCODING_UTF_8) ?: ENCODING_UTF_8)
+        }
 
-            override fun beforeTextChanged(
-                s: CharSequence,
-                start: Int,
-                count: Int,
-                after: Int
+        var delimiter by remember {
+            mutableStateOf(prefHandler.getInt(KEY_DELIMITER, ','.code).toChar())
+        }
+
+        var decimalSeparator by remember {
+            mutableStateOf(prefHandler.getInt(KEY_DECIMAL_SEPARATOR, '.'.code).toChar())
+        }
+
+        var mergeAccounts by remember {
+            mutableStateOf(prefHandler.getBoolean(KEY_MERGE_P, false))
+        }
+
+        var exportNotYetExported by remember { mutableStateOf(accountInfo.hasExported) }
+        var exportDelete by remember { mutableStateOf(false) }
+        var handleDeleted by remember {
+            mutableIntStateOf(
+                prefHandler.getInt(KEY_EXPORT_HANDLE_DELETED, EXPORT_HANDLE_DELETED_DO_NOTHING)
+            )
+        }
+
+        val isFileNameValid = fileName.isNotBlank() && !fileName.contains("/")
+        val isDateFormatValid = try {
+            DateTimeFormatter.ofPattern(dateFormat)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+        val scrollState = rememberScrollState()
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Target Account Info
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
-            }
-
-            override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {}
-        })
-        binding.fileName.filters = arrayOf(
-            InputFilter { source: CharSequence, start: Int, end: Int, _: Spanned?, _: Int, _: Int ->
-                val sb = StringBuilder(end - start)
-                for (i in start until end) {
-                    val c = source[i]
-                    val type = Character.getType(c)
-                    if (type != Character.SURROGATE.toInt() && type != Character.OTHER_SYMBOL.toInt()) {
-                        sb.append(c)
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = if (accountInfo.id == HOME_AGGREGATE_ID) "All Accounts" else accountInfo.label,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (accountInfo.isFiltered) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.dialog_export_applied_to_filter),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
-                sb
             }
-        )
 
-        val encoding = prefHandler.getString(PREF_KEY_EXPORT_ENCODING, ENCODING_UTF_8)
-        binding.Encoding.check(
-            when (encoding) {
-                ENCODING_UTF_8_BOM -> R.id.utf8_bom
-                ENCODING_LATIN_1 -> R.id.iso88591
-                else -> R.id.utf8
-            }
-        )
+            // File Name Input
+            OutlinedTextField(
+                value = fileName,
+                onValueChange = { fileName = it },
+                label = { Text(stringResource(R.string.file_name)) },
+                isError = !isFileNameValid,
+                supportingText = {
+                    if (!isFileNameValid) {
+                        Text(
+                            text = if (fileName.contains("/")) "Slash (/) not allowed in file name" else "File name is required",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        val delimiter = prefHandler.getInt(KEY_DELIMITER, ','.code)
-            .toChar()
-        @IdRes val delimiterButtonResId = when (delimiter) {
-            ';' -> R.id.delimiter_semicolon
-            '\t' -> R.id.delimiter_tab
-            ',' -> R.id.delimiter_comma
-            else -> R.id.delimiter_comma
-        }
-        binding.Delimiter.check(delimiterButtonResId)
-        val separator = prefHandler.getInt(
-            KEY_DECIMAL_SEPARATOR, Utils.getDefaultDecimalSeparator().code
-        )
-            .toChar()
-        binding.separator.check(if (separator == ',') R.id.comma else R.id.dot)
-
-        if (savedInstanceState == null) {
-            when (prefHandler.getInt(
-                KEY_EXPORT_HANDLE_DELETED, EXPORT_HANDLE_DELETED_CREATE_HELPER
-            )) {
-                EXPORT_HANDLE_DELETED_UPDATE_BALANCE -> {
-                    binding.handleDeleted.check(R.id.update_balance)
-                }
-                EXPORT_HANDLE_DELETED_CREATE_HELPER -> {
-                    binding.handleDeleted.check(R.id.create_helper)
+            if (accountInfo.id <= 0 && accountInfo.id != HOME_AGGREGATE_ID) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { mergeAccounts = !mergeAccounts }
+                ) {
+                    Checkbox(
+                        checked = mergeAccounts,
+                        onCheckedChange = { mergeAccounts = it }
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.cb_label_merge_accounts),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
-        }
-        if (accountInfo.cannotResetConditions.isEmpty()) {
-            binding.exportDelete.setOnCheckedChangeListener { _, isChecked ->
-                configure(isChecked)
-                if (isChecked) {
-                    binding.root.postScrollToBottom()
-                }
-                (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).setText(
-                    if (isChecked) R.string.menu_reset else R.string.menu_export
+
+            // Format Selection
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = stringResource(R.string.pref_export_format_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ExportFormat.entries.forEach { f ->
+                        FilterChip(
+                            selected = format == f,
+                            onClick = { format = f },
+                            label = { Text(f.name) }
+                        )
+                    }
+                }
             }
-        } else {
-            binding.exportDelete.isEnabled = false
-            binding.exportDeleteDisabledText.isVisible = true
-            binding.exportDeleteDisabledText.text = accountInfo.cannotResetConditions.joinToString {
-                getString(it)
+
+            // CSV Delimiter & Decimal Separator (if CSV)
+            if (format == ExportFormat.CSV) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Delimiter",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = delimiter == ',',
+                            onClick = { delimiter = ',' },
+                            label = { Text("Comma (,)") }
+                        )
+                        FilterChip(
+                            selected = delimiter == ';',
+                            onClick = { delimiter = ';' },
+                            label = { Text("Semicolon (;)") }
+                        )
+                        FilterChip(
+                            selected = delimiter == '\t',
+                            onClick = { delimiter = '\t' },
+                            label = { Text("Tab") }
+                        )
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = stringResource(R.string.decimal_separator),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = decimalSeparator == '.',
+                            onClick = { decimalSeparator = '.' },
+                            label = { Text("Point (.)") }
+                        )
+                        FilterChip(
+                            selected = decimalSeparator == ',',
+                            onClick = { decimalSeparator = ',' },
+                            label = { Text("Comma (,)") }
+                        )
+                    }
+                }
             }
-        }
-        if (accountInfo.hasExported) {
-            binding.exportNotYetExported.isChecked = true
-            binding.exportNotYetExported.isVisible = true
-        }
-        binding.warningReset.text = warningText
-        if (allP) {
-            val mergeAccounts = prefHandler.getBoolean(KEY_MERGE_P, false)
-            setFileNameLabel(false)
-            binding.mergeAccounts.isVisible = true
-            binding.mergeAccounts.setOnCheckedChangeListener { _: CompoundButton?, isChecked: Boolean ->
-                setFileNameLabel(
-                    isChecked
+
+            // Encoding
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Encoding",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = encoding == ENCODING_UTF_8,
+                        onClick = { encoding = ENCODING_UTF_8 },
+                        label = { Text("UTF-8") }
+                    )
+                    if (format == ExportFormat.CSV) {
+                        FilterChip(
+                            selected = encoding == ENCODING_UTF_8_BOM,
+                            onClick = { encoding = ENCODING_UTF_8_BOM },
+                            label = { Text("UTF-8 BOM") }
+                        )
+                    }
+                    FilterChip(
+                        selected = encoding == ENCODING_LATIN_1,
+                        onClick = { encoding = ENCODING_LATIN_1 },
+                        label = { Text("Latin-1 (ISO-8859-1)") }
+                    )
+                }
             }
-            binding.mergeAccounts.isChecked = mergeAccounts
-        }
 
-        binding.DateFormatHelp.configurePopupAnchor(
-            infoText = this.buildDateFormatHelpText(dateFormat = true, timeFormat = !splitDateTimeConfigured)
-        )
-        if (splitDateTimeConfigured) {
-            binding.TimeFormatHelp.configurePopupAnchor(
-                infoText = this.buildDateFormatHelpText(dateFormat = false, timeFormat = true)
+            // Date Format
+            OutlinedTextField(
+                value = dateFormat,
+                onValueChange = { dateFormat = it },
+                label = { Text("Date Format") },
+                isError = !isDateFormatValid,
+                supportingText = {
+                    if (!isDateFormatValid) {
+                        Text(
+                            text = stringResource(R.string.date_format_illegal),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-        }
 
-        builder.setTitle(if (allP) R.string.menu_reset_all else R.string.menu_reset)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton(R.string.menu_export, this)
-        return builder.create()
-    }
+            // Checkboxes: Not yet exported & Delete after export
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        if (!exportDelete) exportNotYetExported = !exportNotYetExported
+                    }
+                ) {
+                    Checkbox(
+                        checked = exportNotYetExported,
+                        onCheckedChange = { exportNotYetExported = it },
+                        enabled = !exportDelete
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.dialog_export_not_yet_exported),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
 
-    private val splitDateTimeConfigured: Boolean
-        get() = prefHandler.getBoolean(PrefKey.CSV_EXPORT_SPLIT_DATE_TIME, false)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable {
+                        exportDelete = !exportDelete
+                        if (exportDelete) {
+                            exportNotYetExported = false
+                        }
+                    }
+                ) {
+                    Checkbox(
+                        checked = exportDelete,
+                        onCheckedChange = {
+                            exportDelete = it
+                            if (it) exportNotYetExported = false
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.dialog_export_delete),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (exportDelete) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
 
-    private val splitDateTimeActive: Boolean
-        get() = splitDateTimeConfigured && binding.format.checkedButtonId == R.id.csv
+            // Warning and deletion strategy
+            AnimatedVisibility(visible = exportDelete) {
+                Card(
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Exported transactions will be permanently deleted from account!",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
 
-    private fun configureDateTimeFormat() {
-        binding.TimeFormatRow.isVisible = splitDateTimeActive
-    }
+                        Text(
+                            text = "Account Balance Strategy:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
 
-    private fun setFileNameLabel(oneFile: Boolean) {
-        binding.fileNameLabel.setText(if (oneFile) R.string.file_name else R.string.folder_name)
-    }
-
-    private fun buildDateFormatHelpText(dateFormat: Boolean, timeFormat: Boolean): CharSequence {
-        val letters = buildList {
-            if (dateFormat)
-                addAll(resources.getStringArray(R.array.help_ExportDialog_date_format_letters))
-            if (timeFormat)
-                addAll(resources.getStringArray(R.array.help_ExportDialog_time_format_letters))
-        }
-        val components = buildList {
-            if (dateFormat)
-                addAll(resources.getStringArray(R.array.help_ExportDialog_date_format_components))
-            if (timeFormat)
-                addAll(resources.getStringArray(R.array.help_ExportDialog_time_format_components))
-        }
-        val sb = StringBuilder()
-        for (i in letters.indices) {
-            sb.append(letters[i])
-            sb.append(" => ")
-            sb.append(components[i])
-            if (i < letters.size - 1) sb.append(", ") else sb.append(". ")
-        }
-        return TextUtils.concat(
-            sb,
-            HtmlCompat.fromHtml(
-                getString(R.string.help_ExportDialog_date_format, "https://developer.android.com/reference/java/time/format/DateTimeFormatter"),
-                HtmlCompat.FROM_HTML_MODE_LEGACY
-            )
-        )
-    }
-
-    override fun onClick(dialog: DialogInterface, which: Int) {
-        if (activity == null) {
-            return
-        }
-        val accountInfo = requireArguments().getSerializable(KEY_DATA, AccountInfo::class.java)!!
-        val format = ExportFormat.entries.find { it.resId == binding.format.checkedButtonId }
-            ?: ExportFormat.CSV
-        val dateFormat = binding.dateFormat.text.toString()
-        val timeFormat = binding.timeFormat.text.toString()
-        val decimalSeparator = if (binding.separator.checkedButtonId == R.id.dot) '.' else ','
-        val delimiter = when (binding.Delimiter.checkedButtonId) {
-            R.id.delimiter_tab -> {
-                '\t'
-            }
-            R.id.delimiter_semicolon -> {
-                ';'
-            }
-            else -> {
-                ','
-            }
-        }
-        val handleDeleted = when (binding.handleDeleted.checkedButtonId) {
-            R.id.update_balance -> {
-                EXPORT_HANDLE_DELETED_UPDATE_BALANCE
-            }
-            R.id.create_helper -> {
-                EXPORT_HANDLE_DELETED_CREATE_HELPER
-            }
-            else -> {
-                EXPORT_HANDLE_DELETED_DO_NOTHING
-            }
-        }
-        val encoding = when (binding.Encoding.checkedButtonId) {
-            R.id.utf8_bom -> ENCODING_UTF_8_BOM
-            R.id.iso88591 -> ENCODING_LATIN_1
-            else -> ENCODING_UTF_8
-        }
-        with(prefHandler) {
-            putString(PrefKey.EXPORT_FORMAT, format.name)
-            putString(PREF_KEY_EXPORT_DATE_FORMAT, dateFormat)
-            if (splitDateTimeActive) {
-                putString(PREF_KEY_EXPORT_TIME_FORMAT, timeFormat)
-            }
-            putString(PREF_KEY_EXPORT_ENCODING, encoding)
-            putInt(KEY_DECIMAL_SEPARATOR, decimalSeparator.code)
-            putInt(KEY_DELIMITER, delimiter.code)
-            putInt(KEY_EXPORT_HANDLE_DELETED, handleDeleted)
-        }
-        (requireActivity() as BaseMyExpenses<*>).startExport(Bundle().apply {
-            putInt(
-                ConfirmationDialogFragment.KEY_COMMAND_POSITIVE,
-                R.id.START_EXPORT_COMMAND
-            )
-            if (accountInfo.id > 0) {
-                putLong(KEY_ROWID, accountInfo.id)
-            } else {
-                if (accountInfo.id != HOME_AGGREGATE_ID) {
-                    if (accountInfo.id < 0) {
-                        putString(KEY_CURRENCY, accountInfo.currency)
-                    } else {
-                        when(AccountGrouping.valueOf(accountInfo.aggregate!!.first)) {
-                            AccountGrouping.CURRENCY -> {
-                                putString(KEY_CURRENCY, accountInfo.currency)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                handleDeleted = EXPORT_HANDLE_DELETED_DO_NOTHING
                             }
-                            AccountGrouping.FLAG -> {
-                                putLong(KEY_FLAG, accountInfo.aggregate.second!!.second!!)
+                        ) {
+                            RadioButton(
+                                selected = handleDeleted == EXPORT_HANDLE_DELETED_DO_NOTHING,
+                                onClick = { handleDeleted = EXPORT_HANDLE_DELETED_DO_NOTHING }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Do nothing",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                handleDeleted = EXPORT_HANDLE_DELETED_UPDATE_BALANCE
                             }
-                            AccountGrouping.NONE -> {}
-                            AccountGrouping.TYPE -> {
-                                putLong(KEY_TYPE, accountInfo.aggregate.second!!.second!!)
+                        ) {
+                            RadioButton(
+                                selected = handleDeleted == EXPORT_HANDLE_DELETED_UPDATE_BALANCE,
+                                onClick = { handleDeleted = EXPORT_HANDLE_DELETED_UPDATE_BALANCE }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Update initial balance",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable {
+                                handleDeleted = EXPORT_HANDLE_DELETED_CREATE_HELPER
                             }
+                        ) {
+                            RadioButton(
+                                selected = handleDeleted == EXPORT_HANDLE_DELETED_CREATE_HELPER,
+                                onClick = { handleDeleted = EXPORT_HANDLE_DELETED_CREATE_HELPER }
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Create balance transaction",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
                         }
                     }
                 }
-                val mergeAccounts = binding.mergeAccounts.isChecked
-                putBoolean(KEY_MERGE_P, mergeAccounts)
-                prefHandler.putBoolean(KEY_MERGE_P, mergeAccounts)
             }
-            putSerializable(KEY_FORMAT, format)
-            putBoolean(KEY_DELETE_P, binding.exportDelete.isChecked)
-            putBoolean(KEY_NOT_YET_EXPORTED_P, binding.exportNotYetExported.isChecked)
-            putString(KEY_DATE_FORMAT, dateFormat)
-            if (splitDateTimeActive) {
-                putString(KEY_TIME_FORMAT, timeFormat)
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Action Buttons
+            ButtonRow {
+                TextButton(onClick = { dismiss() }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    enabled = isFileNameValid && isDateFormatValid,
+                    onClick = {
+                        with(prefHandler) {
+                            putString(PrefKey.EXPORT_FORMAT, format.name)
+                            putString(PREF_KEY_EXPORT_DATE_FORMAT, dateFormat)
+                            if (splitDateTimeActive) {
+                                putString(PREF_KEY_EXPORT_TIME_FORMAT, timeFormat)
+                            }
+                            putString(PREF_KEY_EXPORT_ENCODING, encoding)
+                            putInt(KEY_DECIMAL_SEPARATOR, decimalSeparator.code)
+                            putInt(KEY_DELIMITER, delimiter.code)
+                            putInt(KEY_EXPORT_HANDLE_DELETED, handleDeleted)
+                        }
+
+                        val exportBundle = Bundle().apply {
+                            putInt(
+                                ConfirmationDialogFragment.KEY_COMMAND_POSITIVE,
+                                R.id.START_EXPORT_COMMAND
+                            )
+                            if (accountInfo.id > 0) {
+                                putLong(KEY_ROWID, accountInfo.id)
+                            } else {
+                                if (accountInfo.id != HOME_AGGREGATE_ID) {
+                                    if (accountInfo.id < 0) {
+                                        putString(KEY_CURRENCY, accountInfo.currency)
+                                    } else {
+                                        when (AccountGrouping.valueOf(accountInfo.aggregate!!.first)) {
+                                            AccountGrouping.CURRENCY -> putString(KEY_CURRENCY, accountInfo.currency)
+                                            AccountGrouping.FLAG -> putLong(KEY_FLAG, accountInfo.aggregate.second!!.second!!)
+                                            AccountGrouping.NONE -> {}
+                                            AccountGrouping.TYPE -> putLong(KEY_TYPE, accountInfo.aggregate.second!!.second!!)
+                                        }
+                                    }
+                                }
+                                putBoolean(KEY_MERGE_P, mergeAccounts)
+                                prefHandler.putBoolean(KEY_MERGE_P, mergeAccounts)
+                            }
+                            putSerializable(KEY_FORMAT, format)
+                            putBoolean(KEY_DELETE_P, exportDelete)
+                            putBoolean(KEY_NOT_YET_EXPORTED_P, exportNotYetExported)
+                            putString(KEY_DATE_FORMAT, dateFormat)
+                            if (splitDateTimeActive) {
+                                putString(KEY_TIME_FORMAT, timeFormat)
+                            }
+                            putChar(KEY_DECIMAL_SEPARATOR, decimalSeparator)
+                            putString(KEY_ENCODING, encoding)
+                            putInt(KEY_EXPORT_HANDLE_DELETED, handleDeleted)
+                            putString(KEY_FILE_NAME, fileName)
+                            putChar(KEY_DELIMITER, delimiter)
+                        }
+
+                        (requireActivity() as? BaseMyExpenses<*>)?.startExport(exportBundle)
+                        dismiss()
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.menu_export),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
-            putChar(KEY_DECIMAL_SEPARATOR, decimalSeparator)
-            putString(KEY_ENCODING, encoding)
-            putInt(KEY_EXPORT_HANDLE_DELETED, handleDeleted)
-            putString(KEY_FILE_NAME, binding.fileName.text.toString())
-            putChar(KEY_DELIMITER, delimiter)
-        })
-    }
-
-    /*
-   * if we are in the situation, where there are already exported transactions
-   * we suggest to the user the default of again exporting without deleting
-   * but if the user now changes to deleting, we enforce a complete export/reset
-   * since a partial deletion of only transactions not yet exported would
-   * lead to an inconsistent state
-   */
-    private fun configure(delete: Boolean) {
-        binding.exportNotYetExported.isEnabled = !delete
-        binding.exportNotYetExported.isChecked = !delete
-        binding.warningReset.isVisible = delete
-        binding.handleDeleted.isVisible = delete
-    }
-
-    private fun configureButton() {
-        (dialog as AlertDialog).getButton(AlertDialog.BUTTON_POSITIVE).isEnabled =
-            binding.dateFormat.error == null && binding.timeFormat.error == null &&
-                    binding.fileName.error == null
-    }
-
-    override fun onStart() {
-        super.onStart()
-        configure(binding.exportDelete.isChecked)
+        }
     }
 
     data class AccountInfo(
