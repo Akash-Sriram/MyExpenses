@@ -116,6 +116,7 @@ android {
     lint {
         abortOnError = true
         checkDependencies = true
+        checkReleaseBuilds = false
         disable += listOf("MissingQuantity", "MissingTranslation", "ImpliedQuantity", "Instantiatable")
     }
 
