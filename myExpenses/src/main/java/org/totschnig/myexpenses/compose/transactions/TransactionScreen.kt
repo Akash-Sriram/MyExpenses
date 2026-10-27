@@ -497,10 +497,12 @@ fun TransactionScreen(
                                             onPrepareMenuItem(it.id)
                                         }
 
-                                        //no need to show overflow menu if there is only one item
-                                        val quickItems = if (filteredItems.size > 1) filteredItems.take(
-                                            visibleActionItems
-                                        ) else filteredItems
+                                        // Show action items directly as icons without an overflow menu when there are 3 or fewer items
+                                        val quickItems = if (filteredItems.size <= 3) {
+                                            filteredItems
+                                        } else {
+                                            filteredItems.take(visibleActionItems)
+                                        }
                                         val overflowItems = filteredItems - quickItems.toSet()
 
                                         quickItems.forEach { menuItem ->
