@@ -46,10 +46,17 @@ val DateRangePickerState.range: Pair<LocalDate, LocalDate>?
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun rememberDefaultDateRangePickerState(): DateRangePickerState {
+fun rememberDefaultDateRangePickerState(
+    initialSelectedStartDateMillis: Long? = null,
+    initialSelectedEndDateMillis: Long? = null,
+    initialYearRange: IntRange? = null,
+): DateRangePickerState {
     val today = LocalDate.now(ZoneOffset.UTC)
+    val yearRange = initialYearRange ?: (1970..today.year)
     return rememberDateRangePickerState(
-        yearRange = (1970..today.year),
+        initialSelectedStartDateMillis = initialSelectedStartDateMillis,
+        initialSelectedEndDateMillis = initialSelectedEndDateMillis,
+        yearRange = yearRange,
         selectableDates = object: SelectableDates {
             private val endOfToday: Long by lazy {
                 ZonedDateTime.of(today, LocalTime.MAX, ZoneOffset.UTC)
@@ -69,12 +76,15 @@ fun DialogFragment.DateRangePickerScaffold(
     state: DateRangePickerState = rememberDefaultDateRangePickerState(),
     warning: String? = null,
     enabled: Boolean? = null,
+    headerContent: @Composable (() -> Unit)? = null,
     doWork: suspend (Pair<LocalDate, LocalDate>) -> Unit,
 ) {
     Column(Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
         val dateFormatter = remember { DatePickerDefaults.dateFormatter() }
         var isWorking by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
+
+        headerContent?.invoke()
 
         DateRangePicker(
             modifier = Modifier.conditional(state.displayMode == DisplayMode.Picker) {

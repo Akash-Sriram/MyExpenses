@@ -58,7 +58,9 @@ import org.totschnig.myexpenses.provider.PORTFOLIO_CONTAINER
 import org.totschnig.myexpenses.provider.PORTFOLIO_NONE
 import org.totschnig.myexpenses.provider.SPLIT_CATID
 import org.totschnig.myexpenses.provider.STATUS_ARCHIVE
+import org.totschnig.myexpenses.provider.STATUS_UNCOMMITTED
 import org.totschnig.myexpenses.provider.TABLE_TRANSACTIONS
+import org.totschnig.myexpenses.util.epochMillis2LocalDate
 import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.provider.TransactionProvider.Companion.AUTHORITY
 import org.totschnig.myexpenses.provider.TransactionProvider.Companion.EXTENDED_URI
@@ -981,6 +983,23 @@ fun Repository.countTransactionsPerAccount(
     "$KEY_ACCOUNTID = ? AND $KEY_PARENTID is null",
     arrayOf(accountId.toString())
 )
+
+fun Repository.getAccountTransactionDateBounds(
+    accountId: Long,
+): Pair<LocalDate, LocalDate>? = contentResolver.query(
+    TRANSACTIONS_URI,
+    arrayOf("min($KEY_DATE)", "max($KEY_DATE)"),
+    "$KEY_ACCOUNTID = ? AND $KEY_PARENTID is null AND $KEY_STATUS != $STATUS_UNCOMMITTED",
+    arrayOf(accountId.toString()),
+    null
+)?.use { cursor ->
+    if (cursor.moveToFirst() && !cursor.isNull(0) && !cursor.isNull(1)) {
+        val minEpoch = cursor.getLong(0)
+        val maxEpoch = cursor.getLong(1)
+        epochMillis2LocalDate(minEpoch * 1000L, java.time.ZoneOffset.UTC) to
+                epochMillis2LocalDate(maxEpoch * 1000L, java.time.ZoneOffset.UTC)
+    } else null
+}
 
 fun ContentResolver.findByAccountAndUuid(accountId: Long, uuid: String) = findBySelection(
     "$KEY_UUID = ? AND $KEY_ACCOUNTID = ?",
