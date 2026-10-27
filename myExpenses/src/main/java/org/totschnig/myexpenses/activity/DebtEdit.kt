@@ -1,178 +1,153 @@
 package org.totschnig.myexpenses.activity
 
 import android.os.Bundle
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.core.view.isVisible
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.databinding.OneDebtBinding
+import org.totschnig.myexpenses.compose.AppTheme
+import org.totschnig.myexpenses.compose.DebtEditScreen
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
-import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.provider.KEY_DEBT_ID
 import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
-import org.totschnig.myexpenses.ui.ButtonWithDialog
+import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.epoch2ZonedDateTime
 import org.totschnig.myexpenses.viewmodel.CurrencyViewModel
 import org.totschnig.myexpenses.viewmodel.DebtViewModel
 import org.totschnig.myexpenses.viewmodel.data.Debt
+import java.math.BigDecimal
 import java.time.LocalDate
-import kotlin.math.sign
 
-class DebtEdit : EditActivity(), ButtonWithDialog.Host {
-    private lateinit var binding: OneDebtBinding
+class DebtEdit : ProtectedFragmentActivity() {
     private val viewModel: DebtViewModel by viewModels()
     private val currencyViewModel: CurrencyViewModel by viewModels()
 
     val payeeName: String
-        get() = intent.getStringExtra(KEY_PAYEE_NAME)!!
+        get() = intent.getStringExtra(KEY_PAYEE_NAME) ?: ""
 
     val payeeId: Long
-        get() = intent.getLongExtra(KEY_PAYEEID, 0)
+        get() = intent.getLongExtra(KEY_PAYEEID, 0L)
 
     private val debtId: Long
-        get() = intent.getLongExtra(KEY_DEBT_ID, 0)
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putString(KEY_CURRENCY, binding.Amount.selectedCurrency?.code)
-    }
-
-    override val fabActionName = "SAVE_DEBT"
-
-    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
-        super.onRestoreInstanceState(savedInstanceState)
-        setTitle(binding.Amount.type)
-    }
+        get() = intent.getLongExtra(KEY_DEBT_ID, 0L)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = OneDebtBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        floatingActionButton = binding.fab.CREATECOMMAND
-        setupToolbarWithClose()
         with((application as MyApplication).appComponent) {
             inject(viewModel)
             inject(currencyViewModel)
         }
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
 
-            currencyViewModel.currencies.collect { list ->
-                binding.Amount.setCurrencies(list)
-                if (savedInstanceState == null) {
-                    if (debtId != 0L) {
-                        viewModel.loadDebt(debtId).filterNotNull().collect { debt ->
-                            if (debt.isSealed) {
-                                setResult(RESULT_FIRST_USER)
-                                finish()
-                            }
-                            binding.Label.setText(debt.label)
-                            binding.Description.setText(debt.description)
-                            setSelectedCurrency(debt.currency)
-                            binding.Amount.setAmount(Money(debt.currency, debt.amount).amountMajor)
-                            binding.DateButton.date = epoch2ZonedDateTime(debt.date).toLocalDate()
-                            debt.equivalentAmount?.let {
-                                binding.EquivalentAmount.setAmount(
-                                    Money(homeCurrency, it).amountMajor
-                                )
-                            }
-                            setTitle(debt.amount > 0)
-                            setupListeners()
+        setContent {
+            AppTheme {
+                val availableCurrencies by currencyViewModel.currencies.collectAsStateWithLifecycle(emptyList())
+
+                if (debtId != 0L) {
+                    val loadedDebt by viewModel.loadDebt(debtId).collectAsStateWithLifecycle()
+                    if (loadedDebt == null) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
                         }
                     } else {
-                        setSelectedCurrency(homeCurrency)
+                        val debt = loadedDebt!!
+                        if (debt.isSealed) {
+                            setResult(RESULT_FIRST_USER)
+                            finish()
+                        } else {
+                            DebtEditContent(
+                                isNew = false,
+                                initialLabel = debt.label,
+                                initialDescription = debt.description,
+                                initialAmount = Money(debt.currency, debt.amount).amountMajor.abs().toPlainString(),
+                                initialIsOwesMe = debt.amount > 0,
+                                initialCurrency = debt.currency,
+                                initialDate = epoch2ZonedDateTime(debt.date).toLocalDate(),
+                                initialEquivalent = debt.equivalentAmount?.let {
+                                    Money(homeCurrency, it).amountMajor.abs().toPlainString()
+                                } ?: "",
+                                availableCurrencies = availableCurrencies
+                            )
+                        }
                     }
                 } else {
-                    savedInstanceState.getString(KEY_CURRENCY)?.let {
-                        setSelectedCurrency(currencyContext[it])
-                    }
+                    DebtEditContent(
+                        isNew = true,
+                        initialLabel = "",
+                        initialDescription = "",
+                        initialAmount = "",
+                        initialIsOwesMe = true,
+                        initialCurrency = homeCurrency,
+                        initialDate = LocalDate.now(),
+                        initialEquivalent = "",
+                        availableCurrencies = availableCurrencies
+                    )
                 }
             }
         }
     }
-        if (savedInstanceState == null) {
-            if (debtId == 0L) {
-                binding.DateButton.date = LocalDate.now()
-                setTitle(false)
-            }
-        }
-        if (savedInstanceState != null || debtId == 0L) {
-            setupListeners()
-        }
-        if (debtId != 0L) {
-            binding.Amount.disableCurrencySelection()
-            newInstance = false
-        }
-        binding.Amount.setTypeChangedListener {
-            setTitle(it)
-        }
-        binding.EquivalentAmount.setFractionDigits(homeCurrency.fractionDigits)
-    }
 
-    private fun setupListeners() {
-        binding.Amount.addTextChangedListener(this)
-        binding.Label.addTextChangedListener(this)
-        binding.Description.addTextChangedListener(this)
-    }
+    @Composable
+    private fun DebtEditContent(
+        isNew: Boolean,
+        initialLabel: String,
+        initialDescription: String,
+        initialAmount: String,
+        initialIsOwesMe: Boolean,
+        initialCurrency: CurrencyUnit,
+        initialDate: LocalDate,
+        initialEquivalent: String,
+        availableCurrencies: List<org.totschnig.myexpenses.viewmodel.data.Currency>
+    ) {
+        DebtEditScreen(
+            isNewDebt = isNew,
+            payeeName = payeeName,
+            initialLabel = initialLabel,
+            initialDescription = initialDescription,
+            initialAmount = initialAmount,
+            initialIsOwesMe = initialIsOwesMe,
+            initialCurrencyUnit = initialCurrency,
+            initialDate = initialDate,
+            initialEquivalentAmount = initialEquivalent,
+            availableCurrencies = availableCurrencies,
+            homeCurrency = homeCurrency,
+            currencyContextLookup = { code -> currencyContext[code] },
+            onSave = { label, description, amountMajor, currencyUnit, date, equivalentAmountMajor ->
+                val money = Money.buildWithMajor(currencyUnit, amountMajor).getOrNull()
+                if (money == null) {
+                    showSnackBar(getString(R.string.number_too_large))
+                    return@DebtEditScreen
+                }
 
-    private fun setSelectedCurrency(currencyUnit: CurrencyUnit) {
-        binding.Amount.setSelectedCurrency(currencyUnit)
-        onCurrencySelectionChanged(currencyUnit)
-    }
+                val equivalentMoney = if (currencyUnit.code != homeCurrency.code && equivalentAmountMajor != null) {
+                    Money.buildWithMajor(homeCurrency, equivalentAmountMajor).getOrNull()
+                } else null
 
-    override fun onCurrencySelectionChanged(currencyUnit: CurrencyUnit) {
-        val isHomeAccount = currencyUnit.code == homeCurrency.code
-        binding.EquivalentAmountRow.isVisible = !isHomeAccount
-        if (!isHomeAccount) {
-            binding.EquivalentAmount.configureExchange(currencyUnit, homeCurrency)
-        }
-    }
+                val debt = Debt(
+                    id = debtId,
+                    label = label,
+                    description = description,
+                    payeeId = payeeId,
+                    amount = money.amountMinor,
+                    currency = currencyUnit,
+                    date = date,
+                    equivalentAmount = equivalentMoney?.amountMinor
+                )
 
-    override fun saveState() {
-        val label = binding.Label.text.toString()
-        if (label == "") {
-            binding.Label.error = getString(R.string.required)
-            return
-        }
-        binding.Amount.selectedCurrency?.let { currency ->
-            val currencyUnit = currencyContext[currency.code]
-            binding.Amount.getAmount(currencyUnit).getOrNull()?.let { amount ->
-                val equivalentAmount = if (currency.code == homeCurrency.code) null else
-                    (binding.EquivalentAmount.getAmount(homeCurrency).getOrNull()
-                        ?: return).let {
-                        if (amount.amountMinor.sign == -1) -it else it
-                    }
-                isSaving = true
-                viewModel.saveDebt(
-                    Debt(
-                        id = debtId,
-                        label = binding.Label.text.toString(),
-                        description = binding.Description.text.toString(),
-                        payeeId = payeeId,
-                        amount = amount.amountMinor,
-                        currency = currencyUnit,
-                        date = binding.DateButton.date,
-                        equivalentAmount = equivalentAmount?.amountMinor
-                    )
-                ).observe(this) {
+                viewModel.saveDebt(debt).observe(this) {
                     finish()
                 }
-            }
-        }
+            },
+            onClose = { finish() }
+        )
     }
-
-    fun setTitle(signum: Boolean) {
-        title = getString(if (signum) R.string.debt_owes_me else R.string.debt_I_owe, payeeName)
-    }
-
-    override val date: LocalDate
-        get() = binding.DateButton.date
-
 }
