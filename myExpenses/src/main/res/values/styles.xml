@@ -47,6 +47,9 @@
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_weight">1</item>
         <item name="android:paddingEnd">12dp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">13sp</item>
     </style>
 
     <style name="FormField">
@@ -100,9 +103,8 @@
         <item name="android:textStyle">bold</item>
     </style>
 
-    <style name="SmallButton" parent="Widget.Material3.Button.OutlinedButton">
-        <item name="strokeColor">?colorPrimary</item>
-        <item name="strokeWidth">2sp</item>
+    <style name="SmallButton" parent="Widget.Material3.Button.TonalButton">
+        <item name="cornerRadius">10dp</item>
     </style>
 
     <style name="SmallButton.FormField">
