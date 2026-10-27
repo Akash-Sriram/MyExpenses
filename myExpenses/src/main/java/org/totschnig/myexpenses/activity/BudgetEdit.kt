@@ -1,31 +1,27 @@
 package org.totschnig.myexpenses.activity
 
-import android.content.Context
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
-import android.widget.DatePicker
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.core.os.BundleCompat
-import androidx.core.view.isVisible
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.adapter.IdAdapter
-import org.totschnig.myexpenses.databinding.OneBudgetBinding
+import org.totschnig.myexpenses.compose.AppTheme
+import org.totschnig.myexpenses.compose.BudgetEditScreen
 import org.totschnig.myexpenses.dialog.KEY_RESULT_FILTER
 import org.totschnig.myexpenses.dialog.select.SelectCrStatusDialogFragment
 import org.totschnig.myexpenses.dialog.select.SelectMethodsAllDialogFragment
 import org.totschnig.myexpenses.dialog.select.SelectMultipleAccountDialogFragment
 import org.totschnig.myexpenses.injector
-import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Grouping
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.provider.DataBaseAccount
@@ -37,188 +33,19 @@ import org.totschnig.myexpenses.provider.filter.MethodCriterion
 import org.totschnig.myexpenses.provider.filter.PayeeCriterion
 import org.totschnig.myexpenses.provider.filter.SimpleCriterion
 import org.totschnig.myexpenses.provider.filter.TagCriterion
-import org.totschnig.myexpenses.ui.SpinnerHelper
-import org.totschnig.myexpenses.ui.filter.ScrollingChip
 import org.totschnig.myexpenses.viewmodel.BudgetEditViewModel
 import org.totschnig.myexpenses.viewmodel.data.AccountMinimal
 import org.totschnig.myexpenses.viewmodel.data.Budget
-import org.totschnig.myexpenses.viewmodel.data.getLabelForBudgetType
+import java.math.BigDecimal
 import java.time.LocalDate
 
-class BudgetEdit : EditActivity(), AdapterView.OnItemSelectedListener,
-    DatePicker.OnDateChangedListener {
+class BudgetEdit : ProtectedFragmentActivity() {
 
     private val viewModel: BudgetEditViewModel by viewModels()
-    private lateinit var binding: OneBudgetBinding
-    private var pendingBudgetLoad = 0L
-    private var resumedP = false
-    private var budget: Budget? = null
-    private lateinit var typeSpinnerHelper: SpinnerHelper
-    private lateinit var accountSpinnerHelper: SpinnerHelper
-
     val filterRequestKey = "confirmFilterBudget"
 
-    var accountId: Long = 0
-
-    private val allFilterChips: Array<ScrollingChip>
-        get() = with(binding) {
-            arrayOf(
-                FILTERCATEGORYCOMMAND,
-                FILTERPAYEECOMMAND,
-                FILTERMETHODCOMMAND,
-                FILTERSTATUSCOMMAND,
-                FILTERTAGCOMMAND,
-                FILTERACCOUNTCOMMAND
-            )
-        }
-
-    private fun setupListeners() {
-        val removeFilter: (View) -> Unit = { view -> removeFilter((view.parent as View).id) }
-        val startFilterDialog: (View) -> Unit =
-            { view -> startFilterDialog((view.parent as View).id) }
-        allFilterChips.forEach {
-            it.setOnCloseIconClickListener(removeFilter)
-            it.setOnClickListener(startFilterDialog)
-        }
-        binding.Title.addTextChangedListener(this)
-        binding.Description.addTextChangedListener(this)
-        binding.Amount.addTextChangedListener(this)
-        typeSpinnerHelper.setOnItemSelectedListener(this)
-        accountSpinnerHelper.setOnItemSelectedListener(this)
-        (budget?.start ?: LocalDate.now()).let {
-            binding.DurationFrom.initWith(it, this)
-        }
-        (budget?.end ?: LocalDate.now()).let {
-            binding.DurationTo.initWith(it, this)
-        }
-    }
-
-    private fun removeFilter(id: Int) {
-        setDirty()
-        viewModel.removeFilter(id)
-    }
-
-    private fun startFilterDialog(id: Int) {
-        val edit = viewModel.criteria.value.find { it.id == id }
-        when (id) {
-            R.id.FILTER_CATEGORY_COMMAND -> getCategory.launch(null to edit as? CategoryCriterion)
-
-            R.id.FILTER_TAG_COMMAND -> getTags.launch(null to edit as? TagCriterion)
-
-            R.id.FILTER_PAYEE_COMMAND -> getPayee.launch(null to edit as? PayeeCriterion)
-
-            R.id.FILTER_METHOD_COMMAND -> {
-                SelectMethodsAllDialogFragment.newInstance(
-                    filterRequestKey,
-                    edit as? MethodCriterion
-                )
-                    .show(supportFragmentManager, "METHOD_FILTER")
-            }
-
-            R.id.FILTER_STATUS_COMMAND -> {
-                SelectCrStatusDialogFragment.newInstance(
-                    filterRequestKey,
-                    edit as? CrStatusCriterion,
-                    false
-                )
-                    .show(supportFragmentManager, "STATUS_FILTER")
-            }
-
-            R.id.FILTER_ACCOUNT_COMMAND -> {
-                SelectMultipleAccountDialogFragment.newInstance(
-                    filterRequestKey,
-                    selectedAccount()
-                        .takeIf { !DataBaseAccount.isHomeAggregate(it.id) }
-                        ?.currency,
-                    edit as? AccountCriterion
-                ).show(supportFragmentManager, "ACCOUNT_FILTER")
-            }
-        }
-    }
-
-    private val budgetId
-        get() = intent.extras?.getLong(KEY_ROWID) ?: 0
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (savedInstanceState != null) {
-            accountId = savedInstanceState.getLong(KEY_ACCOUNT_ID, 0L)
-        }
-        binding = OneBudgetBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        floatingActionButton = binding.fab.CREATECOMMAND
-        setupToolbarWithClose()
-        injector.inject(viewModel)
-        pendingBudgetLoad = if (savedInstanceState == null) budgetId else 0L
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.accountsMinimal().take(1).collect { list ->
-                    if (list.isEmpty()) {
-                        Toast.makeText(
-                            this@BudgetEdit,
-                            getString(R.string.no_accounts),
-                            Toast.LENGTH_LONG
-                        ).show()
-                        finish()
-                    } else {
-                        accountSpinnerHelper.adapter = IdAdapter(this@BudgetEdit, list)
-                        (accountId.takeIf { it != 0L } ?: list.getOrNull(0)?.id)?.let {
-                            populateAccount(it)
-                        }
-                        if (pendingBudgetLoad != 0L) {
-                            viewModel.budget(pendingBudgetLoad)
-                                .observe(this@BudgetEdit) { populateData(it) }
-                        }
-                    }
-                }
-            }
-        }
-        newInstance = budgetId == 0L
-        viewModel.databaseResult.observe(this) {
-            if (it > -1) {
-                finish()
-            } else {
-                Toast.makeText(this, "Error while saving budget", Toast.LENGTH_LONG).show()
-            }
-        }
-        typeSpinnerHelper = SpinnerHelper(binding.Type).apply {
-            adapter = GroupingAdapter(this@BudgetEdit)
-            setSelection(Grouping.MONTH.ordinal)
-        }
-        accountSpinnerHelper = SpinnerHelper(binding.Accounts)
-        if (!newInstance) {
-            viewModel.initWith(budgetId)
-        }
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.criteria.collect { criteria ->
-                    listOf(
-                        R.id.FILTER_CATEGORY_COMMAND to R.string.budget_filter_all_categories,
-                        R.id.FILTER_PAYEE_COMMAND to R.string.budget_filter_all_parties,
-                        R.id.FILTER_METHOD_COMMAND to R.string.budget_filter_all_methods,
-                        R.id.FILTER_STATUS_COMMAND to R.string.budget_filter_all_states,
-                        R.id.FILTER_TAG_COMMAND to R.string.budget_filter_all_tags,
-                        R.id.FILTER_ACCOUNT_COMMAND to R.string.budget_filter_all_accounts
-                    ).forEach { (id, label) ->
-                        findViewById<ScrollingChip>(id)?.apply {
-                            val criterion = criteria.find { it.id == id }
-                            text = criterion?.prettyPrint(this@BudgetEdit) ?: getText(label)
-                            isCloseIconVisible = criterion != null
-                        }
-                    }
-                    configureFilterDependents(criteria.isEmpty())
-                }
-            }
-        }
-        setTitle(if (newInstance) R.string.menu_create_budget else R.string.menu_edit_budget)
-        linkInputsWithLabels()
-        supportFragmentManager.setFragmentResultListener(filterRequestKey, this) { _, result ->
-            BundleCompat.getParcelable(result, KEY_RESULT_FILTER, SimpleCriterion::class.java)
-                ?.let {
-                    addFilterCriterion(it)
-                }
-        }
-    }
+    private val budgetId: Long
+        get() = intent.extras?.getLong(KEY_ROWID) ?: 0L
 
     private inline fun buildLauncher(createContract: () -> PickObjectContract) =
         registerForActivityResult(createContract()) { criterion ->
@@ -230,175 +57,155 @@ class BudgetEdit : EditActivity(), AdapterView.OnItemSelectedListener,
     private val getTags = buildLauncher(::PickTagContract)
 
     fun addFilterCriterion(c: SimpleCriterion<*>) {
-        setDirty()
         viewModel.addFilterCriterion(c)
     }
 
-    override fun onResume() {
-        super.onResume()
-        resumedP = true
-        if (pendingBudgetLoad == 0L) setupListeners()
-    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        injector.inject(viewModel)
 
-    override fun onPause() {
-        super.onPause()
-        resumedP = false
-    }
+        if (budgetId != 0L) {
+            viewModel.initWith(budgetId)
+        }
 
-    private fun populateData(budget: Budget) {
-        check(!newInstance)
-        this.budget = budget
-        binding.Title.setText(budget.title)
-        binding.Description.setText(budget.description)
-        populateAccount(budget.accountId)
-        binding.AmountRow.isVisible = false
-        typeSpinnerHelper.setSelection(budget.grouping.ordinal)
-        typeSpinnerHelper.isEnabled = false
-        configureTypeDependents(budget.grouping)
-        binding.DefaultBudget.isChecked = budget.default
-        if (resumedP) setupListeners()
-        pendingBudgetLoad = 0L
-    }
-
-    private fun populateAccount(accountId: Long) {
-        this.accountId = accountId
-        with(accountSpinnerHelper) {
-            (adapter as IdAdapter<*>).getPosition(accountId).takeIf { it > -1 }?.let {
-                setSelection(it)
+        viewModel.databaseResult.observe(this) { result ->
+            if (result > -1) {
+                finish()
+            } else {
+                Toast.makeText(this, "Error while saving budget", Toast.LENGTH_LONG).show()
             }
         }
-        configureAccount()
-    }
 
-    override fun onNothingSelected(parent: AdapterView<*>) {
-        //noop
-    }
-
-    override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-        setDirty()
-        when (parent.id) {
-            R.id.Type -> {
-                configureTypeDependents(binding.Type.adapter.getItem(position) as Grouping)
-            }
-
-            R.id.Accounts -> {
-                configureAccount()
-                removeFilter(R.id.FILTER_ACCOUNT_COMMAND)
-            }
+        supportFragmentManager.setFragmentResultListener(filterRequestKey, this) { _, result ->
+            BundleCompat.getParcelable(result, KEY_RESULT_FILTER, SimpleCriterion::class.java)
+                ?.let {
+                    addFilterCriterion(it)
+                }
         }
-    }
 
-    private fun configureAccount() {
-        val account = selectedAccount()
-        accountId = account.id
-        binding.FILTERACCOUNTCOMMAND.visibility = if (accountId < 0) View.VISIBLE else View.GONE
-        configureAmount(currencyContext[account.currency])
-    }
+        setContent {
+            AppTheme {
+                val accounts by viewModel.accountsMinimal().collectAsStateWithLifecycle(emptyList())
+                val criteria by viewModel.criteria.collectAsStateWithLifecycle(emptyList())
 
-    private fun configureAmount(currencyUnit: CurrencyUnit) {
-        binding.Amount.setFractionDigits(currencyUnit.fractionDigits)
-    }
-
-    private fun configureTypeDependents(grouping: Grouping) {
-        binding.DurationFromRow.isVisible = grouping == Grouping.NONE
-        binding.DurationToRow.isVisible = grouping == Grouping.NONE
-        binding.DefaultBudget.isVisible = grouping != Grouping.NONE
-    }
-
-    private fun configureFilterDependents(isEmpty: Boolean) {
-        with(binding.DefaultBudget) {
-            if (!isEmpty) {
-                isChecked = false
-            }
-            isEnabled = isEmpty
-        }
-    }
-
-    override fun onDateChanged(view: DatePicker?, year: Int, monthOfYear: Int, dayOfMonth: Int) {
-        setDirty()
-    }
-
-    override val fabActionName = "SAVE_BUDGET"
-
-    override fun onFabClicked() {
-        super.onFabClicked()
-        val grouping = typeSpinnerHelper.selectedItem as Grouping
-        val duration =
-            if (grouping == Grouping.NONE) binding.DurationFrom.getDate() to binding.DurationTo.getDate() else null
-        if (duration != null && duration.second < duration.first) {
-            showDismissibleSnackBar(R.string.budget_date_end_after_start)
-        } else {
-            val allocation = binding.Amount.getAmount(budgetId == 0L)
-            if (allocation != null || budgetId != 0L) {
-                val account: AccountMinimal = selectedAccount()
-                val currencyUnit = currencyContext[account.currency]
-                val initialAmount = if (budgetId == 0L) {
-                    Money.buildWithMajor(currencyUnit, allocation!!).onFailure {
-                        showDismissibleSnackBar(R.string.number_too_large)
-                        return
-                    }.getOrNull()?.amountMinor
-                } else null
-
-                val budget = Budget(
-                    budgetId,
-                    account.id,
-                    binding.Title.text.toString(),
-                    binding.Description.text.toString(),
-                    account.currency,
-                    grouping,
-                    -1,
-                    duration?.first,
-                    duration?.second,
-                    null,
-                    binding.DefaultBudget.isChecked
-                )
-                viewModel.saveBudget(budget, initialAmount)
+                if (accounts.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else if (budgetId != 0L) {
+                    val loadedBudget by viewModel.budget(budgetId).observeAsState()
+                    if (loadedBudget == null) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        val b = loadedBudget!!
+                        BudgetEditScreen(
+                            isNewBudget = false,
+                            initialTitle = b.title,
+                            initialDescription = b.description ?: "",
+                            initialAmount = "",
+                            initialAccountId = b.accountId,
+                            initialGrouping = b.grouping,
+                            initialStartDate = b.start ?: LocalDate.now(),
+                            initialEndDate = b.end ?: LocalDate.now(),
+                            initialIsDefault = b.default,
+                            accounts = accounts,
+                            currencyContextLookup = { code -> currencyContext[code] },
+                            criteria = criteria.toList(),
+                            onFilterClick = { id -> startFilterDialog(id, b.accountId, accounts) },
+                            onRemoveFilter = { id -> viewModel.removeFilter(id) },
+                            onSave = { title, description, _, accountId, grouping, start, end, isDefault ->
+                                val acc = accounts.find { it.id == accountId } ?: accounts.first()
+                                val budget = Budget(
+                                    budgetId,
+                                    acc.id,
+                                    title,
+                                    description,
+                                    acc.currency,
+                                    grouping,
+                                    -1,
+                                    start,
+                                    end,
+                                    null,
+                                    isDefault
+                                )
+                                viewModel.saveBudget(budget, null)
+                            },
+                            onClose = { finish() }
+                        )
+                    }
+                } else {
+                    BudgetEditScreen(
+                        isNewBudget = true,
+                        initialTitle = "",
+                        initialDescription = "",
+                        initialAmount = "",
+                        initialAccountId = accounts.first().id,
+                        initialGrouping = Grouping.MONTH,
+                        initialStartDate = LocalDate.now(),
+                        initialEndDate = LocalDate.now(),
+                        initialIsDefault = false,
+                        accounts = accounts,
+                        currencyContextLookup = { code -> currencyContext[code] },
+                        criteria = criteria.toList(),
+                        onFilterClick = { id -> startFilterDialog(id, accounts.first().id, accounts) },
+                        onRemoveFilter = { id -> viewModel.removeFilter(id) },
+                        onSave = { title, description, allocationAmount, accountId, grouping, start, end, isDefault ->
+                            val acc = accounts.find { it.id == accountId } ?: accounts.first()
+                            val currencyUnit = currencyContext[acc.currency]
+                            val initialAmountMinor = allocationAmount?.let {
+                                Money.buildWithMajor(currencyUnit, it).getOrNull()?.amountMinor
+                            }
+                            val budget = Budget(
+                                0L,
+                                acc.id,
+                                title,
+                                description,
+                                acc.currency,
+                                grouping,
+                                -1,
+                                start,
+                                end,
+                                null,
+                                isDefault
+                            )
+                            viewModel.saveBudget(budget, initialAmountMinor)
+                        },
+                        onClose = { finish() }
+                    )
+                }
             }
         }
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putLong(KEY_ACCOUNT_ID, accountId)
-    }
-
-    private fun selectedAccount() = binding.Accounts.selectedItem as AccountMinimal
-
-    companion object {
-        private const val KEY_ACCOUNT_ID = "key_account_id"
+    private fun startFilterDialog(id: Int, selectedAccountId: Long, accounts: List<AccountMinimal>) {
+        val edit = viewModel.criteria.value.find { it.id == id }
+        when (id) {
+            R.id.FILTER_CATEGORY_COMMAND -> getCategory.launch(null to edit as? CategoryCriterion)
+            R.id.FILTER_TAG_COMMAND -> getTags.launch(null to edit as? TagCriterion)
+            R.id.FILTER_PAYEE_COMMAND -> getPayee.launch(null to edit as? PayeeCriterion)
+            R.id.FILTER_METHOD_COMMAND -> {
+                SelectMethodsAllDialogFragment.newInstance(
+                    filterRequestKey,
+                    edit as? MethodCriterion
+                ).show(supportFragmentManager, "METHOD_FILTER")
+            }
+            R.id.FILTER_STATUS_COMMAND -> {
+                SelectCrStatusDialogFragment.newInstance(
+                    filterRequestKey,
+                    edit as? CrStatusCriterion,
+                    false
+                ).show(supportFragmentManager, "STATUS_FILTER")
+            }
+            R.id.FILTER_ACCOUNT_COMMAND -> {
+                val acc = accounts.find { it.id == selectedAccountId } ?: accounts.firstOrNull()
+                SelectMultipleAccountDialogFragment.newInstance(
+                    filterRequestKey,
+                    acc?.takeIf { !DataBaseAccount.isHomeAggregate(it.id) }?.currency,
+                    edit as? AccountCriterion
+                ).show(supportFragmentManager, "ACCOUNT_FILTER")
+            }
+        }
     }
 }
-
-class GroupingAdapter(context: Context) : ArrayAdapter<Grouping>(
-    context, android.R.layout.simple_spinner_item, android.R.id.text1,
-    Grouping.entries.toTypedArray()
-) {
-
-    init {
-        setDropDownViewResource(androidx.appcompat.R.layout.support_simple_spinner_dropdown_item)
-    }
-
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val row = super.getView(position, convertView, parent)
-        setText(position, row)
-        return row
-    }
-
-    override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val row = super.getDropDownView(position, convertView, parent)
-        setText(position, row)
-        return row
-    }
-
-    private fun setText(position: Int, row: View) {
-        (row.findViewById<View>(android.R.id.text1) as TextView).setText(getItem(position)!!.getLabelForBudgetType())
-    }
-}
-
-fun DatePicker.initWith(date: LocalDate, listener: DatePicker.OnDateChangedListener) {
-    with(date) {
-        init(year, monthValue - 1, dayOfMonth, listener)
-    }
-}
-
-fun DatePicker.getDate(): LocalDate = LocalDate.of(year, month + 1, dayOfMonth)
