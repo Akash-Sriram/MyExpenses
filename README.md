@@ -20,6 +20,9 @@
 
 This repository is a modern, privacy-focused fork of [MyExpenses](https://github.com/mtotschnig/MyExpenses). Built with modern Jetpack Compose and Kotlin, it eliminates all proprietary paywalls, strips legacy bloat, introduces robust atomic backup pipelines, and integrates deeply with everyday financial workflows like UPI receipts, credit card billing cycles, and loan amortization.
 
+> [!NOTE]
+> **Personal & Standalone Fork**: This repository is strictly configured and maintained for personal daily use on specific hardware (Samsung Galaxy S24 and POCO F1). All development, issues, and changes are handled locally for this private workflow; external issues and pull requests are not tracked.
+
 ---
 
 ## ✨ Key Highlights
