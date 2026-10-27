@@ -14,53 +14,183 @@
 */
 package org.totschnig.myexpenses.activity
 
+import android.content.ContentUris
 import android.content.Intent
 import android.os.Bundle
 import android.provider.CalendarContract
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.app.NavUtils
 import androidx.core.app.TaskStackBuilder
 import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
+import org.totschnig.myexpenses.compose.AppTheme
+import org.totschnig.myexpenses.compose.templates.TemplatesScreen
+import org.totschnig.myexpenses.compose.templates.toTemplateItemList
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions
+import org.totschnig.myexpenses.db2.entities.Template
 import org.totschnig.myexpenses.dialog.ConfirmationDialogFragment.ConfirmationDialogListener
-import org.totschnig.myexpenses.fragment.TemplatesList
+import org.totschnig.myexpenses.fragment.PlannerFragment
+import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.ContribFeature
+import org.totschnig.myexpenses.provider.KEY_ROWID
+import org.totschnig.myexpenses.provider.KEY_TEMPLATEID
 import org.totschnig.myexpenses.util.PermissionHelper
+import org.totschnig.myexpenses.util.PermissionHelper.PermissionGroup
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.viewmodel.PlanInstanceInfo
+import org.totschnig.myexpenses.viewmodel.TemplatesListViewModel
 import java.io.Serializable
 
 const val HELP_VARIANT_TEMPLATES = "templates"
 const val HELP_VARIANT_PLANS = "plans"
 const val HELP_VARIANT_PLANNER = "planner"
+const val PLANNER_FRAGMENT_TAG = "PLANNER_FRAGMENT"
 
 class ManageTemplates : ProtectedFragmentActivity(), ConfirmationDialogListener, ContribIFace {
     var calledFromCalendarWithId = NOT_CALLED
         private set
 
-    private val mListFragment
-        get() = supportFragmentManager.findFragmentById(R.id.fragment_container) as TemplatesList
+    val viewModel: TemplatesListViewModel by viewModels()
 
+    private val editInstanceLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            // Screen updates automatically via Flow
+        }
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setHelpVariant(HELP_VARIANT_TEMPLATES, true)
-        setupWithFragment(savedInstanceState == null) {
-            TemplatesList()
-        }
-        setupToolbar()
-        title = getString(R.string.menu_manage_plans)
+        injector.inject(viewModel)
+
         val uriString = intent.getStringExtra(CalendarContract.Events.CUSTOM_APP_URI)
         if (uriString != null) {
             val uriPath = uriString.toUri().pathSegments
             try {
                 calledFromCalendarWithId =
-                    uriPath[uriPath.size - 1].toLong() //legacy uri had account_id/template_id
-                if (calledFromCalendarWithId == 0L) { //ignore 0 that were introduced by legacy bug
+                    uriPath[uriPath.size - 1].toLong()
+                if (calledFromCalendarWithId == 0L) {
                     calledFromCalendarWithId = NOT_CALLED
                 }
             } catch (e: Exception) {
                 CrashHandler.report(e)
+            }
+        }
+
+        viewModel.setSortOrder(null)
+
+        setContent {
+            AppTheme {
+                val cursor by viewModel.templatesCursor.collectAsStateWithLifecycle(initialValue = null)
+                val templateItems = remember(cursor) { cursor?.toTemplateItemList() ?: emptyList() }
+                val snackbarHostState = remember { SnackbarHostState() }
+                val coroutineScope = rememberCoroutineScope()
+
+                TemplatesScreen(
+                    templates = templateItems,
+                    snackbarHostState = snackbarHostState,
+                    onBack = { finish() },
+                    onNewTemplate = {
+                        startActivity(Intent(this@ManageTemplates, ExpenseEdit::class.java).apply {
+                            putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
+                            putExtra(ExpenseEdit.KEY_NEW_TEMPLATE, true)
+                        })
+                    },
+                    onRunTemplate = { template ->
+                        if (template.isSealed) {
+                            showSnackBar(R.string.object_sealed)
+                            return@TemplatesScreen
+                        }
+                        if (template.defaultAction == Template.Action.SAVE) {
+                            viewModel.newFromTemplate(PlanInstanceInfo(template.id)).observe(this@ManageTemplates) { count ->
+                                coroutineScope.launch {
+                                    val msg = if (count > 0) {
+                                        resources.getQuantityString(
+                                            R.plurals.save_transaction_from_template_success,
+                                            count,
+                                            count
+                                        )
+                                    } else {
+                                        getString(R.string.save_transaction_error)
+                                    }
+                                    snackbarHostState.showSnackbar(msg)
+                                }
+                            }
+                        } else {
+                            startActivity(Intent(this@ManageTemplates, ExpenseEdit::class.java).apply {
+                                action = ExpenseEdit.ACTION_CREATE_FROM_TEMPLATE
+                                putExtra(KEY_TEMPLATEID, template.id)
+                            })
+                        }
+                    },
+                    onEditInstance = { template ->
+                        startActivity(Intent(this@ManageTemplates, ExpenseEdit::class.java).apply {
+                            action = ExpenseEdit.ACTION_CREATE_FROM_TEMPLATE
+                            putExtra(KEY_TEMPLATEID, template.id)
+                        })
+                    },
+                    onEditTemplate = { template ->
+                        editInstanceLauncher.launch(
+                            Intent(this@ManageTemplates, ExpenseEdit::class.java).apply {
+                                putExtra(KEY_TEMPLATEID, template.id)
+                            }
+                        )
+                    },
+                    onToggleDefaultAction = { template ->
+                        val newAction = if (template.defaultAction == Template.Action.SAVE) {
+                            Template.Action.EDIT
+                        } else {
+                            Template.Action.SAVE
+                        }
+                        viewModel.updateDefaultAction(longArrayOf(template.id), newAction).observe(this@ManageTemplates) { success ->
+                            coroutineScope.launch {
+                                val msg = if (success) {
+                                    if (newAction == Template.Action.SAVE) "Default set to Execute directly" else "Default set to Customize before saving"
+                                } else {
+                                    "Error updating default action"
+                                }
+                                snackbarHostState.showSnackbar(msg)
+                            }
+                        }
+                    },
+                    onDeleteTemplate = { template ->
+                        val hasCalendar = PermissionGroup.CALENDAR.hasPermission(this@ManageTemplates)
+                        viewModel.deleteTemplates(longArrayOf(template.id), hasCalendar).observe(this@ManageTemplates) { result ->
+                            coroutineScope.launch {
+                                val msg = if (result.success > 0) {
+                                    resources.getQuantityString(
+                                        R.plurals.delete_success,
+                                        result.success,
+                                        result.success
+                                    )
+                                } else {
+                                    deleteFailureMessage(null)
+                                }
+                                snackbarHostState.showSnackbar(msg)
+                            }
+                        }
+                    },
+                    onOpenPlanner = {
+                        PlannerFragment().show(supportFragmentManager, PLANNER_FRAGMENT_TAG)
+                    },
+                    onViewCalendarPlan = { planId ->
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, planId)
+                            }
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            CrashHandler.report(e)
+                        }
+                    }
+                )
             }
         }
     }
@@ -69,72 +199,39 @@ class ManageTemplates : ProtectedFragmentActivity(), ConfirmationDialogListener,
 
     override val fabActionName = "CREATE_TEMPLATE"
 
-    override fun onFabClicked() {
-        super.onFabClicked()
-        startActivity(Intent(this, ExpenseEdit::class.java).apply {
-            putExtra(Transactions.OPERATION_TYPE, Transactions.TYPE_TRANSACTION)
-            putExtra(ExpenseEdit.KEY_NEW_TEMPLATE, true)
-        })
-    }
-
-    override fun dispatchCommand(command: Int, tag: Any?) =
-        if (super.dispatchCommand(command, tag)) {
-            true
-        } else when (command) {
-            R.id.DELETE_COMMAND_DO -> {
-                finishActionMode()
-                mListFragment.dispatchDeleteDo((tag as LongArray))
-                true
-            }
-
-            R.id.CANCEL_CALLBACK_COMMAND -> {
-                finishActionMode()
-                true
-            }
-            else -> false
-        }
-
     fun dispatchEditInstance(transactionId: Long) {
-        mListFragment.dispatchEditInstance(transactionId)
+        editInstanceLauncher.launch(
+            Intent(this, ExpenseEdit::class.java).putExtra(KEY_ROWID, transactionId)
+        )
     }
 
     fun dispatchDeleteInstance(transactionId: Long) {
-        mListFragment.dispatchDeleteInstance(transactionId)
+        viewModel.deleteTransactions(longArrayOf(transactionId))
     }
 
     fun dispatchRelinkInstance(planInstanceInfo: PlanInstanceInfo, adjustDate: Boolean) {
-        mListFragment.dispatchRelinkInstance(planInstanceInfo, adjustDate)
+        viewModel.relink(planInstanceInfo, adjustDate)
     }
 
     override fun doHome() {
         if (isTaskRoot) {
             val upIntent = NavUtils.getParentActivityIntent(this)
-            // create new task
             TaskStackBuilder.create(this).addNextIntentWithParentStack(upIntent!!)
                 .startActivities()
         } else {
-            // Stay in same task
-           super.doHome()
-        }
-    }
-
-    private fun finishActionMode() {
-        mListFragment.finishActionMode()
-    }
-
-    override fun onPermissionsGranted(requestCode: Int, perms: List<String>) {
-        super.onPermissionsGranted(requestCode, perms)
-        if (requestCode == PermissionHelper.PERMISSIONS_REQUEST_WRITE_CALENDAR) {
-            mListFragment.loadData()
+            super.doHome()
         }
     }
 
     override fun contribFeatureCalled(feature: ContribFeature, tag: Serializable?) {
         if (feature == ContribFeature.SPLIT_TRANSACTION) {
             if (tag is Long) {
-                mListFragment.dispatchCreateInstanceEditDo((tag as Long?)!!)
+                startActivity(Intent(this, ExpenseEdit::class.java).apply {
+                    action = ExpenseEdit.ACTION_CREATE_FROM_TEMPLATE
+                    putExtra(KEY_TEMPLATEID, tag)
+                })
             } else if (tag is LongArray) {
-                mListFragment.dispatchCreateInstanceSaveDo((tag as LongArray?)!!)
+                viewModel.newFromTemplate(*tag.map { PlanInstanceInfo(it) }.toTypedArray())
             }
         }
     }
