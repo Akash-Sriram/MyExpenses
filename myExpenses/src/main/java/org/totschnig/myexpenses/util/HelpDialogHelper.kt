@@ -149,10 +149,7 @@ class HelpDialogHelper(val context: Context, val extra: CharSequence? = null) : 
         )
     }
 
-    private fun shouldSkip(component: String) = when (component) {
-        "help_ManageSyncBackends_drive" -> DistributionHelper.isGithub
-        else -> false
-    }
+    private fun shouldSkip(component: String) = false
 
     @StringRes
     fun resolveString(resIdString: String) = resolve(resIdString, "string")

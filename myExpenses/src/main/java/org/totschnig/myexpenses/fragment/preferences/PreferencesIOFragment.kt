@@ -26,11 +26,6 @@ class PreferencesIOFragment: BasePreferenceIOBRFragment() {
             title = getString(R.string.pref_import_title, "QIF")
         }
 
-        with(requirePreference<Preference>(PrefKey.IMPORT_CSV)) {
-            summary = getString(R.string.pref_import_summary, "CSV")
-            title = getString(R.string.pref_import_title, "CSV")
-        }
-
         requirePreference<Preference>(PrefKey.CSV_EXPORT).title =
             getString(R.string.export_to_format, "CSV")
 
@@ -40,9 +35,5 @@ class PreferencesIOFragment: BasePreferenceIOBRFragment() {
         configureShareTargetPreference()
     }
 
-    override fun onPreferenceTreeClick(preference: Preference) = when {
-        super.onPreferenceTreeClick(preference) -> true
-        handleContrib(PrefKey.IMPORT_CSV, ContribFeature.CSV_IMPORT, preference) -> true
-        else -> false
-    }
+    override fun onPreferenceTreeClick(preference: Preference) = super.onPreferenceTreeClick(preference)
 }

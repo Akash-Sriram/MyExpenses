@@ -25,7 +25,7 @@ import androidx.annotation.StringRes
 import kotlinx.coroutines.runBlocking
 import org.totschnig.myexpenses.BuildConfig
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.activity.ManageSyncBackends
+import org.totschnig.myexpenses.activity.PreferenceActivity
 import org.totschnig.myexpenses.db2.Repository
 import org.totschnig.myexpenses.db2.loadAccount
 import org.totschnig.myexpenses.db2.requireAccountTypeForSync
@@ -682,7 +682,7 @@ class SyncAdapter(
     }
 
     private val manageSyncBackendsIntent: Intent
-        get() = Intent(context, ManageSyncBackends::class.java)
+        get() = Intent(context, PreferenceActivity::class.java)
 
     @Synchronized
     private fun appendToNotification(content: String, account: Account, newLine: Boolean) {

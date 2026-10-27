@@ -16,16 +16,11 @@ import org.totschnig.myexpenses.di.ViewModelModule
 import org.totschnig.myexpenses.model.CurrencyContext
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.provider.filter.Criterion
-import org.totschnig.myexpenses.sync.json.AccountMetaData
-import org.totschnig.myexpenses.viewmodel.AbstractSyncBackendViewModel
 import org.totschnig.myexpenses.viewmodel.MyExpensesV2ViewModel
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
 import org.totschnig.myexpenses.viewmodel.data.Transaction2
 
 object TestViewModelModule : ViewModelModule() {
-    override fun provideSyncBackendViewModelClass(): Class<out AbstractSyncBackendViewModel> =
-        FakeSyncBackendViewModel::class.java
-
     override fun provideMyExpensesViewModelClass(): Class<out MyExpensesV2ViewModel> {
         return DecoratingMyExpensesViewModel::class.java
     }
@@ -48,44 +43,6 @@ class DecoratingMyExpensesViewModel(
             countingResource,
             prefHandler
         )
-}
-
-class FakeSyncBackendViewModel(application: Application) :
-    AbstractSyncBackendViewModel(application) {
-    override fun getAccounts(context: Context): List<Pair<String, Boolean>> =
-        with(getApplication<TestApp>().fixture) {
-            listOf(
-                syncAccount1 to true,
-                syncAccount2 to false,
-                syncAccount3 to false
-            )
-        }
-
-    override fun accountMetadata(
-        accountName: String,
-        isFeatureAvailable: Boolean,
-    ): LiveData<Result<List<Result<AccountMetaData>>>> = liveData {
-        val syncedAccount = with(getApplication<TestApp>().fixture) {
-            when (accountName) {
-                syncAccount1 -> account1
-                syncAccount2 -> account2
-                syncAccount3 -> account3
-                else -> throw IllegalStateException()
-            }
-        }
-        emit(
-            Result.success(
-                listOf(
-                    Result.success(
-                        AccountMetaData.from(
-                            syncedAccount,
-                            getApplication<MyApplication>().appComponent.currencyContext().homeCurrencyString
-                        )
-                    )
-                )
-            )
-        )
-    }
 }
 
 class DecoratedTransactionPagingSource(

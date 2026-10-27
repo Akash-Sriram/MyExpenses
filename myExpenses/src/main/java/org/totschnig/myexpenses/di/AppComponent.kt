@@ -8,7 +8,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import okhttp3.OkHttpClient
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.activity.BaseActivity
-import org.totschnig.myexpenses.activity.CsvImportActivity
 import org.totschnig.myexpenses.activity.EditActivity
 import org.totschnig.myexpenses.activity.ExpenseEdit
 import org.totschnig.myexpenses.activity.MyExpensesV2
@@ -32,8 +31,6 @@ import org.totschnig.myexpenses.dialog.VersionDialogFragment
 import org.totschnig.myexpenses.dialog.select.SelectFromTableDialogFragment
 import org.totschnig.myexpenses.export.pdf.PdfPrinter
 import org.totschnig.myexpenses.feature.FeatureManager
-import org.totschnig.myexpenses.fragment.CsvImportDataFragment
-import org.totschnig.myexpenses.fragment.CsvImportParseFragment
 import org.totschnig.myexpenses.fragment.HistoryChart
 import org.totschnig.myexpenses.fragment.OnBoardingPrivacyFragment
 import org.totschnig.myexpenses.fragment.OnboardingDataFragment
@@ -41,7 +38,6 @@ import org.totschnig.myexpenses.fragment.OnboardingUiFragment
 import org.totschnig.myexpenses.fragment.PartiesList
 import org.totschnig.myexpenses.fragment.PlannerFragment.PlanInstanceViewHolder
 import org.totschnig.myexpenses.fragment.StaleImagesList
-import org.totschnig.myexpenses.fragment.SyncBackendList
 import org.totschnig.myexpenses.fragment.TemplatesList
 import org.totschnig.myexpenses.fragment.preferences.BasePreferenceFragment
 import org.totschnig.myexpenses.model.CurrencyContext
@@ -185,8 +181,6 @@ interface AppComponent {
 
     fun inject(historyChart: HistoryChart)
 
-    fun inject(syncBackendList: SyncBackendList)
-
     fun inject(transactionProvider: BaseTransactionProvider)
 
     fun inject(onboardingDataFragment: OnboardingDataFragment)
@@ -235,11 +229,7 @@ interface AppComponent {
 
     fun inject(baseDialogFragment: BaseDialogFragment)
 
-    fun inject(csvImportParseFragment: CsvImportParseFragment)
-
     fun inject(featureViewModel: FeatureViewModel)
-
-    fun inject(csvImportDataFragment: CsvImportDataFragment)
 
     fun inject(debtViewModel: DebtViewModel)
 
@@ -273,8 +263,6 @@ interface AppComponent {
     fun inject(restoreViewModel: RestoreViewModel)
 
     fun inject(planExecutor: PlanExecutor)
-
-    fun inject(csvImportActivity: CsvImportActivity)
 
     fun inject(archiveDialogFragment: ArchiveDialogFragment)
 

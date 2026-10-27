@@ -23,11 +23,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.BackupRestoreActivity
-import org.totschnig.myexpenses.activity.CsvImportActivity
 import org.totschnig.myexpenses.activity.ManageCategories
 import org.totschnig.myexpenses.activity.ManageCurrencies
 import org.totschnig.myexpenses.activity.ManageMethods
-import org.totschnig.myexpenses.activity.ManageSyncBackends
 import org.totschnig.myexpenses.activity.PreferenceActivity
 import org.totschnig.myexpenses.model.CommodityType
 import org.totschnig.myexpenses.model.ContribFeature
@@ -78,12 +76,6 @@ class SettingsTest : BaseUiTest<PreferenceActivity>() {
         intended(ManageMethods::class)
     }
 
-    @Test
-    fun importCsv() {
-        navigateTo(withText(ioTitle), withText(getString(R.string.pref_import_title, "CSV")))
-        handleContribDialog(ContribFeature.CSV_IMPORT)
-        intended(CsvImportActivity::class)
-    }
 
     private val backupRestoreTitle: String
         get() = getString(R.string.menu_backup) + " / " + getString(R.string.pref_restore_title)
@@ -108,11 +100,6 @@ class SettingsTest : BaseUiTest<PreferenceActivity>() {
             .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
     }
 
-    @Test
-    fun manageSync() {
-        navigateTo(R.string.synchronization, R.string.pref_manage_sync_backends_title)
-        intended(ManageSyncBackends::class)
-    }
 
     @Test
     fun manageCurrencies() {

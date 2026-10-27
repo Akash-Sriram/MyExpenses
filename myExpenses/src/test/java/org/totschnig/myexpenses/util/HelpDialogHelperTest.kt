@@ -9,7 +9,6 @@ import org.robolectric.ParameterizedRobolectricTestRunner
 import org.totschnig.myexpenses.activity.AccountEdit
 import org.totschnig.myexpenses.activity.BudgetActivity
 import org.totschnig.myexpenses.activity.BudgetEdit
-import org.totschnig.myexpenses.activity.CsvImportActivity
 import org.totschnig.myexpenses.activity.DebtEdit
 import org.totschnig.myexpenses.activity.DistributionActivity
 import org.totschnig.myexpenses.activity.ExpenseEdit
@@ -35,7 +34,6 @@ import org.totschnig.myexpenses.activity.ManageCurrencies
 import org.totschnig.myexpenses.activity.ManageMethods
 import org.totschnig.myexpenses.activity.ManageParties
 import org.totschnig.myexpenses.activity.ManageStaleImages
-import org.totschnig.myexpenses.activity.ManageSyncBackends
 import org.totschnig.myexpenses.activity.ManageTags
 import org.totschnig.myexpenses.activity.ManageTemplates
 import org.totschnig.myexpenses.activity.MethodEdit
@@ -53,7 +51,6 @@ class HelpDialogHelperTest(private val activity: Class<out ProtectedFragmentActi
             arrayOf(AccountEdit::class.java),
             arrayOf(BudgetActivity::class.java),
             arrayOf(BudgetEdit::class.java),
-            arrayOf(CsvImportActivity::class.java),
             arrayOf(DebtEdit::class.java),
             arrayOf(DistributionActivity::class.java),
             arrayOf(ExpenseEdit::class.java),
@@ -64,7 +61,6 @@ class HelpDialogHelperTest(private val activity: Class<out ProtectedFragmentActi
             arrayOf(ManageMethods::class.java),
             arrayOf(ManageParties::class.java),
             arrayOf(ManageStaleImages::class.java),
-            arrayOf(ManageSyncBackends::class.java),
             arrayOf(ManageTags::class.java),
             arrayOf(ManageTemplates::class.java),
             arrayOf(MethodEdit::class.java),

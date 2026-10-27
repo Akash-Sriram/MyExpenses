@@ -135,7 +135,6 @@
                 <data android:mimeType="application/octet-stream" />
             </intent-filter>
         </activity>
-        <activity android:name=".activity.CsvImportActivity" />
         <activity
             android:name=".activity.PreferenceActivity"
             android:exported="false">
@@ -195,10 +194,6 @@
             android:theme="@style/Calculator" />
         <activity
             android:name=".activity.ManageCurrencies"
-            android:exported="false"
-            android:theme="@style/EditDialog" />
-        <activity
-            android:name=".activity.ManageSyncBackends"
             android:exported="false"
             android:theme="@style/EditDialog" />
         <activity

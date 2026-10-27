@@ -27,7 +27,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.IBinder
 import org.totschnig.myexpenses.BuildConfig
-import org.totschnig.myexpenses.activity.ManageSyncBackends
+import org.totschnig.myexpenses.activity.PreferenceActivity
 import org.totschnig.myexpenses.model.ContribFeature
 import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
@@ -77,7 +77,7 @@ class GenericAccountService : Service() {
             val result = Bundle()
             result.putParcelable(
                 AccountManager.KEY_INTENT,
-                Intent(this@GenericAccountService, ManageSyncBackends::class.java)
+                Intent(this@GenericAccountService, PreferenceActivity::class.java)
             )
             return result
         }
