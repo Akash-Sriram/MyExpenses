@@ -76,10 +76,11 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         Timber.w("now doWork $WORK_NAME")
-        doBackup(applicationContext, prefHandler, true).onSuccess { (_, oldBackups) ->
+        doBackup(applicationContext, prefHandler, true, mode = org.totschnig.myexpenses.provider.BackupMode.FULL_ZIP).onSuccess { (_, oldBackups) ->
             if (oldBackups.isNotEmpty()) {
+                val keep = prefHandler.getInt(PrefKey.PURGE_BACKUP_KEEP, 1)
                 val requireConfirmation =
-                    prefHandler.getBoolean(PrefKey.PURGE_BACKUP_REQUIRE_CONFIRMATION, true)
+                    keep > 1 && prefHandler.getBoolean(PrefKey.PURGE_BACKUP_REQUIRE_CONFIRMATION, false)
                 if (requireConfirmation) {
                     val builder = buildMessage(
                         "${wrappedContext.getString(R.string.dialog_title_purge_backups)} (${oldBackups.size})"
@@ -110,13 +111,7 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
                     )
                     notify(builder.build())
                 } else {
-                    notify(
-                        buildMessage(
-                            BackupViewModel.purgeResult2Message(wrappedContext,
-                                oldBackups.map { it.delete() }
-                            )
-                        ).build()
-                    )
+                    Timber.d("Auto-backup: silently pruned ${oldBackups.size} old backup(s) to retain single verified copy")
                 }
             }
         }.onFailure {

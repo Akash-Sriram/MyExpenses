@@ -424,7 +424,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Backup Now Action Button
+                    // Backup Now Action Button (Solid Single Copy Full ZIP)
                     Button(
                         onClick = { viewModel.performBackupNow() },
                         enabled = backupOpState !is BackupOperationState.InProgress,
@@ -438,12 +438,25 @@ fun SettingsScreen(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Validating SQLite DB & Creating Backup...")
+                            Text("Building & Verifying Solid Backup...")
                         } else {
                             Icon(imageVector = Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Create Verified Backup Now")
+                            Text("Create Solid Full Backup (Single Copy)")
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = { viewModel.performIncrementalBackup() },
+                        enabled = backupOpState !is BackupOperationState.InProgress,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Create Quick Incremental Snapshot")
                     }
 
                     // Operation state alert
@@ -491,7 +504,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Verified Healthy Snapshots (${snapshots.size}/3)",
+                        text = "Verified Backups & Snapshots (${snapshots.size})",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -849,19 +862,19 @@ private fun SnapshotItemCard(
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = GreenAccent.copy(alpha = 0.15f)
+                        color = if (snapshot.isFullArchive) MaterialTheme.colorScheme.primaryContainer else GreenAccent.copy(alpha = 0.15f)
                     ) {
                         Text(
-                            text = "✓ SQLite Verified",
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                            text = if (snapshot.isFullArchive) "Full ZIP (All Photos)" else "✓ DB Snapshot",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = GreenAccent
+                            color = if (snapshot.isFullArchive) MaterialTheme.colorScheme.onPrimaryContainer else GreenAccent
                         )
                     }
                 }
                 Text(
-                    text = "${snapshot.name} (${sizeKb} KB)",
+                    text = "${snapshot.name} • ${snapshot.formattedSize}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

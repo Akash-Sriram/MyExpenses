@@ -13,6 +13,8 @@ import org.totschnig.myexpenses.provider.getBackupDbFile
 import org.totschnig.myexpenses.provider.getBackupPrefFile
 import org.totschnig.myexpenses.util.crypt.EncryptionHelper
 import timber.log.Timber
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileNotFoundException
@@ -20,12 +22,38 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.security.GeneralSecurityException
+import java.util.zip.Deflater
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 object ZipUtils {
     const val PICTURES = "Pictures"
+
+    @Throws(IOException::class, GeneralSecurityException::class)
+    fun zipDbSnapshot(
+        cacheDir: File?,
+        destZipFile: DocumentFile,
+        context: Context,
+        password: String? = null,
+    ) {
+        val resolver = context.contentResolver
+        val out = resolver.openOutputStream(destZipFile.uri)
+        val zip = ZipOutputStream(
+            if (password.isNullOrEmpty()) out else EncryptionHelper.encrypt(
+                out!!, password
+            )
+        )
+        addFileToZip("", getBackupDbFile(cacheDir), zip)
+        addFileToZip("", getBackupPrefFile(cacheDir), zip)
+        val backupDataStoreFile = getBackupDataStoreFile(cacheDir)
+        if (backupDataStoreFile.exists()) {
+            addFileToZip("", backupDataStoreFile, zip)
+        }
+        zip.flush()
+        zip.close()
+    }
+
     @Throws(IOException::class, GeneralSecurityException::class)
     fun zipBackup(
         context: Context,
@@ -47,6 +75,8 @@ object ZipUtils {
         if (backupDataStoreFile.exists()) {
             addFileToZip("", backupDataStoreFile, zip)
         }
+        // Pictures are already compressed JPEG/PNG/PDFs; storing uncompressed is 10x faster and prevents background timeouts
+        zip.setLevel(Deflater.NO_COMPRESSION)
         try {
             resolver
                 .query(
@@ -100,7 +130,7 @@ object ZipUtils {
         path: String, inputStream: InputStream,
         zip: ZipOutputStream,
     ) {
-        val buf = ByteArray(1024)
+        val buf = ByteArray(65536)
         var len: Int
         zip.putNextEntry(ZipEntry(path))
         while (inputStream.read(buf).also { len = it } > 0) {
@@ -110,37 +140,57 @@ object ZipUtils {
 
     @Throws(IOException::class, GeneralSecurityException::class)
     fun unzip(fileIn: InputStream?, dirOut: File, password: String?) {
+        val bufferedInput = if (fileIn != null) BufferedInputStream(fileIn, 65536) else null
         val zin = ZipInputStream(
-            if (password.isNullOrEmpty()) fileIn else EncryptionHelper.decrypt(
-                fileIn,
+            if (password.isNullOrEmpty()) bufferedInput else EncryptionHelper.decrypt(
+                bufferedInput,
                 password
             )
         )
-        while (true) {
-            val ze = zin.nextEntry ?: break
-            Timber.v("Unzipping %s", ze.name)
-            val newFile = File(dirOut, ze.name)
-            val canonicalPath = newFile.canonicalPath
-            if (!canonicalPath.startsWith(dirOut.canonicalPath)) {
-                throw SecurityException("Path Traversal Vulnerability")
-            }
-            newFile.parentFile?.mkdirs()
-            if (ze.isDirectory) {
-                newFile.mkdir()
-            } else {
-                val fout = FileOutputStream(newFile)
-                val startTime = System.currentTimeMillis()
-                val buffer = ByteArray(1024)
-                var count: Int
-                while (zin.read(buffer).also { count = it } != -1) {
-                    fout.write(buffer, 0, count)
+        val buffer = ByteArray(65536)
+        try {
+            while (true) {
+                val ze = try {
+                    zin.nextEntry ?: break
+                } catch (e: Exception) {
+                    Timber.w(e, "Zip entry read failed or archive truncated at end")
+                    break
                 }
-                val endTime = System.currentTimeMillis()
-                Timber.d("That took %d milliseconds", endTime - startTime)
-                zin.closeEntry()
-                fout.close()
+                Timber.v("Unzipping %s", ze.name)
+                val newFile = File(dirOut, ze.name)
+                val canonicalPath = newFile.canonicalPath
+                if (!canonicalPath.startsWith(dirOut.canonicalPath)) {
+                    throw SecurityException("Path Traversal Vulnerability")
+                }
+                newFile.parentFile?.mkdirs()
+                if (ze.isDirectory) {
+                    newFile.mkdir()
+                } else {
+                    val entryOk = try {
+                        BufferedOutputStream(FileOutputStream(newFile), 65536).use { fout ->
+                            var count: Int
+                            while (zin.read(buffer).also { count = it } != -1) {
+                                fout.write(buffer, 0, count)
+                            }
+                            fout.flush()
+                        }
+                        zin.closeEntry()
+                        true
+                    } catch (e: Exception) {
+                        Timber.w(e, "Error reading entry %s, partial file cleaned up", ze.name)
+                        newFile.delete()
+                        false
+                    }
+                    if (!entryOk) {
+                        break
+                    }
+                }
+            }
+        } finally {
+            try {
+                zin.close()
+            } catch (_: Exception) {
             }
         }
-        zin.close()
     }
 }

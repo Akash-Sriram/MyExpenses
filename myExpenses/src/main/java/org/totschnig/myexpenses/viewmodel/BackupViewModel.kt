@@ -16,6 +16,9 @@ import org.totschnig.myexpenses.provider.doBackup
 import org.totschnig.myexpenses.util.AppDirHelper
 import org.totschnig.myexpenses.util.crypt.EncryptionHelper
 import org.totschnig.myexpenses.util.io.displayName
+import android.os.Environment
+import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
 
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,12 +60,51 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
 
     fun loadBackups() {
         viewModelScope.launch(coroutineDispatcher) {
-            val appDir = AppDirHelper.checkAppDir(getApplication()).getOrNull() ?: return@launch
             val prefix = prefHandler.requireString(PrefKey.BACKUP_FILE_PREFIX, "myexpenses-backup")
-            val files = appDir.listFiles()
-                .filter { it.name?.matches("""$prefix-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()) == true }
+            val fullRegex = """$prefix-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()
+            val dbRegex = """${org.totschnig.myexpenses.util.IncrementalBackupHelper.SNAPSHOT_PREFIX}-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()
+            val dirsToScan = mutableListOf<DocumentFile>()
+
+            // 1. Configured / Default appDir and its snapshots/ subfolder
+            AppDirHelper.checkAppDir(getApplication()).getOrNull()?.let { appDir ->
+                dirsToScan.add(appDir)
+                appDir.findFile(org.totschnig.myexpenses.util.IncrementalBackupHelper.DIR_SNAPSHOTS)?.let { dirsToScan.add(it) }
+            }
+
+            // 2. Fallback common storage directories (Music, Download, Documents)
+            listOf(
+                Environment.DIRECTORY_MUSIC,
+                Environment.DIRECTORY_DOWNLOADS,
+                Environment.DIRECTORY_DOCUMENTS
+            ).forEach { dirType ->
+                try {
+                    val publicDir = Environment.getExternalStoragePublicDirectory(dirType)
+                    if (publicDir.exists() && publicDir.isDirectory) {
+                        DocumentFile.fromFile(publicDir)?.let { docDir ->
+                            dirsToScan.add(docDir)
+                            val snapshotsSub = File(publicDir, org.totschnig.myexpenses.util.IncrementalBackupHelper.DIR_SNAPSHOTS)
+                            if (snapshotsSub.exists() && snapshotsSub.isDirectory) {
+                                DocumentFile.fromFile(snapshotsSub)?.let { dirsToScan.add(it) }
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+
+            val matchingFiles = dirsToScan.flatMap { dir ->
+                try {
+                    dir.listFiles().filter {
+                        it.name?.matches(fullRegex) == true || it.name?.matches(dbRegex) == true
+                    }
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }.distinctBy { it.name ?: it.uri.toString() }
                 .sortedByDescending { it.lastModified() }
-            _backupsList.value = files.map { file ->
+                .take(15)
+
+            _backupsList.value = matchingFiles.map { file ->
                 BackupSnapshot(
                     uri = file.uri,
                     name = file.name ?: "backup.zip",
@@ -77,7 +119,7 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
     private val _backupState = MutableStateFlow<BackupState?>(null)
     val backupState: StateFlow<BackupState?> = _backupState.asStateFlow()
 
-    fun doBackup(withSync: Boolean, lenientMode: Boolean) {
+    fun doBackup(withSync: Boolean, lenientMode: Boolean, mode: org.totschnig.myexpenses.provider.BackupMode = org.totschnig.myexpenses.provider.BackupMode.FULL_ZIP) {
         viewModelScope.launch(coroutineDispatcher) {
             _backupState.value = BackupState.Running
             _backupState.value = BackupState.Completed(
@@ -85,7 +127,8 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
                     getApplication(),
                     prefHandler,
                     withSync,
-                    lenientMode
+                    lenientMode,
+                    mode
                 ).mapCatching { (backupFile, oldBackups) ->
                     loadBackups()
                     val requireConfirmation =
@@ -106,7 +149,12 @@ class BackupViewModel(application: Application) : ContentResolvingAndroidViewMod
 
     suspend fun checkIsEncrypted(uri: Uri): Result<Boolean> = withContext(coroutineContext()) {
         runCatching {
-            getApplication<MyApplication>().contentResolver.openInputStream(uri).use {
+            val stream = if (uri.scheme == "file") {
+                FileInputStream(File(uri.path!!))
+            } else {
+                getApplication<MyApplication>().contentResolver.openInputStream(uri)
+            }
+            stream.use {
                 if (it == null) throw IOException("Unable to open file $uri")
                 EncryptionHelper.isEncrypted(it)
             }

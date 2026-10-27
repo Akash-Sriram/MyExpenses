@@ -135,6 +135,8 @@ class OnboardingActivity : SyncBackendSetupActivity() {
         }
     }
 
+    override fun isCustomRestoreUiActive(): Boolean = true
+
     override fun onPostRestoreTask(result: Result<Unit>) {
         super.onPostRestoreTask(result)
         result.onSuccess {

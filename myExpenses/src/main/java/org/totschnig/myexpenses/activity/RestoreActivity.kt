@@ -34,12 +34,14 @@ abstract class RestoreActivity: ProtectedFragmentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 restoreViewModel.result.collect { result ->
                     result?.let {
-                        result.onFailure { throwable ->
-                            progressDialogFragment?.appendToMessage(throwable.safeMessage)
+                        if (!isCustomRestoreUiActive()) {
+                            result.onFailure { throwable ->
+                                progressDialogFragment?.appendToMessage(throwable.safeMessage)
+                            }
+                            progressDialogFragment?.onTaskCompleted()
+                            onPostRestoreTask(it)
+                            restoreViewModel.resultProcessed()
                         }
-                        progressDialogFragment?.onTaskCompleted()
-                        onPostRestoreTask(it)
-                        restoreViewModel.resultProcessed()
                     }
                 }
             }
@@ -96,6 +98,8 @@ abstract class RestoreActivity: ProtectedFragmentActivity() {
             restoreViewModel.startRestore(args)
         }
     }
+
+    protected open fun isCustomRestoreUiActive(): Boolean = false
 
     protected open fun onPostRestoreTask(result: Result<Unit>) {
         if (result.isSuccess) {

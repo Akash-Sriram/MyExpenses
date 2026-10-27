@@ -23,13 +23,35 @@ const val BACKUP_DB_FILE_NAME = "BACKUP"
 const val BACKUP_PREF_FILE_NAME = "BACKUP_PREF"
 const val BACKUP_DATASTORE_FILE_NAME = "ui_settings.preferences_pb"
 
+enum class BackupMode {
+    INCREMENTAL,
+    FULL_ZIP
+}
+
 @Synchronized
 fun doBackup(
     context: Context,
     prefHandler: PrefHandler,
     withSync: Boolean,
-    lenientMode: Boolean = false
+    lenientMode: Boolean = false,
+    mode: BackupMode = BackupMode.FULL_ZIP
 ): Result<Pair<DocumentFile, List<DocumentFile>>> {
+    if (mode == BackupMode.INCREMENTAL) {
+        val cloudStorage = if (withSync) prefHandler.cloudStorage else null
+        return org.totschnig.myexpenses.util.IncrementalBackupHelper.doIncrementalBackup(
+            context,
+            prefHandler,
+            lenientMode
+        ).mapCatching { result ->
+            try {
+                sync(context.contentResolver, cloudStorage, result.snapshotFile)
+            } catch (e: Exception) {
+                if (!lenientMode) throw e
+            }
+            result.snapshotFile to result.prunedSnapshots
+        }
+    }
+
     val password = prefHandler.getString(PrefKey.EXPORT_PASSWORD, null)
     val cloudStorage = if (withSync) prefHandler.cloudStorage else null
     return AppDirHelper.checkAppDir(context).mapCatching { appDir ->
@@ -55,8 +77,9 @@ fun doBackup(
                 if (!lenientMode) throw e
             }
 
-            // Keep exactly the last 3 healthy backups, prune older ones silently
-            val pruned = pruneOldBackups(appDir, prefHandler.backupFilePrefix, keep = 3)
+            // Keep exactly 1 verified healthy backup (or configured count), atomic swap: older ones pruned
+            val keep = prefHandler.getInt(PrefKey.PURGE_BACKUP_KEEP, 1)
+            val pruned = pruneOldBackups(appDir, prefHandler.backupFilePrefix, keep = keep)
             backupFile to pruned
         } catch (e: Throwable) {
             CrashHandler.report(e)
@@ -107,7 +130,7 @@ fun validateBackupFile(
 fun pruneOldBackups(
     appDir: DocumentFile,
     prefix: String = "myexpenses-backup",
-    keep: Int = 3
+    keep: Int = 1
 ): List<DocumentFile> {
     val backups = appDir.listFiles()
         .filter {

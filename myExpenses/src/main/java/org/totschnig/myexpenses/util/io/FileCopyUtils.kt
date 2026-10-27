@@ -48,7 +48,7 @@ object FileCopyUtils {
     @JvmStatic
     @Throws(IOException::class)
     fun copy(input: InputStream, output: OutputStream) {
-        val buffer = ByteArray(1024)
+        val buffer = ByteArray(65536)
         var read: Int
         while (input.read(buffer).also { read = it } != -1) {
             output.write(buffer, 0, read)

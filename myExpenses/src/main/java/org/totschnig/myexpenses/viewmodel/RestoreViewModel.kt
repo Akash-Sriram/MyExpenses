@@ -2,12 +2,14 @@ package org.totschnig.myexpenses.viewmodel
 
 import android.accounts.AccountManager
 import android.app.Application
+import android.content.ContentProviderOperation
 import android.content.ContentUris
 import android.content.ContentValues
 import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.os.Bundle
 import android.provider.CalendarContract
+import org.totschnig.myexpenses.util.distrib.DistributionHelper
 import androidx.core.os.BundleCompat
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
@@ -60,6 +62,7 @@ import org.totschnig.myexpenses.util.crypt.EncryptionHelper
 import org.totschnig.myexpenses.util.io.FileCopyUtils
 import timber.log.Timber
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
 import java.io.PushbackInputStream
 import java.security.GeneralSecurityException
@@ -158,7 +161,12 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                         return@launch
                     }.getOrNull()
                 } else {
-                    EncryptionHelper.wrap(contentResolver.openInputStream(fileUri!!))
+                    val stream = if (fileUri!!.scheme == "file") {
+                        FileInputStream(File(fileUri.path!!))
+                    } else {
+                        contentResolver.openInputStream(fileUri)
+                    }
+                    EncryptionHelper.wrap(stream)
                 }
                 if (inputStream == null) {
                     failureResult("Unable to open backup file")
@@ -370,6 +378,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                         )
                     }
                     edit.putBoolean(prefHandler.getKey(PrefKey.ENCRYPT_DATABASE), encrypt)
+                    edit.putInt(prefHandler.getKey(PrefKey.CURRENT_VERSION), DistributionHelper.versionNumber)
                     edit.apply()
                     tempPrefFile.delete()
                     publishProgress(R.string.restore_preferences_success)
@@ -406,6 +415,44 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                     //3. move pictures home and update uri
                     val backupPictureDir = File(workingDir, ZipUtils.PICTURES)
                     val backupFiles = backupPictureDir.listFiles() ?: emptyArray()
+
+                    class MediaSource(val name: String, val extension: String, val openStream: () -> java.io.InputStream?)
+
+                    val mediaSourcesByRowId = mutableMapOf<Long, MediaSource>()
+                    val mediaSourcesByName = mutableMapOf<String, MediaSource>()
+
+                    for (file in backupFiles) {
+                        val source = MediaSource(file.name, file.extension) { FileInputStream(file) }
+                        val rowId = file.name.substringBefore('_').toLongOrNull()
+                        if (rowId != null) {
+                            mediaSourcesByRowId[rowId] = source
+                        }
+                        mediaSourcesByName[file.name] = source
+                    }
+
+                    if (mediaSourcesByName.isEmpty()) {
+                        val companionMedia = org.totschnig.myexpenses.util.IncrementalBackupHelper.findCompanionMediaDir(application, fileUri ?: Uri.EMPTY)
+                        if (companionMedia != null && companionMedia.isDirectory) {
+                            val docFiles = companionMedia.listFiles()
+                            val datSuffix = ".${org.totschnig.myexpenses.util.IncrementalBackupHelper.MEDIA_EXTENSION}"
+                            for (doc in docFiles) {
+                                val rawName = doc.name ?: continue
+                                if (rawName == ".nomedia") continue
+                                val cleanName = if (rawName.endsWith(datSuffix)) rawName.removeSuffix(datSuffix) else rawName
+                                val ext = cleanName.substringAfterLast('.', "jpg")
+                                val source = MediaSource(cleanName, ext) { contentResolver.openInputStream(doc.uri) }
+                                val rowId = cleanName.substringBefore('_').toLongOrNull()
+                                if (rowId != null) {
+                                    mediaSourcesByRowId[rowId] = source
+                                }
+                                mediaSourcesByName[cleanName] = source
+                            }
+                            Timber.i("Restoring pictures from companion media directory: %s (%d files)", companionMedia.uri, docFiles.size)
+                        }
+                    }
+
+                    var restoredPicturesCount = 0
+                    val operations = ArrayList<ContentProviderOperation>()
                     contentResolver.query(
                         TransactionProvider.ATTACHMENTS_URI,
                         arrayOf(KEY_ROWID, KEY_URI),
@@ -414,40 +461,52 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                         null
                     )!!.use { c ->
                         c.asSequence.forEach { cursor ->
-                            val uriValues = ContentValues(1)
                             val rowId = cursor.getLong(0)
                             val fromBackup = cursor.getString(1)
-                            val selection = "$KEY_URI = ?"
-                            val selectionArguments = arrayOf(fromBackup)
-                            val restored = (backupFiles.firstOrNull { file ->
-                                file.name.startsWith("${rowId}_")
-                            }?.let {
-                                it to it.nameWithoutExtension.substringAfter('_')
+                            val matchingSource = mediaSourcesByRowId[rowId]?.let {
+                                it to it.name.substringBeforeLast('.').substringAfter('_')
                             } ?: Uri.parse(fromBackup).lastPathSegment?.let { fileName ->
-                                //legacy backups
-                                backupFiles.firstOrNull { it.name == fileName }
-                                    ?.let { it to it.nameWithoutExtension }
-                            })?.let { (image, fileName) ->
+                                mediaSourcesByName[fileName]?.let { it to it.name.substringBeforeLast('.') }
+                            }
+
+                            val restored = matchingSource?.let { (source, fileName) ->
                                 val restoredImage = PictureDirHelper.getOutputMediaFile(
                                     fileName = fileName,
                                     temp = false,
                                     checkUnique = true,
                                     application = getApplication(),
-                                    extension = image.extension
+                                    extension = source.extension
                                 )
-                                if (FileCopyUtils.copy(image, restoredImage)) {
-                                    val restored =
-                                        AppDirHelper.getContentUriForFile(
-                                            application,
-                                            restoredImage
-                                        )
-                                    uriValues.put(KEY_URI, restored.toString())
-                                    contentResolver.update(
-                                        TransactionProvider.ATTACHMENTS_URI,
-                                        uriValues,
-                                        selection,
-                                        selectionArguments
+                                val copySuccess = try {
+                                    source.openStream()?.use { inStream ->
+                                        java.io.FileOutputStream(restoredImage).use { outStream ->
+                                            FileCopyUtils.copy(inStream, outStream)
+                                            true
+                                        }
+                                    } == true
+                                } catch (e: Exception) {
+                                    false
+                                }
+                                if (copySuccess) {
+                                    restoredPicturesCount++
+                                    val restoredUri = AppDirHelper.getContentUriForFile(
+                                        application,
+                                        restoredImage
                                     )
+                                    operations.add(
+                                        ContentProviderOperation.newUpdate(TransactionProvider.ATTACHMENTS_URI)
+                                            .withSelection("$KEY_URI = ?", arrayOf(fromBackup))
+                                            .withValue(KEY_URI, restoredUri.toString())
+                                            .build()
+                                    )
+                                    if (operations.size >= 100) {
+                                        try {
+                                            contentResolver.applyBatch(TransactionProvider.AUTHORITY, operations)
+                                        } catch (e: Exception) {
+                                            CrashHandler.report(e)
+                                        }
+                                        operations.clear()
+                                    }
                                     true
                                 } else false
                             }
@@ -456,6 +515,14 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                                     Exception("Could not restore file $fromBackup from backup")
                                 )
                             }
+                        }
+                        if (operations.isNotEmpty()) {
+                            try {
+                                contentResolver.applyBatch(TransactionProvider.AUTHORITY, operations)
+                            } catch (e: Exception) {
+                                CrashHandler.report(e)
+                            }
+                            operations.clear()
                         }
                     }
 
@@ -472,7 +539,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                     _restoreStats.value = RestoreStats(
                         accounts = accCount,
                         transactions = txCount,
-                        attachments = backupFiles.size,
+                        attachments = restoredPicturesCount,
                         preferencesRestored = true
                     )
 

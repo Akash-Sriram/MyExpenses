@@ -33,8 +33,16 @@ data class SettingsBackupSnapshot(
     val name: String,
     val lastModified: Long,
     val sizeBytes: Long,
-    val isVerified: Boolean = true
-)
+    val isVerified: Boolean = true,
+    val isFullArchive: Boolean = false
+) {
+    val formattedSize: String
+        get() = if (sizeBytes >= 1024 * 1024) {
+            String.format(java.util.Locale.US, "%.1f MB", sizeBytes / (1024.0 * 1024.0))
+        } else {
+            "${sizeBytes / 1024} KB"
+        }
+}
 
 sealed interface BackupOperationState {
     object Idle : BackupOperationState
@@ -167,33 +175,86 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             val appDir = AppDirHelper.checkAppDir(getApplication()).getOrNull() ?: return@launch
             val prefix = prefHandler.requireString(PrefKey.BACKUP_FILE_PREFIX, "myexpenses-backup")
-            val files = appDir.listFiles()
-                .filter { it.name?.matches("""$prefix-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()) == true }
-                .sortedByDescending { it.lastModified() }
-            _backupSnapshots.value = files.take(3).map { file ->
+            val fullRegex = """$prefix-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()
+            val dbRegex = """${org.totschnig.myexpenses.util.IncrementalBackupHelper.SNAPSHOT_PREFIX}-\d\d\d\d\d\d\d\d-\d\d\d\d\d\d\..+""".toRegex()
+            val snapshotsDir = appDir.findFile(org.totschnig.myexpenses.util.IncrementalBackupHelper.DIR_SNAPSHOTS)
+            val fullBackups = try {
+                appDir.listFiles().filter { it.name?.matches(fullRegex) == true }
+                    .sortedByDescending { it.lastModified() }
+                    .take(1)
+            } catch (_: Exception) {
+                emptyList()
+            }
+
+            val dbSnapshots = try {
+                snapshotsDir?.listFiles()?.filter { it.name?.matches(dbRegex) == true }
+                    ?.sortedByDescending { it.lastModified() }
+                    ?.take(3) ?: emptyList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+
+            val combined = (fullBackups + dbSnapshots).map { file ->
+                val fileName = file.name ?: "backup.zip"
                 SettingsBackupSnapshot(
                     uri = file.uri,
-                    name = file.name ?: "backup.zip",
+                    name = fileName,
                     lastModified = file.lastModified(),
                     sizeBytes = file.length(),
-                    isVerified = true
+                    isVerified = true,
+                    isFullArchive = fileName.matches(fullRegex)
                 )
             }
+            _backupSnapshots.value = combined
         }
     }
 
     fun performBackupNow() {
         viewModelScope.launch(Dispatchers.IO) {
             _backupOpState.value = BackupOperationState.InProgress
-            val result = doBackup(getApplication(), prefHandler, withSync = false)
+            val result = doBackup(getApplication(), prefHandler, withSync = false, mode = org.totschnig.myexpenses.provider.BackupMode.FULL_ZIP)
             result.onSuccess { (file, _) ->
                 loadBackups()
                 _backupOpState.value = BackupOperationState.Success(
-                    "SQLite verified backup created successfully (${file.name})"
+                    "Solid verified full backup created (${file.name})"
                 )
             }.onFailure { err ->
                 _backupOpState.value = BackupOperationState.Error(
                     err.message ?: "Backup creation or validation failed"
+                )
+            }
+        }
+    }
+
+    fun performIncrementalBackup() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _backupOpState.value = BackupOperationState.InProgress
+            val result = doBackup(getApplication(), prefHandler, withSync = false, mode = org.totschnig.myexpenses.provider.BackupMode.INCREMENTAL)
+            result.onSuccess { (file, _) ->
+                loadBackups()
+                _backupOpState.value = BackupOperationState.Success(
+                    "Verified incremental snapshot & media sync complete (${file.name})"
+                )
+            }.onFailure { err ->
+                _backupOpState.value = BackupOperationState.Error(
+                    err.message ?: "Incremental backup failed"
+                )
+            }
+        }
+    }
+
+    fun performFullZipExport() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _backupOpState.value = BackupOperationState.InProgress
+            val result = doBackup(getApplication(), prefHandler, withSync = false, mode = org.totschnig.myexpenses.provider.BackupMode.FULL_ZIP)
+            result.onSuccess { (file, _) ->
+                loadBackups()
+                _backupOpState.value = BackupOperationState.Success(
+                    "Full portable ZIP export created (${file.name})"
+                )
+            }.onFailure { err ->
+                _backupOpState.value = BackupOperationState.Error(
+                    err.message ?: "Full export failed"
                 )
             }
         }
