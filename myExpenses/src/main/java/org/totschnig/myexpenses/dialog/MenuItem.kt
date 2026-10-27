@@ -339,11 +339,6 @@ sealed class MenuItem(
 
             MenuContext.V2Transactions -> listOf(
                 Search,
-                Distribution,
-                History,
-                Sync,
-                Reset,
-                Print,
                 Tune,
                 Archive,
             )
