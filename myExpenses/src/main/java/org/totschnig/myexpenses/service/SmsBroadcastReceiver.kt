@@ -11,6 +11,8 @@ import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.ExpenseEdit
 import org.totschnig.myexpenses.contract.TransactionsContract
+import org.totschnig.myexpenses.db2.SmsAccountMatch
+import org.totschnig.myexpenses.db2.findMatchingAccountForSms
 import org.totschnig.myexpenses.util.CHANNEL_ID_SMS
 import org.totschnig.myexpenses.util.contacts.ContactPayeeResolver
 import org.totschnig.myexpenses.util.sms.IndianSmsParser
@@ -50,7 +52,18 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
                 ?: parsed.payee
                 ?: "UPI Payee"
 
-            post1TapNotification(context, parsed, finalPayee)
+            val matchedAccount = try {
+                myApp?.appComponent?.repository()?.findMatchingAccountForSms(
+                    parsed.bankHint,
+                    parsed.accountDigits,
+                    "INR"
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Error matching account for SMS")
+                null
+            }
+
+            post1TapNotification(context, parsed, finalPayee, matchedAccount)
         } catch (e: Exception) {
             Timber.e(e, "Error processing incoming SMS for 1-tap logging")
         }
@@ -59,7 +72,8 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
     private fun post1TapNotification(
         context: Context,
         parsed: org.totschnig.myexpenses.util.sms.ParsedDebitSms,
-        payee: String
+        payee: String,
+        matchedAccount: SmsAccountMatch? = null
     ) {
         val notificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
@@ -81,13 +95,24 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
             if (!parsed.utrNumber.isNullOrEmpty()) {
                 putExtra(TransactionsContract.Transactions.REFERENCE_NUMBER, parsed.utrNumber)
             }
-            if (!parsed.bankHint.isNullOrEmpty()) {
+            if (matchedAccount != null) {
+                putExtra(TransactionsContract.Transactions.ACCOUNT_ID, matchedAccount.id)
+                putExtra(TransactionsContract.Transactions.ACCOUNT_LABEL, matchedAccount.label)
+            } else if (!parsed.bankHint.isNullOrEmpty()) {
                 putExtra(TransactionsContract.Transactions.ACCOUNT_LABEL, parsed.bankHint)
             }
-            putExtra(
-                TransactionsContract.Transactions.COMMENT,
-                "UPI: ${parsed.upiId ?: "VPA"} • Ref: ${parsed.utrNumber ?: "N/A"}"
-            )
+            val commentText = when {
+                !parsed.upiId.isNullOrEmpty() && !parsed.utrNumber.isNullOrEmpty() ->
+                    "UPI: ${parsed.upiId} • Ref: ${parsed.utrNumber}"
+                !parsed.upiId.isNullOrEmpty() ->
+                    "UPI: ${parsed.upiId}"
+                !parsed.utrNumber.isNullOrEmpty() ->
+                    "Ref: ${parsed.utrNumber}"
+                else -> ""
+            }
+            if (commentText.isNotEmpty()) {
+                putExtra(TransactionsContract.Transactions.COMMENT, commentText)
+            }
             putExtra(MyApplication.KEY_NOTIFICATION_ID, notificationId)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -101,7 +126,16 @@ class SmsBroadcastReceiver : BroadcastReceiver() {
 
         val amountStr = String.format(Locale.ENGLISH, "₹%.2f", parsed.amountRupees)
         val title = "$amountStr debited to $payee"
-        val subtitle = "UPI / ${parsed.bankHint ?: "Bank"} • Tap to log expense"
+        val accountDisplay = when {
+            matchedAccount != null && !parsed.accountDigits.isNullOrEmpty() ->
+                "${matchedAccount.label} (XX${parsed.accountDigits})"
+            matchedAccount != null -> matchedAccount.label
+            !parsed.bankHint.isNullOrEmpty() && !parsed.accountDigits.isNullOrEmpty() ->
+                "${parsed.bankHint} (XX${parsed.accountDigits})"
+            !parsed.bankHint.isNullOrEmpty() -> parsed.bankHint
+            else -> "Bank"
+        }
+        val subtitle = "$accountDisplay • Tap to log expense"
 
         val notification = Notification.Builder(context, CHANNEL_ID_SMS)
             .setSmallIcon(R.drawable.ic_stat_notification_sigma)

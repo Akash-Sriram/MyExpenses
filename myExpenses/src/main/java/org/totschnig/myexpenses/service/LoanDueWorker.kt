@@ -206,21 +206,25 @@ class LoanDueWorker(
         private const val NOTIFICATION_COMMITMENT_BASE = 90000
 
         fun enqueue(context: Context) {
-            val workManager = WorkManager.getInstance(context)
-            val periodicWork = PeriodicWorkRequestBuilder<LoanDueWorker>(12, TimeUnit.HOURS)
-                .build()
-            workManager.enqueueUniquePeriodicWork(
-                WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                periodicWork
-            )
+            try {
+                val workManager = WorkManager.getInstance(context)
+                val periodicWork = PeriodicWorkRequestBuilder<LoanDueWorker>(12, TimeUnit.HOURS)
+                    .build()
+                workManager.enqueueUniquePeriodicWork(
+                    WORK_NAME,
+                    ExistingPeriodicWorkPolicy.KEEP,
+                    periodicWork
+                )
 
-            val oneTimeWork = OneTimeWorkRequestBuilder<LoanDueWorker>().build()
-            workManager.enqueueUniqueWork(
-                WORK_NAME + "_immediate",
-                ExistingWorkPolicy.REPLACE,
-                oneTimeWork
-            )
+                val oneTimeWork = OneTimeWorkRequestBuilder<LoanDueWorker>().build()
+                workManager.enqueueUniqueWork(
+                    WORK_NAME + "_immediate",
+                    ExistingWorkPolicy.REPLACE,
+                    oneTimeWork
+                )
+            } catch (t: Throwable) {
+                Timber.e(t, "WorkManager not available or failed to enqueue LoanDueWorker")
+            }
         }
     }
 }

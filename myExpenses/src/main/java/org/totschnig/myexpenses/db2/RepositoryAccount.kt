@@ -410,6 +410,82 @@ fun Repository.findAnyOpen(column: String? = null, search: String? = null) = con
     null
 )?.use { if (it.moveToFirst()) it.getLong(0) else null }
 
+data class SmsAccountMatch(
+    val id: Long,
+    val label: String
+)
+
+/**
+ * Searches for an open account matching SMS bank hint and/or account digits.
+ * Matches are scored based on bank name and account digits matching account label or description.
+ */
+fun Repository.findMatchingAccountForSms(
+    bankHint: String?,
+    accountDigits: String?,
+    currency: String = "INR"
+): SmsAccountMatch? {
+    val cursor = contentResolver.query(
+        ACCOUNTS_URI,
+        arrayOf(KEY_ROWID, KEY_LABEL, KEY_DESCRIPTION, KEY_CURRENCY),
+        "$KEY_SEALED = 0",
+        null,
+        null
+    ) ?: return null
+
+    var bestMatch: SmsAccountMatch? = null
+    var highestScore = -1
+
+    cursor.use { c ->
+        val idIdx = c.getColumnIndexOrThrow(KEY_ROWID)
+        val labelIdx = c.getColumnIndexOrThrow(KEY_LABEL)
+        val descIdx = c.getColumnIndexOrThrow(KEY_DESCRIPTION)
+        val currIdx = c.getColumnIndexOrThrow(KEY_CURRENCY)
+
+        while (c.moveToNext()) {
+            val id = c.getLong(idIdx)
+            val label = c.getString(labelIdx) ?: ""
+            val desc = c.getString(descIdx) ?: ""
+            val curr = c.getString(currIdx) ?: ""
+
+            var score = 0
+
+            val matchesCurrency = curr.equals(currency, ignoreCase = true)
+            if (matchesCurrency) {
+                score += 10
+            }
+
+            val digitsMatch = !accountDigits.isNullOrBlank() && (
+                label.contains(accountDigits, ignoreCase = true) ||
+                desc.contains(accountDigits, ignoreCase = true)
+            )
+
+            val bankMatch = !bankHint.isNullOrBlank() && (
+                label.contains(bankHint, ignoreCase = true) ||
+                desc.contains(bankHint, ignoreCase = true)
+            )
+
+            val bankExactMatch = !bankHint.isNullOrBlank() && label.equals(bankHint, ignoreCase = true)
+
+            if (digitsMatch && bankMatch) {
+                score += 100
+            } else if (digitsMatch) {
+                score += 70
+            } else if (bankExactMatch) {
+                score += 50
+            } else if (bankMatch) {
+                score += 30
+            }
+
+            if (score > highestScore) {
+                highestScore = score
+                bestMatch = SmsAccountMatch(id, label)
+            }
+        }
+    }
+
+    return if (highestScore > 0) bestMatch else null
+}
+
 fun updateTransferPeersForTransactionDelete(
     ops: ArrayList<ContentProviderOperation>,
     rowSelect: String,

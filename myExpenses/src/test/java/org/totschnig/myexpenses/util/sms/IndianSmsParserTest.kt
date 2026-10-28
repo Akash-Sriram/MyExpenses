@@ -33,6 +33,32 @@ class IndianSmsParserTest {
     }
 
     @Test
+    fun testIciciWhiskAndSipDebitSms() {
+        val sms = "ICICI Bank Acct XX407 debited for Rs 30.00 on 28-Oct-26; WHISK AND SIP C credited. UPI:148625303016. Call 18002662 for dispute. SMS BLOCK 407 to 9215676766."
+        val parsed = IndianSmsParser.parse(sms)
+        assertNotNull(parsed)
+        assertEquals(30.0, parsed!!.amountRupees, 0.001)
+        assertEquals("ICICI", parsed.bankHint)
+        assertEquals("407", parsed.accountDigits)
+        assertEquals("Whisk And Sip C", parsed.payee)
+        assertEquals("148625303016", parsed.utrNumber)
+        assertEquals(java.time.LocalDate.of(2026, 10, 28), parsed.transactionDate)
+    }
+
+    @Test
+    fun testIciciDtaxDebitSms() {
+        val sms = "ICICI Bank Acct XX407 debited for Rs 1000.00 on 28-Oct-26; DTAX credited. UPI:111022544257. Call 18002662 for dispute. SMS BLOCK 407 to 9215676766."
+        val parsed = IndianSmsParser.parse(sms)
+        assertNotNull(parsed)
+        assertEquals(1000.0, parsed!!.amountRupees, 0.001)
+        assertEquals("ICICI", parsed.bankHint)
+        assertEquals("407", parsed.accountDigits)
+        assertEquals("Dtax", parsed.payee)
+        assertEquals("111022544257", parsed.utrNumber)
+        assertEquals(java.time.LocalDate.of(2026, 10, 28), parsed.transactionDate)
+    }
+
+    @Test
     fun testSenderMatching() {
         val sms = "Dear Customer, Acct XX567 debited with INR 100.00 on 22-Oct-24. Info: UPI*chai@upi."
         val parsed = IndianSmsParser.parse(sms, sender = "VK-ICICIB")
@@ -58,7 +84,7 @@ class IndianSmsParserTest {
         assertNotNull(parsed)
         assertEquals(750.0, parsed!!.amountRupees, 0.001)
         assertEquals("AXIS", parsed.bankHint)
-        assertEquals("BLINKIT", parsed.payee)
+        assertEquals("Blinkit", parsed.payee)
         assertEquals("429618192027", parsed.utrNumber)
         assertEquals("4321", parsed.accountDigits)
     }

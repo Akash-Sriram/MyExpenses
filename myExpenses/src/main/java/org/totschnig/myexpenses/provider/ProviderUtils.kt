@@ -9,6 +9,7 @@ import org.totschnig.myexpenses.db2.Repository
 import org.totschnig.myexpenses.db2.findAnyOpen
 import org.totschnig.myexpenses.db2.findAnyOpenByCurrency
 import org.totschnig.myexpenses.db2.findAnyOpenByLabel
+import org.totschnig.myexpenses.db2.findMatchingAccountForSms
 import org.totschnig.myexpenses.db2.findPaymentMethod
 import org.totschnig.myexpenses.db2.loadAccount
 import org.totschnig.myexpenses.model.generateUuid
@@ -21,9 +22,14 @@ import org.totschnig.myexpenses.viewmodel.data.TransferEditData
 object ProviderUtils {
     //TODO add tags to contract
     fun buildFromExtras(repository: Repository, extras: Bundle): TransactionEditData? {
-        return (extras.getString(Transactions.ACCOUNT_LABEL)
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { repository.findAnyOpenByLabel(it) }
+        val explicitAccountId = extras.getLong(Transactions.ACCOUNT_ID, 0L).takeIf { it > 0 }
+        return (explicitAccountId
+            ?: extras.getString(Transactions.ACCOUNT_LABEL)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { label ->
+                    repository.findAnyOpenByLabel(label)
+                        ?: repository.findMatchingAccountForSms(label, null)?.id
+                }
             ?: extras.getString(Transactions.CURRENCY)
                 ?.let { repository.findAnyOpenByCurrency(it) }
             ?: repository.findAnyOpen())

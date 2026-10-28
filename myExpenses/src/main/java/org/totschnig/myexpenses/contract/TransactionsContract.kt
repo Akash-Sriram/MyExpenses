@@ -37,6 +37,7 @@ object TransactionsContract {
         val CONTENT_URI: Uri = Uri.parse("content://com.myexpenses/transactions")
 
         const val OPERATION_TYPE = "operationType"
+        const val ACCOUNT_ID = "accountId"
         const val ACCOUNT_LABEL = "accountLabel"
         const val TRANSFER_ACCOUNT_LABEL = "transferAccountLabel"
         const val CURRENCY = "currency"
