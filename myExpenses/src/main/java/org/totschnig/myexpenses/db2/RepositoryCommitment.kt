@@ -254,6 +254,51 @@ class RepositoryCommitment @Inject constructor(
             }
         }
 
+    suspend fun cancelInsurancePolicy(id: Long): Boolean =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            db.beginTransaction()
+            try {
+                val values = ContentValues().apply {
+                    put(KEY_STATUS, CommitmentStatus.CANCELLED.name)
+                }
+                val rows = db.update(
+                    TABLE_INSURANCE_POLICIES,
+                    SQLiteDatabase.CONFLICT_NONE,
+                    values,
+                    "$KEY_ROWID = ?",
+                    arrayOf(id.toString())
+                )
+                db.delete(
+                    TABLE_COMMITMENT_PAYMENTS,
+                    "$KEY_COMMITMENT_TYPE = ? AND $KEY_COMMITMENT_ID = ? AND $KEY_STATUS = ?",
+                    arrayOf("INSURANCE", id.toString(), PaymentRecordStatus.PENDING.name)
+                )
+                db.setTransactionSuccessful()
+                invalidate()
+                rows > 0
+            } finally {
+                db.endTransaction()
+            }
+        }
+
+    suspend fun reactivateInsurancePolicy(id: Long): Boolean =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            val values = ContentValues().apply {
+                put(KEY_STATUS, CommitmentStatus.ACTIVE.name)
+            }
+            val rows = db.update(
+                TABLE_INSURANCE_POLICIES,
+                SQLiteDatabase.CONFLICT_NONE,
+                values,
+                "$KEY_ROWID = ?",
+                arrayOf(id.toString())
+            )
+            invalidate()
+            rows > 0
+        }
+
     // ==========================================
     // SUBSCRIPTIONS CRUD
     // ==========================================

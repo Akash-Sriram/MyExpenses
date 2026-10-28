@@ -492,6 +492,28 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
         }
     }
 
+    fun cancelInsurancePolicy(
+        id: Long,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val ok = repositoryCommitment.cancelInsurancePolicy(id)
+            resyncAllCommitments()
+            onComplete(ok)
+        }
+    }
+
+    fun reactivateInsurancePolicy(
+        id: Long,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val ok = repositoryCommitment.reactivateInsurancePolicy(id)
+            resyncAllCommitments()
+            onComplete(ok)
+        }
+    }
+
     fun getCommitmentAttachments(type: String, id: Long): Flow<List<CommitmentAttachment>> =
         repositoryCommitment.getCommitmentAttachments(type, id)
 

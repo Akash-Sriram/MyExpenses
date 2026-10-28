@@ -77,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.totschnig.myexpenses.domain.commitment.CommitmentItem
+import org.totschnig.myexpenses.domain.commitment.CommitmentStatus
 import org.totschnig.myexpenses.domain.commitment.CommitmentType
 import org.totschnig.myexpenses.domain.commitment.CommitmentsSummary
 import org.totschnig.myexpenses.domain.commitment.PaidCommitmentInfo
@@ -126,10 +127,10 @@ fun CommitmentsThisMonthView(
         .filter { it.nextDueInstallment != null && it.nextDueInstallment.dueDate <= endOfMonthMillis && it.nextDueInstallment.status == InstallmentStatus.PENDING }
 
     val pendingInsurance = commitmentItems.filterIsInstance<CommitmentItem.InsuranceItem>()
-        .filter { it.nextPayment != null && it.nextPayment.dueDate <= endOfMonthMillis }
+        .filter { it.policy.status == CommitmentStatus.ACTIVE && it.nextPayment != null && it.nextPayment.dueDate <= endOfMonthMillis }
 
     val pendingRegularSubs = commitmentItems.filterIsInstance<CommitmentItem.SubscriptionItem>()
-        .filter { !it.subscription.isVariableAmount && it.nextPayment != null && it.nextPayment.dueDate <= endOfMonthMillis }
+        .filter { it.subscription.status == CommitmentStatus.ACTIVE && !it.subscription.isVariableAmount && it.nextPayment != null && it.nextPayment.dueDate <= endOfMonthMillis }
 
     val pendingMeterItems = commitmentItems.filterIsInstance<CommitmentItem.SubscriptionItem>()
         .filter { it.subscription.isVariableAmount }
@@ -1077,6 +1078,7 @@ fun MobilePlanTrackerCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -1094,15 +1096,17 @@ fun MobilePlanTrackerCard(
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
                                 text = "Mobile & Data (${tracker.operator})",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             if (onEditPlan != null) {
                                 IconButton(
@@ -1156,11 +1160,15 @@ fun MobilePlanTrackerCard(
                             Text(
                                 text = "Base Recharge: ${tracker.lastRechargeAmount.toRupeeString()}",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.width(8.dp))
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -1171,7 +1179,9 @@ fun MobilePlanTrackerCard(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = badgeTextColor,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                     )
                 }
             }

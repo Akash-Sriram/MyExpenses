@@ -25,17 +25,26 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import android.content.ContentUris
+import android.content.Intent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.DropdownMenu
+import org.totschnig.myexpenses.contract.TransactionsContract
+import org.totschnig.myexpenses.activity.ExpenseEdit
+import timber.log.Timber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -98,6 +107,8 @@ fun CommitmentEmisView(
     var documentLoanTarget by remember { mutableStateOf<Loan?>(null) }
     var payingInstallmentTarget by remember { mutableStateOf<Pair<Loan, EmiInstallment>?>(null) }
     var showAddLoanDialog by remember { mutableStateOf(false) }
+    var closingLoanTarget by remember { mutableStateOf<Loan?>(null) }
+    var deletingLoanTarget by remember { mutableStateOf<Loan?>(null) }
 
     val selectedLoanWithInstallments by viewModel.selectedLoanWithInstallments.collectAsState()
 
@@ -109,7 +120,10 @@ fun CommitmentEmisView(
     ) {
         item {
             Spacer(modifier = Modifier.height(4.dp))
-            ActiveLoansSummaryHeader(activeLoans = activeLoans)
+            ActiveLoansSummaryHeader(
+                activeLoans = activeLoans,
+                onAddLoan = { showAddLoanDialog = true }
+            )
         }
 
         // Active Loans
@@ -139,6 +153,12 @@ fun CommitmentEmisView(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { showAddLoanDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Loan / EMI")
+                        }
                     }
                 }
             }
@@ -171,7 +191,9 @@ fun CommitmentEmisView(
                     },
                     onPaySpecificInstallment = { inst ->
                         payingInstallmentTarget = Pair(loanItem.loan, inst)
-                    }
+                    },
+                    onCloseLoan = { closingLoanTarget = loanItem.loan },
+                    onDeleteLoan = { deletingLoanTarget = loanItem.loan }
                 )
             }
         }
@@ -188,13 +210,69 @@ fun CommitmentEmisView(
             }
 
             items(closedLoans) { closedLoan ->
-                ClosedLoanCard(loan = closedLoan)
+                ClosedLoanCard(
+                    loan = closedLoan,
+                    onDelete = { deletingLoanTarget = closedLoan }
+                )
             }
         }
 
         item {
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    // Close Loan Dialog
+    closingLoanTarget?.let { loan ->
+        AlertDialog(
+            onDismissRequest = { closingLoanTarget = null },
+            title = { Text("Foreclose / Close Loan?") },
+            text = { Text("Mark '${loan.label}' as CLOSED? All future pending installments will be removed.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.closeLoan(loan.id) {
+                            closingLoanTarget = null
+                            viewModel.resyncAllCommitments()
+                        }
+                    }
+                ) {
+                    Text("Close Loan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { closingLoanTarget = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Delete Loan Dialog
+    deletingLoanTarget?.let { loan ->
+        AlertDialog(
+            onDismissRequest = { deletingLoanTarget = null },
+            title = { Text("Delete Loan?") },
+            text = { Text("Are you sure you want to permanently delete '${loan.label}' and all its installments? Past recorded transactions will remain in your ledger.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteLoan(loan.id) {
+                            deletingLoanTarget = null
+                            viewModel.resyncAllCommitments()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingLoanTarget = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // Source Documents Dialog
@@ -260,7 +338,10 @@ fun CommitmentEmisView(
 }
 
 @Composable
-fun ActiveLoansSummaryHeader(activeLoans: List<CommitmentItem.LoanItem>) {
+fun ActiveLoansSummaryHeader(
+    activeLoans: List<CommitmentItem.LoanItem>,
+    onAddLoan: () -> Unit
+) {
     val totalMonthlyEmi = activeLoans.sumOf { it.loan.monthlyEmiAmount }
     val totalRemainingPrincipal = activeLoans.sumOf { it.progress.remainingPrincipal }
 
@@ -274,12 +355,28 @@ fun ActiveLoansSummaryHeader(activeLoans: List<CommitmentItem.LoanItem>) {
                 .fillMaxWidth()
                 .padding(18.dp)
         ) {
-            Text(
-                text = "Loans & Active EMIs",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Loans & Active EMIs",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                IconButton(
+                    onClick = onAddLoan,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Add Loan",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -327,12 +424,15 @@ fun ActiveLoanCard(
     onToggleSchedule: () -> Unit,
     onOpenDocuments: () -> Unit,
     onPayNextEmi: () -> Unit,
-    onPaySpecificInstallment: (EmiInstallment) -> Unit
+    onPaySpecificInstallment: (EmiInstallment) -> Unit,
+    onCloseLoan: () -> Unit,
+    onDeleteLoan: () -> Unit
 ) {
     val loan = loanItem.loan
     val progress = loanItem.progress
     val nextInst = loanItem.nextDueInstallment
     val linkedAccount = accounts.find { it.id == loan.linkedAccountId }
+    var showMenu by remember { mutableStateOf(false) }
 
     val progressFraction = if (progress.totalInstallmentsCount > 0) {
         progress.paidInstallmentsCount.toFloat() / progress.totalInstallmentsCount.toFloat()
@@ -372,18 +472,47 @@ fun ActiveLoanCard(
                     }
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = loan.monthlyEmiAmount.toRupeeString(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "/ month",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = loan.monthlyEmiAmount.toRupeeString(),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "/ month",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Foreclose / Close Loan") },
+                                onClick = {
+                                    showMenu = false
+                                    onCloseLoan()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFE65100), modifier = Modifier.size(18.dp)) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete Loan", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    showMenu = false
+                                    onDeleteLoan()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -503,7 +632,7 @@ fun ActiveLoanCard(
                         .padding(top = 16.dp)
                 ) {
                     Text(
-                        text = "Amortization Schedule (60 Installments)",
+                        text = "Amortization Schedule (${installments.size} Installments)",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -540,10 +669,29 @@ fun InstallmentRow(
     onPay: () -> Unit
 ) {
     val isPaid = installment.status == InstallmentStatus.PAID
+    val txId = installment.transactionId
+    val context = LocalContext.current
+
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = if (isPaid) Color(0xFFF1F8E9) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (txId != null && txId > 0) {
+                    Modifier.clickable {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                data = ContentUris.withAppendedId(TransactionsContract.Transactions.CONTENT_URI, txId)
+                                setClass(context, ExpenseEdit::class.java)
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to open transaction #$txId")
+                        }
+                    }
+                } else Modifier
+            )
     ) {
         Row(
             modifier = Modifier
@@ -577,11 +725,21 @@ fun InstallmentRow(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 Column {
-                    Text(
-                        text = "EMI #${installment.installmentNumber} • ${formatCommitmentDate(installment.dueDate, short = true)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "EMI #${installment.installmentNumber} • ${formatCommitmentDate(installment.dueDate, short = true)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (txId != null && txId > 0) {
+                            Icon(
+                                Icons.Default.OpenInNew,
+                                contentDescription = "View Transaction",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = "P: ${installment.principalPart.toRupeeString()} + I: ${installment.interestPart.toRupeeString()}",
                         style = MaterialTheme.typography.labelSmall,
@@ -613,7 +771,12 @@ fun InstallmentRow(
 }
 
 @Composable
-fun ClosedLoanCard(loan: Loan) {
+fun ClosedLoanCard(
+    loan: Loan,
+    onDelete: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -626,7 +789,7 @@ fun ClosedLoanCard(loan: Loan) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = loan.label,
                     style = MaterialTheme.typography.bodyMedium,
@@ -639,17 +802,38 @@ fun ClosedLoanCard(loan: Loan) {
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .background(Color(0xFFE8F5E9), shape = RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = "✓ Closed",
-                    color = Color(0xFF2E7D32),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .background(Color(0xFFE8F5E9), shape = RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "✓ Closed",
+                        color = Color(0xFF2E7D32),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Delete Loan Record", color = MaterialTheme.colorScheme.error) },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+                        )
+                    }
+                }
             }
         }
     }

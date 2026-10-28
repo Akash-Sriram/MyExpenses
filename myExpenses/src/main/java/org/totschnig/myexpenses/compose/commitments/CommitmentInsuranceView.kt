@@ -32,6 +32,23 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Security
+import android.content.ContentUris
+import android.content.Intent
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.clickable
+import org.totschnig.myexpenses.contract.TransactionsContract
+import org.totschnig.myexpenses.activity.ExpenseEdit
+import org.totschnig.myexpenses.domain.commitment.CommitmentStatus
+import timber.log.Timber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,13 +98,18 @@ fun CommitmentInsuranceView(
     val accounts by viewModel.accounts.collectAsState()
 
     val insuranceItems = commitmentItems.filterIsInstance<CommitmentItem.InsuranceItem>()
+    val activeInsuranceItems = insuranceItems.filter { it.policy.status == CommitmentStatus.ACTIVE }
+    val inactiveInsuranceItems = insuranceItems.filter { it.policy.status != CommitmentStatus.ACTIVE }
 
     var payingInsuranceTarget by remember { mutableStateOf<CommitmentItem.InsuranceItem?>(null) }
     var documentTarget by remember { mutableStateOf<InsurancePolicy?>(null) }
     var expandedHistoryPolicyId by remember { mutableStateOf<Long?>(null) }
     var showAddPolicyDialog by remember { mutableStateOf(false) }
+    var editingPolicyTarget by remember { mutableStateOf<InsurancePolicy?>(null) }
+    var deletingPolicyTarget by remember { mutableStateOf<InsurancePolicy?>(null) }
+    var showInactivePolicies by remember { mutableStateOf(false) }
 
-    val totalAnnualPremium = insuranceItems.sumOf { item ->
+    val totalAnnualPremium = activeInsuranceItems.sumOf { item ->
         when (item.policy.frequency) {
             PremiumFrequency.MONTHLY -> item.policy.premiumAmount * 12
             PremiumFrequency.QUARTERLY -> item.policy.premiumAmount * 4
@@ -106,11 +128,12 @@ fun CommitmentInsuranceView(
             Spacer(modifier = Modifier.height(4.dp))
             InsuranceSummaryHeader(
                 totalAnnual = totalAnnualPremium,
-                policiesCount = insuranceItems.size
+                policiesCount = activeInsuranceItems.size,
+                onAddPolicy = { showAddPolicyDialog = true }
             )
         }
 
-        if (insuranceItems.isEmpty()) {
+        if (activeInsuranceItems.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -130,17 +153,23 @@ fun CommitmentInsuranceView(
                             modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("No insurance policies added", fontWeight = FontWeight.SemiBold)
+                        Text("No active insurance policies", fontWeight = FontWeight.SemiBold)
                         Text(
                             "Add your LIC, Health, or Vehicle insurance policies",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = { showAddPolicyDialog = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Policy")
+                        }
                     }
                 }
             }
         } else {
-            items(insuranceItems) { insItem ->
+            items(activeInsuranceItems) { insItem ->
                 val isHistoryOpen = expandedHistoryPolicyId == insItem.policy.id
                 val paymentHistoryFlow = remember(insItem.policy.id) {
                     viewModel.getPaymentsForCommitment("INSURANCE", insItem.policy.id)
@@ -155,8 +184,75 @@ fun CommitmentInsuranceView(
                         expandedHistoryPolicyId = if (isHistoryOpen) null else insItem.policy.id
                     },
                     onOpenDocuments = { documentTarget = insItem.policy },
-                    onPayPremium = { payingInsuranceTarget = insItem }
+                    onPayPremium = { payingInsuranceTarget = insItem },
+                    onEdit = { editingPolicyTarget = insItem.policy },
+                    onCancel = {
+                        viewModel.cancelInsurancePolicy(insItem.policy.id) {
+                            viewModel.resyncAllCommitments()
+                        }
+                    },
+                    onDelete = { deletingPolicyTarget = insItem.policy }
                 )
+            }
+        }
+
+        // Inactive / Discontinued Policies Section
+        if (inactiveInsuranceItems.isNotEmpty()) {
+            item {
+                Surface(
+                    onClick = { showInactivePolicies = !showInactivePolicies },
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Discontinued Policies (${inactiveInsuranceItems.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Icon(
+                            imageVector = if (showInactivePolicies) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (showInactivePolicies) {
+                items(inactiveInsuranceItems) { insItem ->
+                    val isHistoryOpen = expandedHistoryPolicyId == insItem.policy.id
+                    val paymentHistoryFlow = remember(insItem.policy.id) {
+                        viewModel.getPaymentsForCommitment("INSURANCE", insItem.policy.id)
+                    }
+                    val pastPayments by paymentHistoryFlow.collectAsState(initial = emptyList())
+
+                    InsurancePolicyCard(
+                        item = insItem,
+                        isHistoryOpen = isHistoryOpen,
+                        pastPayments = pastPayments.filter { it.status == org.totschnig.myexpenses.domain.commitment.PaymentRecordStatus.PAID },
+                        onToggleHistory = {
+                            expandedHistoryPolicyId = if (isHistoryOpen) null else insItem.policy.id
+                        },
+                        onOpenDocuments = { documentTarget = insItem.policy },
+                        onPayPremium = { payingInsuranceTarget = insItem },
+                        onEdit = { editingPolicyTarget = insItem.policy },
+                        onReactivate = {
+                            viewModel.reactivateInsurancePolicy(insItem.policy.id) {
+                                viewModel.resyncAllCommitments()
+                            }
+                        },
+                        onDelete = { deletingPolicyTarget = insItem.policy }
+                    )
+                }
             }
         }
 
@@ -207,7 +303,8 @@ fun CommitmentInsuranceView(
 
     // Add Policy Dialog
     if (showAddPolicyDialog) {
-        AddInsurancePolicyDialog(
+        AddEditInsurancePolicyDialog(
+            initialPolicy = null,
             accounts = accounts,
             onDismiss = { showAddPolicyDialog = false },
             onConfirm = { policy ->
@@ -218,10 +315,56 @@ fun CommitmentInsuranceView(
             }
         )
     }
+
+    // Edit Policy Dialog
+    editingPolicyTarget?.let { policyToEdit ->
+        AddEditInsurancePolicyDialog(
+            initialPolicy = policyToEdit,
+            accounts = accounts,
+            onDismiss = { editingPolicyTarget = null },
+            onConfirm = { updated ->
+                viewModel.updateInsurancePolicy(updated) {
+                    editingPolicyTarget = null
+                    viewModel.resyncAllCommitments()
+                }
+            }
+        )
+    }
+
+    // Delete Policy Confirmation
+    deletingPolicyTarget?.let { policyToDelete ->
+        AlertDialog(
+            onDismissRequest = { deletingPolicyTarget = null },
+            title = { Text("Delete Insurance Policy?") },
+            text = { Text("Are you sure you want to delete '${policyToDelete.policyName}'? Past transactions in your ledger will not be affected.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteInsurancePolicy(policyToDelete.id) {
+                            deletingPolicyTarget = null
+                            viewModel.resyncAllCommitments()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingPolicyTarget = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-fun InsuranceSummaryHeader(totalAnnual: Long, policiesCount: Int) {
+fun InsuranceSummaryHeader(
+    totalAnnual: Long,
+    policiesCount: Int,
+    onAddPolicy: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -232,12 +375,28 @@ fun InsuranceSummaryHeader(totalAnnual: Long, policiesCount: Int) {
                 .fillMaxWidth()
                 .padding(18.dp)
         ) {
-            Text(
-                text = "Insurance & Policy Cover",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Insurance & Policy Cover",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                IconButton(
+                    onClick = onAddPolicy,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Add Policy",
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -276,11 +435,17 @@ fun InsurancePolicyCard(
     pastPayments: List<CommitmentPayment>,
     onToggleHistory: () -> Unit,
     onOpenDocuments: () -> Unit,
-    onPayPremium: () -> Unit
+    onPayPremium: () -> Unit,
+    onEdit: () -> Unit,
+    onCancel: (() -> Unit)? = null,
+    onReactivate: (() -> Unit)? = null,
+    onDelete: () -> Unit
 ) {
     val policy = item.policy
     val nextPayment = item.nextPayment
     val icon = getInsuranceIcon(policy.insuranceType)
+    val context = LocalContext.current
+    var showMenu by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -327,18 +492,67 @@ fun InsurancePolicyCard(
                     }
                 }
 
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = policy.premiumAmount.toRupeeString(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "/ ${policy.frequency.name.lowercase()}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = policy.premiumAmount.toRupeeString(),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "/ ${policy.frequency.name.lowercase()}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Edit Policy") },
+                                onClick = {
+                                    showMenu = false
+                                    onEdit()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                            if (policy.status == CommitmentStatus.ACTIVE && onCancel != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Discontinue / Cancel") },
+                                    onClick = {
+                                        showMenu = false
+                                        onCancel()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFFE65100), modifier = Modifier.size(18.dp)) }
+                                )
+                            }
+                            if (policy.status != CommitmentStatus.ACTIVE && onReactivate != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Reactivate Policy") },
+                                    onClick = {
+                                        showMenu = false
+                                        onReactivate()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp)) }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Delete Policy", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    showMenu = false
+                                    onDelete()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -353,17 +567,34 @@ fun InsurancePolicyCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    StatusBadge(isPaid = isPaid, dueDateMillis = nextPayment?.dueDate ?: 0L)
+                    if (policy.status != CommitmentStatus.ACTIVE) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = "DISCONTINUED",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    } else {
+                        StatusBadge(isPaid = isPaid, dueDateMillis = nextPayment?.dueDate ?: 0L)
+                    }
                     if (policy.payerMode.equals("FAMILY_SHARED", ignoreCase = true)) {
                         PayerBadge(payer = "DAD")
                     }
                 }
 
-                Text(
-                    text = "Next: ${formatCommitmentDate(nextPayment?.dueDate ?: 0L)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (policy.status == CommitmentStatus.ACTIVE && nextPayment != null) {
+                    Text(
+                        text = "Next: ${formatCommitmentDate(nextPayment.dueDate)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -400,7 +631,7 @@ fun InsurancePolicyCard(
                     }
                 }
 
-                if (nextPayment != null && !isPaid) {
+                if (policy.status == CommitmentStatus.ACTIVE && nextPayment != null && !isPaid) {
                     Button(
                         onClick = onPayPremium,
                         shape = RoundedCornerShape(8.dp),
@@ -436,10 +667,27 @@ fun InsurancePolicyCard(
                         Text("No past recorded payments yet", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         pastPayments.forEach { payment ->
+                            val txId = payment.transactionId
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
                                 color = Color(0xFFF1F8E9),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .then(
+                                        if (txId != null && txId > 0) {
+                                            Modifier.clickable {
+                                                try {
+                                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                        data = ContentUris.withAppendedId(TransactionsContract.Transactions.CONTENT_URI, txId)
+                                                        setClass(context, ExpenseEdit::class.java)
+                                                    }
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Timber.e(e, "Failed to open transaction #$txId")
+                                                }
+                                            }
+                                        } else Modifier
+                                    )
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -449,11 +697,21 @@ fun InsurancePolicyCard(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column {
-                                        Text(
-                                            text = formatCommitmentDate(payment.paidDate ?: payment.dueDate),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text(
+                                                text = formatCommitmentDate(payment.paidDate ?: payment.dueDate),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            if (txId != null && txId > 0) {
+                                                Icon(
+                                                    Icons.Default.OpenInNew,
+                                                    contentDescription = "View Transaction",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(13.dp)
+                                                )
+                                            }
+                                        }
                                         if (payment.notes.isNotBlank()) {
                                             Text(
                                                 text = "Ref: ${payment.notes}",
@@ -491,23 +749,30 @@ fun getInsuranceIcon(type: InsuranceType): ImageVector = when (type) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddInsurancePolicyDialog(
+fun AddEditInsurancePolicyDialog(
+    initialPolicy: InsurancePolicy? = null,
     accounts: List<AccountMinimal>,
     onDismiss: () -> Unit,
     onConfirm: (InsurancePolicy) -> Unit
 ) {
-    var policyName by remember { mutableStateOf("") }
-    var insurerName by remember { mutableStateOf("LIC") }
-    var insuranceType by remember { mutableStateOf(InsuranceType.LIFE) }
-    var premiumText by remember { mutableStateOf("") }
-    var frequency by remember { mutableStateOf(PremiumFrequency.QUARTERLY) }
-    var dueDayText by remember { mutableStateOf("5") }
-    var payerMode by remember { mutableStateOf("SELF") }
-    var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id) }
+    val isEdit = initialPolicy != null
+    var policyName by remember { mutableStateOf(initialPolicy?.policyName ?: "") }
+    var insurerName by remember { mutableStateOf(initialPolicy?.insurerName ?: "LIC") }
+    var insuranceType by remember { mutableStateOf(initialPolicy?.insuranceType ?: InsuranceType.LIFE) }
+    var premiumText by remember {
+        mutableStateOf(if (initialPolicy != null) (initialPolicy.premiumAmount / 100.0).toString() else "")
+    }
+    var frequency by remember { mutableStateOf(initialPolicy?.frequency ?: PremiumFrequency.QUARTERLY) }
+    var dueDayText by remember { mutableStateOf((initialPolicy?.dueDayOfMonth ?: 5).toString()) }
+    var payerMode by remember { mutableStateOf(initialPolicy?.payerMode ?: "SELF") }
+    var selectedAccountId by remember { mutableStateOf(initialPolicy?.linkedAccountId ?: accounts.firstOrNull()?.id) }
+
+    var expandedFreq by remember { mutableStateOf(false) }
+    var expandedType by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Insurance Policy", fontWeight = FontWeight.Bold) },
+        title = { Text(if (isEdit) "Edit Insurance Policy" else "Add Insurance Policy", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 modifier = Modifier
@@ -531,14 +796,77 @@ fun AddInsurancePolicyDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = premiumText,
-                    onValueChange = { premiumText = it },
-                    label = { Text("Premium Amount (₹)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
+                ExposedDropdownMenuBox(
+                    expanded = expandedType,
+                    onExpandedChange = { expandedType = it },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    OutlinedTextField(
+                        value = insuranceType.name,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Insurance Type") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedType) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expandedType,
+                        onDismissRequest = { expandedType = false }
+                    ) {
+                        InsuranceType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.name) },
+                                onClick = {
+                                    insuranceType = type
+                                    expandedType = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = premiumText,
+                        onValueChange = { premiumText = it },
+                        label = { Text("Premium (₹)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = expandedFreq,
+                        onExpandedChange = { expandedFreq = it },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        OutlinedTextField(
+                            value = frequency.name,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Frequency") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedFreq) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expandedFreq,
+                            onDismissRequest = { expandedFreq = false }
+                        ) {
+                            PremiumFrequency.entries.forEach { freq ->
+                                DropdownMenuItem(
+                                    text = { Text(freq.name) },
+                                    onClick = {
+                                        frequency = freq
+                                        expandedFreq = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
 
                 OutlinedTextField(
                     value = dueDayText,
@@ -554,25 +882,28 @@ fun AddInsurancePolicyDialog(
             Button(
                 onClick = {
                     val p = ((premiumText.toDoubleOrNull() ?: 0.0) * 100).toLong()
-                    val d = dueDayText.toIntOrNull() ?: 5
+                    val d = dueDayText.toIntOrNull()?.coerceIn(1, 31) ?: 5
                     if (policyName.isNotBlank() && p > 0) {
                         onConfirm(
                             InsurancePolicy(
+                                id = initialPolicy?.id ?: 0L,
                                 policyName = policyName.trim(),
                                 insurerName = insurerName.trim(),
                                 insuranceType = insuranceType,
                                 premiumAmount = p,
                                 frequency = frequency,
-                                startDate = System.currentTimeMillis(),
+                                startDate = initialPolicy?.startDate ?: System.currentTimeMillis(),
+                                endDate = initialPolicy?.endDate,
                                 dueDayOfMonth = d,
                                 linkedAccountId = selectedAccountId,
-                                payerMode = payerMode
+                                payerMode = payerMode,
+                                status = initialPolicy?.status ?: CommitmentStatus.ACTIVE
                             )
                         )
                     }
                 }
             ) {
-                Text("Add Policy")
+                Text(if (isEdit) "Update Policy" else "Add Policy")
             }
         },
         dismissButton = {
@@ -580,3 +911,4 @@ fun AddInsurancePolicyDialog(
         }
     )
 }
+
