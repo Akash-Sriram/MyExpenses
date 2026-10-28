@@ -2206,6 +2206,10 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
         db.upgradeTo196();
       }
 
+      if (oldVersion < 197) {
+        db.upgradeTo197();
+      }
+
       TransactionProvider.resumeChangeTrigger(db)
     } catch (e: SQLException) {
       throw SQLiteUpgradeFailedException(oldVersion, newVersion, e)

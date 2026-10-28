@@ -452,6 +452,23 @@ class RepositoryCommitment @Inject constructor(
             }
         }
 
+    suspend fun reactivateSubscription(id: Long): Boolean =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            val values = ContentValues().apply {
+                put(KEY_STATUS, CommitmentStatus.ACTIVE.name)
+            }
+            val rows = db.update(
+                TABLE_SUBSCRIPTIONS,
+                SQLiteDatabase.CONFLICT_NONE,
+                values,
+                "$KEY_ROWID = ?",
+                arrayOf(id.toString())
+            )
+            invalidate()
+            rows > 0
+        }
+
     suspend fun deleteSubscription(id: Long): Boolean =
         withContext(coroutineDispatcher) {
             val db = openHelper.writableDatabase
@@ -513,6 +530,7 @@ class RepositoryCommitment @Inject constructor(
                         put(KEY_CREATED_AT, if (meter.createdAt > 0) meter.createdAt else System.currentTimeMillis())
                         put(KEY_UNIT_PRICE, meter.unitPrice)
                         put(KEY_UNITS_PER_DAY, meter.unitsPerDay)
+                        put("is_active", if (meter.isActive) 1 else 0)
                     }
                     if (meter.id > 0) {
                         db.update(TABLE_UTILITY_METERS, SQLiteDatabase.CONFLICT_NONE, values, "$KEY_ROWID = ?", arrayOf(meter.id.toString()))
@@ -525,6 +543,53 @@ class RepositoryCommitment @Inject constructor(
             } finally {
                 db.endTransaction()
             }
+        }
+
+    suspend fun addUtilityMeter(subscriptionId: Long, meter: UtilityMeter): Long =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            val values = ContentValues().apply {
+                put(KEY_SUBSCRIPTION_ID, subscriptionId)
+                put(KEY_METER_NUMBER, meter.meterNumber.trim())
+                put(KEY_METER_LABEL, meter.meterLabel.trim())
+                put(KEY_ESTIMATED_AMOUNT, meter.estimatedAmount)
+                put(KEY_MATCHING_KEYWORDS, meter.matchingKeywords.trim())
+                put(KEY_CREATED_AT, if (meter.createdAt > 0) meter.createdAt else System.currentTimeMillis())
+                put(KEY_UNIT_PRICE, meter.unitPrice)
+                put(KEY_UNITS_PER_DAY, meter.unitsPerDay)
+                put("is_active", if (meter.isActive) 1 else 0)
+            }
+            val id = db.insert(TABLE_UTILITY_METERS, SQLiteDatabase.CONFLICT_NONE, values)
+            if (id > 0) invalidate()
+            id
+        }
+
+    suspend fun updateUtilityMeter(meter: UtilityMeter): Boolean =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            val values = ContentValues().apply {
+                put(KEY_METER_NUMBER, meter.meterNumber.trim())
+                put(KEY_METER_LABEL, meter.meterLabel.trim())
+                put(KEY_ESTIMATED_AMOUNT, meter.estimatedAmount)
+                put(KEY_MATCHING_KEYWORDS, meter.matchingKeywords.trim())
+                put(KEY_UNIT_PRICE, meter.unitPrice)
+                put(KEY_UNITS_PER_DAY, meter.unitsPerDay)
+                put("is_active", if (meter.isActive) 1 else 0)
+            }
+            val rows = db.update(TABLE_UTILITY_METERS, SQLiteDatabase.CONFLICT_NONE, values, "$KEY_ROWID = ?", arrayOf(meter.id.toString()))
+            if (rows > 0) invalidate()
+            rows > 0
+        }
+
+    suspend fun toggleMeterActiveStatus(meterId: Long, isActive: Boolean): Boolean =
+        withContext(coroutineDispatcher) {
+            val db = openHelper.writableDatabase
+            val values = ContentValues().apply {
+                put("is_active", if (isActive) 1 else 0)
+            }
+            val rows = db.update(TABLE_UTILITY_METERS, SQLiteDatabase.CONFLICT_NONE, values, "$KEY_ROWID = ?", arrayOf(meterId.toString()))
+            if (rows > 0) invalidate()
+            rows > 0
         }
 
     suspend fun deleteUtilityMeter(meterId: Long): Boolean =
@@ -1865,7 +1930,8 @@ class RepositoryCommitment @Inject constructor(
         matchingKeywords = getStringOrNull(KEY_MATCHING_KEYWORDS) ?: "",
         createdAt = getLongOrNull(KEY_CREATED_AT) ?: 0L,
         unitPrice = getLongOrNull(KEY_UNIT_PRICE) ?: 0L,
-        unitsPerDay = getDoubleOrNull(KEY_UNITS_PER_DAY) ?: 0.0
+        unitsPerDay = getDoubleOrNull(KEY_UNITS_PER_DAY) ?: 0.0,
+        isActive = runCatching { getInt(getColumnIndexOrThrow("is_active")) == 1 }.getOrDefault(true)
     )
 
     private fun Cursor.toCommitmentAttachment() = CommitmentAttachment(

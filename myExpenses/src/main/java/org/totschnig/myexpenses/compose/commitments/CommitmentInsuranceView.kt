@@ -58,6 +58,12 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +83,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -467,13 +474,19 @@ fun InsurancePolicyCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
+                    val (iconBg, iconTint) = when (policy.insuranceType) {
+                        InsuranceType.VEHICLE -> Pair(Color(0xFFE0F2F1), Color(0xFF00796B))
+                        InsuranceType.HEALTH -> Pair(Color(0xFFFFEBEE), Color(0xFFC62828))
+                        else -> Pair(Color(0xFFEDE7F6), Color(0xFF5E35B1))
+                    }
+
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Color(0xFFEDE7F6), shape = CircleShape),
+                            .background(iconBg, shape = CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(icon, contentDescription = null, tint = Color(0xFF5E35B1), modifier = Modifier.size(22.dp))
+                        Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
                     }
 
                     Spacer(modifier = Modifier.width(12.dp))
@@ -484,6 +497,20 @@ fun InsurancePolicyCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
+                        if (policy.policyNumber.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Text(
+                                    text = policy.policyNumber,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
                         Text(
                             text = "${policy.insurerName} • ${policy.insuranceType.name} Insurance",
                             style = MaterialTheme.typography.bodySmall,
@@ -556,7 +583,7 @@ fun InsurancePolicyCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             val isPaid = nextPayment == null || item.isCurrentCyclePaid
 
@@ -594,6 +621,58 @@ fun InsurancePolicyCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            // Sum Assured / IDV & Timeline Row
+            if (policy.sumAssured > 0 || policy.startDate > 0 || policy.endDate != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (policy.sumAssured > 0) {
+                        val coverLabel = if (policy.insuranceType == InsuranceType.VEHICLE) "IDV: " else "Cover: "
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = when (policy.insuranceType) {
+                                InsuranceType.VEHICLE -> Color(0xFFE0F2F1)
+                                InsuranceType.HEALTH -> Color(0xFFFFEBEE)
+                                else -> Color(0xFFEDE7F6)
+                            }
+                        ) {
+                            Text(
+                                text = "$coverLabel${policy.sumAssured.toRupeeString()}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = when (policy.insuranceType) {
+                                    InsuranceType.VEHICLE -> Color(0xFF00796B)
+                                    InsuranceType.HEALTH -> Color(0xFFC62828)
+                                    else -> Color(0xFF5E35B1)
+                                },
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+
+                    if (policy.startDate > 0 || policy.endDate != null) {
+                        val endLabel = if (policy.insuranceType == InsuranceType.VEHICLE) "Expires: " else "Matures: "
+                        val timelineText = if (policy.startDate > 0 && policy.endDate != null) {
+                            "${formatCommitmentDate(policy.startDate)} → $endLabel${formatCommitmentDate(policy.endDate)}"
+                        } else if (policy.endDate != null) {
+                            "$endLabel${formatCommitmentDate(policy.endDate)}"
+                        } else {
+                            "Started: ${formatCommitmentDate(policy.startDate)}"
+                        }
+                        Text(
+                            text = timelineText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -758,17 +837,67 @@ fun AddEditInsurancePolicyDialog(
     val isEdit = initialPolicy != null
     var policyName by remember { mutableStateOf(initialPolicy?.policyName ?: "") }
     var insurerName by remember { mutableStateOf(initialPolicy?.insurerName ?: "LIC") }
+    var policyNumber by remember { mutableStateOf(initialPolicy?.policyNumber ?: "") }
     var insuranceType by remember { mutableStateOf(initialPolicy?.insuranceType ?: InsuranceType.LIFE) }
     var premiumText by remember {
         mutableStateOf(if (initialPolicy != null) (initialPolicy.premiumAmount / 100.0).toString() else "")
     }
+    var sumAssuredText by remember {
+        mutableStateOf(if (initialPolicy != null && initialPolicy.sumAssured > 0) (initialPolicy.sumAssured / 100).toString() else "")
+    }
     var frequency by remember { mutableStateOf(initialPolicy?.frequency ?: PremiumFrequency.QUARTERLY) }
+    var startDateMillis by remember { mutableStateOf(initialPolicy?.startDate ?: System.currentTimeMillis()) }
+    var endDateMillis by remember { mutableStateOf<Long?>(initialPolicy?.endDate) }
     var dueDayText by remember { mutableStateOf((initialPolicy?.dueDayOfMonth ?: 5).toString()) }
     var payerMode by remember { mutableStateOf(initialPolicy?.payerMode ?: "SELF") }
     var selectedAccountId by remember { mutableStateOf(initialPolicy?.linkedAccountId ?: accounts.firstOrNull()?.id) }
 
     var expandedFreq by remember { mutableStateOf(false) }
     var expandedType by remember { mutableStateOf(false) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+
+    if (showStartDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = startDateMillis)
+        DatePickerDialog(
+            onDismissRequest = { showStartDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { startDateMillis = it }
+                    showStartDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showEndDatePicker) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = endDateMillis ?: (System.currentTimeMillis() + 365L * 86400000L))
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    endDateMillis = datePickerState.selectedDateMillis
+                    showEndDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        endDateMillis = null
+                        showEndDatePicker = false
+                    }) { Text("Clear") }
+                    TextButton(onClick = { showEndDatePicker = false }) { Text("Cancel") }
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -777,13 +906,14 @@ fun AddEditInsurancePolicyDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedTextField(
                     value = policyName,
                     onValueChange = { policyName = it },
-                    label = { Text("Policy Name (e.g. LIC Policy)") },
+                    label = { Text("Policy Name (e.g. LIC Jeevan Labh)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -792,6 +922,15 @@ fun AddEditInsurancePolicyDialog(
                     value = insurerName,
                     onValueChange = { insurerName = it },
                     label = { Text("Insurer (e.g. LIC, ICICI Lombard)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                val policyNumberLabel = if (insuranceType == InsuranceType.VEHICLE) "Vehicle Reg / Policy No. (e.g. TN-09-AB-1234)" else "Policy Number"
+                OutlinedTextField(
+                    value = policyNumber,
+                    onValueChange = { policyNumber = it },
+                    label = { Text(policyNumberLabel) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -868,6 +1007,49 @@ fun AddEditInsurancePolicyDialog(
                     }
                 }
 
+                val sumAssuredLabel = if (insuranceType == InsuranceType.VEHICLE) "IDV / Insured Value (₹)" else "Sum Assured / Coverage (₹)"
+                OutlinedTextField(
+                    value = sumAssuredText,
+                    onValueChange = { sumAssuredText = it },
+                    label = { Text(sumAssuredLabel) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Timeline Dates Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = formatCommitmentDate(startDateMillis),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Start Date") },
+                        trailingIcon = {
+                            IconButton(onClick = { showStartDatePicker = true }) {
+                                Icon(Icons.Default.CalendarToday, contentDescription = "Start Date", modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).clickable { showStartDatePicker = true }
+                    )
+
+                    val endLabel = if (insuranceType == InsuranceType.VEHICLE) "Expiry Date" else "Matures On"
+                    OutlinedTextField(
+                        value = endDateMillis?.let { formatCommitmentDate(it) } ?: "Open / None",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(endLabel) },
+                        trailingIcon = {
+                            IconButton(onClick = { showEndDatePicker = true }) {
+                                Icon(Icons.Default.CalendarToday, contentDescription = "Maturity Date", modifier = Modifier.size(18.dp))
+                            }
+                        },
+                        modifier = Modifier.weight(1f).clickable { showEndDatePicker = true }
+                    )
+                }
+
                 OutlinedTextField(
                     value = dueDayText,
                     onValueChange = { dueDayText = it },
@@ -882,6 +1064,7 @@ fun AddEditInsurancePolicyDialog(
             Button(
                 onClick = {
                     val p = ((premiumText.toDoubleOrNull() ?: 0.0) * 100).toLong()
+                    val s = ((sumAssuredText.toDoubleOrNull() ?: 0.0) * 100).toLong()
                     val d = dueDayText.toIntOrNull()?.coerceIn(1, 31) ?: 5
                     if (policyName.isNotBlank() && p > 0) {
                         onConfirm(
@@ -889,11 +1072,13 @@ fun AddEditInsurancePolicyDialog(
                                 id = initialPolicy?.id ?: 0L,
                                 policyName = policyName.trim(),
                                 insurerName = insurerName.trim(),
+                                policyNumber = policyNumber.trim(),
                                 insuranceType = insuranceType,
                                 premiumAmount = p,
+                                sumAssured = s,
                                 frequency = frequency,
-                                startDate = initialPolicy?.startDate ?: System.currentTimeMillis(),
-                                endDate = initialPolicy?.endDate,
+                                startDate = startDateMillis,
+                                endDate = endDateMillis,
                                 dueDayOfMonth = d,
                                 linkedAccountId = selectedAccountId,
                                 payerMode = payerMode,

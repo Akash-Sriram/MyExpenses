@@ -31,7 +31,7 @@ import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import timber.log.Timber
 import kotlin.math.pow
 
-const val DATABASE_VERSION = 196
+const val DATABASE_VERSION = 197
 
 private const val RAISE_UPDATE_SEALED_DEBT = "SELECT RAISE (FAIL, 'attempt to update sealed debt');"
 private const val RAISE_INCONSISTENT_CATEGORY_HIERARCHY =
@@ -373,7 +373,8 @@ CREATE TABLE $TABLE_UTILITY_METERS (
     $KEY_MATCHING_KEYWORDS text,
     $KEY_CREATED_AT integer not null,
     $KEY_UNIT_PRICE integer not null default 0,
-    $KEY_UNITS_PER_DAY real not null default 0.0
+    $KEY_UNITS_PER_DAY real not null default 0.0,
+    is_active integer not null default 1
 );
 """
 
@@ -1339,6 +1340,14 @@ abstract class BaseTransactionDatabase(
     fun SupportSQLiteDatabase.upgradeTo196() {
         execSQL(COMMITMENT_ATTACHMENTS_CREATE)
         execSQL(COMMITMENT_ATTACHMENTS_IDX)
+    }
+
+    fun SupportSQLiteDatabase.upgradeTo197() {
+        try {
+            execSQL("ALTER TABLE $TABLE_UTILITY_METERS ADD COLUMN is_active integer not null default 1")
+        } catch (e: Exception) {
+            Timber.w(e, "is_active column might already exist")
+        }
     }
 
     protected fun SupportSQLiteDatabase.createOrRefreshAccountTriggers() {

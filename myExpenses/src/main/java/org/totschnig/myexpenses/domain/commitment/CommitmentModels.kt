@@ -118,7 +118,8 @@ data class UtilityMeter(
     val matchingKeywords: String = "", // Comma-separated e.g. "Single phase, Domestic"
     val createdAt: Long = System.currentTimeMillis(),
     val unitPrice: Long = 0L,       // in minor units (paise), e.g. 1850L for ₹18.50 per packet
-    val unitsPerDay: Double = 0.0   // packets/units per day, e.g. 2.0
+    val unitsPerDay: Double = 0.0,  // packets/units per day, e.g. 2.0
+    val isActive: Boolean = true
 ) {
     val isDailyConsumption: Boolean get() = unitPrice > 0L && unitsPerDay > 0.0
 
@@ -241,7 +242,10 @@ sealed class CommitmentItem {
             "${subscription.billingCycle.name} Subscription"
         }
         override val amount: Long get() = if (subscription.isVariableAmount && meters.isNotEmpty()) {
-            meters.sumOf { runCatching { it.calculateAmountForDate(nextDueDate) }.getOrDefault(it.estimatedAmount) }
+            val activeMeters = meters.filter { it.isActive }
+            if (activeMeters.isNotEmpty()) {
+                activeMeters.sumOf { runCatching { it.calculateAmountForDate(nextDueDate) }.getOrDefault(it.estimatedAmount) }
+            } else 0L
         } else {
             subscription.amount
         }

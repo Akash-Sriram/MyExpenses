@@ -24,10 +24,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
@@ -93,13 +96,17 @@ fun CommitmentSubscriptionsView(
     val regularSubscriptions = commitmentItems.filterIsInstance<CommitmentItem.SubscriptionItem>()
         .filter { !it.subscription.isVariableAmount }
 
+    val activeSubscriptions = regularSubscriptions.filter { it.subscription.status == CommitmentStatus.ACTIVE }
+    val cancelledSubscriptions = regularSubscriptions.filter { it.subscription.status != CommitmentStatus.ACTIVE }
+
     var payingSubTarget by remember { mutableStateOf<CommitmentItem.SubscriptionItem?>(null) }
     var documentTarget by remember { mutableStateOf<Subscription?>(null) }
     var showAddSubDialog by remember { mutableStateOf(false) }
     var editingSubTarget by remember { mutableStateOf<Subscription?>(null) }
     var editingTrackerTarget by remember { mutableStateOf<MobilePlanTracker?>(null) }
+    var isCancelledExpanded by remember { mutableStateOf(false) }
 
-    val totalAnnualSpend = regularSubscriptions.sumOf { item ->
+    val totalAnnualSpend = activeSubscriptions.sumOf { item ->
         when (item.subscription.billingCycle) {
             BillingCycle.MONTHLY -> item.subscription.amount * 12
             BillingCycle.QUARTERLY -> item.subscription.amount * 4
@@ -119,7 +126,7 @@ fun CommitmentSubscriptionsView(
             Spacer(modifier = Modifier.height(4.dp))
             SubscriptionsSummaryHeader(
                 totalAnnual = totalAnnualSpend,
-                subsCount = regularSubscriptions.size,
+                subsCount = activeSubscriptions.size,
                 onAddSubscription = { showAddSubDialog = true }
             )
         }
@@ -131,7 +138,7 @@ fun CommitmentSubscriptionsView(
             )
         }
 
-        if (regularSubscriptions.isEmpty()) {
+        if (activeSubscriptions.isEmpty() && cancelledSubscriptions.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -167,7 +174,7 @@ fun CommitmentSubscriptionsView(
                 }
             }
         } else {
-            items(regularSubscriptions) { subItem ->
+            items(activeSubscriptions) { subItem ->
                 SubscriptionCard(
                     item = subItem,
                     onOpenDocuments = { documentTarget = subItem.subscription },
@@ -176,10 +183,60 @@ fun CommitmentSubscriptionsView(
                     onCancel = {
                         viewModel.cancelSubscription(subItem.subscription.id)
                     },
+                    onReactivate = null,
                     onDelete = {
                         viewModel.deleteSubscription(subItem.subscription.id)
                     }
                 )
+            }
+
+            if (cancelledSubscriptions.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isCancelledExpanded = !isCancelledExpanded },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Cancelled Subscriptions (${cancelledSubscriptions.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Icon(
+                                imageVector = if (isCancelledExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                if (isCancelledExpanded) {
+                    items(cancelledSubscriptions) { subItem ->
+                        SubscriptionCard(
+                            item = subItem,
+                            onOpenDocuments = { documentTarget = subItem.subscription },
+                            onPay = { payingSubTarget = subItem },
+                            onEdit = { editingSubTarget = subItem.subscription },
+                            onCancel = {},
+                            onReactivate = {
+                                viewModel.reactivateSubscription(subItem.subscription.id)
+                            },
+                            onDelete = {
+                                viewModel.deleteSubscription(subItem.subscription.id)
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -354,6 +411,7 @@ fun SubscriptionCard(
     onPay: () -> Unit,
     onEdit: () -> Unit,
     onCancel: () -> Unit,
+    onReactivate: (() -> Unit)? = null,
     onDelete: () -> Unit
 ) {
     val sub = item.subscription
@@ -446,6 +504,16 @@ fun SubscriptionCard(
                                         onCancel()
                                     },
                                     leadingIcon = { Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFE65100), modifier = Modifier.size(18.dp)) }
+                                )
+                            }
+                            if (sub.status != CommitmentStatus.ACTIVE && onReactivate != null) {
+                                DropdownMenuItem(
+                                    text = { Text("Reactivate Subscription") },
+                                    onClick = {
+                                        showMenu = false
+                                        onReactivate()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(18.dp)) }
                                 )
                             }
                             DropdownMenuItem(

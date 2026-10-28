@@ -563,6 +563,17 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
         }
     }
 
+    fun reactivateSubscription(
+        id: Long,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val ok = repositoryCommitment.reactivateSubscription(id)
+            resyncAllCommitments()
+            onComplete(ok)
+        }
+    }
+
     fun deleteSubscription(
         id: Long,
         onComplete: () -> Unit = {}
@@ -584,7 +595,43 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
     ) {
         viewModelScope.launch {
             repositoryCommitment.saveUtilityMeters(subscriptionId, meters)
+            resyncAllCommitments()
             onComplete()
+        }
+    }
+
+    fun addUtilityMeter(
+        subscriptionId: Long,
+        meter: UtilityMeter,
+        onComplete: (Long) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val id = repositoryCommitment.addUtilityMeter(subscriptionId, meter)
+            resyncAllCommitments()
+            onComplete(id)
+        }
+    }
+
+    fun updateUtilityMeter(
+        meter: UtilityMeter,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val ok = repositoryCommitment.updateUtilityMeter(meter)
+            resyncAllCommitments()
+            onComplete(ok)
+        }
+    }
+
+    fun toggleMeterActiveStatus(
+        meterId: Long,
+        isActive: Boolean,
+        onComplete: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val ok = repositoryCommitment.toggleMeterActiveStatus(meterId, isActive)
+            resyncAllCommitments()
+            onComplete(ok)
         }
     }
 
@@ -594,6 +641,7 @@ class LoanViewModel(application: Application) : ContentResolvingAndroidViewModel
     ) {
         viewModelScope.launch {
             repositoryCommitment.deleteUtilityMeter(meterId)
+            resyncAllCommitments()
             onComplete()
         }
     }
