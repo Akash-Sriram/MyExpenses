@@ -1,0 +1,101 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'r*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publish as GitHub Release'
+        required: true
+        type: boolean
+        default: true
+      release_tag:
+        description: 'Release tag (leave empty for automatic version from git)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Sign Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
+      - name: Decode Release Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.jks"
+
+      - name: Build Intern Release APK
+        env:
+          RELEASE_STORE_FILE: ${{ github.workspace }}/release.jks
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleInternRelease --stacktrace
+
+      - name: Prepare Release Artifacts
+        id: prepare_artifacts
+        run: |
+          APK_PATH="myExpenses/build/outputs/apk/intern/release/myExpenses-intern-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "Error: Release APK not found at $APK_PATH"
+            exit 1
+          fi
+
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            VERSION="${{ inputs.release_tag }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION=$(git describe --tags --always)
+          fi
+
+          NAMED_APK="MyExpenses-${VERSION}.apk"
+          cp "$APK_PATH" "$NAMED_APK"
+          echo "apk_path=$NAMED_APK" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.prepare_artifacts.outputs.apk_path }}
+          path: ${{ steps.prepare_artifacts.outputs.apk_path }}
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prepare_artifacts.outputs.version }}
+          name: MyExpenses ${{ steps.prepare_artifacts.outputs.version }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ${{ steps.prepare_artifacts.outputs.apk_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
