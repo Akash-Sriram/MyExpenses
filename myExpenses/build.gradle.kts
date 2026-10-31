@@ -1,5 +1,6 @@
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,6 +9,16 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
+fun getSecretProperty(name: String): String? =
+    System.getenv(name) ?: localProperties.getProperty(name) ?: project.findProperty(name)?.toString()
 
 fun getPropertyIfDefined(property: String, defaultValue: String): String =
     project.findProperty(property)?.toString() ?: defaultValue
@@ -54,6 +65,24 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    signingConfigs {
+        val releaseStoreFile = getSecretProperty("RELEASE_STORE_FILE")
+        val releaseStorePassword = getSecretProperty("RELEASE_STORE_PASSWORD")
+        val releaseKeyAlias = getSecretProperty("RELEASE_KEY_ALIAS")
+        val releaseKeyPassword = getSecretProperty("RELEASE_KEY_PASSWORD")
+
+        if (releaseStoreFile != null && file(releaseStoreFile).exists() &&
+            releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -61,7 +90,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-project.txt")
             manifestPlaceholders["appName"] = "@string/app_name"
             applicationIdSuffix = ""
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         debug {
             applicationIdSuffix = ".debug"

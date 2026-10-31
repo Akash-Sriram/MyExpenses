@@ -10,3 +10,5 @@ google-services.json
 Test_Receipts_Curated/
 extracted_backup/
 *.zip
+*.jks
+*.keystore
