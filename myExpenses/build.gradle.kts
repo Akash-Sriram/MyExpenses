@@ -226,6 +226,7 @@ dependencies {
 
     implementation(libs.reorderable)
     implementation(libs.text.recognition.devanagari)
+    implementation(libs.play.services.code.scanner)
 
     debugImplementation(libs.androidx.fragment.testing.manifest)
     testImplementation(libs.androidx.fragment.testing)

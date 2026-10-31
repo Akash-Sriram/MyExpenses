@@ -8,6 +8,8 @@ import androidx.compose.material.icons.automirrored.filled.TrendingFlat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Payment
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Scanner
 import androidx.compose.runtime.Composable
@@ -36,6 +38,7 @@ enum class Action(
         R.string.split_transaction,
         TransactionsContract.Transactions.TYPE_SPLIT
     ),
+    ScanUpi(Icons.Default.QrCodeScanner, R.string.scan_upi_qr),
     Scan(Icons.Default.Scanner, R.string.button_scan),
     Buy(Icons.Default.ArrowUpward, R.string.trade_buy),
     Sell(Icons.Default.ArrowDownward, R.string.trade_sell),
@@ -70,6 +73,6 @@ AssetTransfer(
 
     companion object {
         val PORTFOLIO_ACTIONS = listOf(Buy, Sell, Deposit, Withdraw, AssetTransfer)
-        val STANDARD_ACTIONS = listOf(Expense, Income, Transfer, Scan)
+        val STANDARD_ACTIONS = listOf(Expense, Income, Transfer, ScanUpi, Scan)
     }
 }

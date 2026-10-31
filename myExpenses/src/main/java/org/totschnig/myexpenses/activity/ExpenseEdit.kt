@@ -638,6 +638,42 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
                     getString(R.string.default_attachment_mime_types)
                 ).split(',').map { it.trim() }.toTypedArray()
                 when (item.itemId) {
+                    R.id.SCAN_UPI_QR_COMMAND -> {
+                        org.totschnig.myexpenses.util.upi.UpiQrScannerHelper.scanQrCode(
+                            this@ExpenseEdit,
+                            onSuccess = { qrString ->
+                                val qrData = org.totschnig.myexpenses.util.upi.UpiQrParser.parse(qrString)
+                                if (qrData != null && qrData.isValid) {
+                                    qrData.amount?.let { amt ->
+                                        delegate.fillAmount(amt)
+                                    }
+                                    qrData.payeeName?.let { payee ->
+                                        lifecycleScope.launch {
+                                            val payeeId = viewModel.resolvePayeeId(payee, qrData.vpa)
+                                            rootBinding.Payee.party = org.totschnig.myexpenses.ui.DisplayParty(payeeId, payee)
+                                        }
+                                    }
+                                    qrData.transactionRef?.let { ref ->
+                                        delegate.methodRowBinding.Number.setText(ref)
+                                        delegate.setReferenceNumberVisibility()
+                                    }
+                                    rootBinding.UpiId.setText(qrData.vpa)
+                                    val noteText = if (!qrData.transactionNote.isNullOrBlank()) {
+                                        "UPI: ${qrData.vpa} • Note: ${qrData.transactionNote}"
+                                    } else {
+                                        "UPI: ${qrData.vpa}"
+                                    }
+                                    rootBinding.Comment.setText(noteText)
+                                    showSnackBar("Scanned UPI QR: ${qrData.payeeName ?: qrData.vpa}")
+                                } else {
+                                    showSnackBar("Invalid UPI QR code")
+                                }
+                            },
+                            onFailure = { e ->
+                                showSnackBar("QR Scan error: ${e.message}")
+                            }
+                        )
+                    }
                     R.id.PHOTO_COMMAND -> startMediaChooserDo()
                     R.id.ATTACH_COMMAND -> try {
                         pickAttachment.launch(types)

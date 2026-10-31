@@ -759,6 +759,7 @@
     <string name="menu_scan_mode">Scan mode</string>
     <!-- Button that triggers the scan operation -->
     <string name="button_scan">Scan</string>
+    <string name="scan_upi_qr">Scan UPI QR</string>
     <string name="pref_ocr_total_indicators_title">Indicators for total amount</string>
     <string name="pref_ocr_total_indicators_summary">A list of strings, which identify the total value in a receipt. Put each value on a new line. Leave empty to restore the default value.</string>
     <string name="pref_ocr_date_formats_title">Date Formats</string>

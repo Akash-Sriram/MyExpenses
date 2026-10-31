@@ -45,6 +45,8 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Payment
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
@@ -459,6 +461,8 @@ fun TransactionScreen(
                                 else -> false
                             }
 
+                            val isPortfolio = (currentAccount as? FullAccount)?.isPortfolio == true
+
                             TopAppBar(
                                 windowInsets = windowInsets.only(
                                     WindowInsetsSides.Horizontal + WindowInsetsSides.Top
@@ -467,7 +471,6 @@ fun TransactionScreen(
                                 modifier = Modifier.height(height),
                                 navigationIcon = navigationIcon,
                                 title = {
-                                    val isPortfolio = (currentAccount as? FullAccount)?.isPortfolio == true
                                     BalanceHeader(
                                         modifier = Modifier.conditional(isFramed) {
                                             padding(start = 4.dp, top = 4.dp)
@@ -488,6 +491,18 @@ fun TransactionScreen(
                                     )
                                 },
                                 actions = {
+                                    if (!isPortfolio) {
+                                        IconButton(
+                                            onClick = {
+                                                onEvent(AppEvent.CreateTransaction(Action.ScanUpi))
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.QrCodeScanner,
+                                                contentDescription = stringResource(R.string.scan_upi_qr)
+                                            )
+                                        }
+                                    }
                                     val menuConfig = viewModel.transactionMenuAccessor.statefulFlow
                                         .collectAsState(PreferenceState.Loading).value
 
