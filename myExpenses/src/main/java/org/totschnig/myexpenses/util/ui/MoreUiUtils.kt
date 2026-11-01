@@ -249,38 +249,58 @@ fun attachmentInfoMap(context: Context, withFile: Boolean = false): Map<Uri, Att
                 } catch (_: IllegalArgumentException) {
                     null
                 }
-                val mimeType = contentResolver.getType(resolvedUri) ?: file?.let { getMimeType(it.name) }
-                mimeType?.let {
-                    if (it.startsWith("image")) {
-                        val size = UiUtils.dp2Px(48f, context.resources)
-                        try {
-                            AttachmentInfo.of(
-                                it,
-                                contentResolver.loadThumbnail(
-                                    resolvedUri,
-                                    Size(size, size),
-                                    null
-                                ), contentDescription, if (withFile) file else null
-                            )
-                        } catch (_: Exception) {
-                            val bitmap = file?.takeIf { f -> f.exists() }?.let { f ->
-                                try {
-                                    BitmapFactory.decodeFile(f.absolutePath)
-                                } catch (_: Exception) {
-                                    null
-                                }
+                val mimeType = contentResolver.getType(resolvedUri) ?: file?.let { getMimeType(it.name) } ?: "image/*"
+                if (mimeType.startsWith("image")) {
+                    val sizePx = UiUtils.dp2Px(96f, context.resources)
+                    val bitmap = try {
+                        contentResolver.loadThumbnail(resolvedUri, Size(sizePx, sizePx), null)
+                    } catch (_: Exception) {
+                        null
+                    } ?: try {
+                        contentResolver.openInputStream(resolvedUri)?.use { stream ->
+                            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeStream(stream, null, boundsOptions)
+                            val inSampleSize = calculateInSampleSize(boundsOptions, sizePx, sizePx)
+                            context.contentResolver.openInputStream(resolvedUri)?.use { stream2 ->
+                                val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+                                BitmapFactory.decodeStream(stream2, null, decodeOptions)
                             }
-                            if (bitmap != null) {
-                                AttachmentInfo.of(it, bitmap, contentDescription, if (withFile) file else null)
-                            } else null
                         }
-                    } else {
+                    } catch (_: Exception) {
+                        null
+                    } ?: file?.takeIf { f -> f.exists() }?.let { f ->
                         try {
-                            val icon = contentResolver.getTypeInfo(it).icon
-                            AttachmentInfo.of(it, icon, contentDescription, if (withFile) file else null)
+                            val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeFile(f.absolutePath, boundsOptions)
+                            val inSampleSize = calculateInSampleSize(boundsOptions, sizePx, sizePx)
+                            val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+                            BitmapFactory.decodeFile(f.absolutePath, decodeOptions)
                         } catch (_: Exception) {
                             null
                         }
+                    }
+
+                    if (bitmap != null) {
+                        AttachmentInfo.of(mimeType, bitmap, contentDescription, if (withFile) file else null)
+                    } else {
+                        AttachmentInfo.of(
+                            mimeType,
+                            com.google.android.material.R.drawable.mtrl_ic_error,
+                            contentDescription,
+                            if (withFile) file else null
+                        )
+                    }
+                } else {
+                    try {
+                        val icon = contentResolver.getTypeInfo(mimeType).icon
+                        AttachmentInfo.of(mimeType, icon, contentDescription, if (withFile) file else null)
+                    } catch (_: Exception) {
+                        AttachmentInfo.of(
+                            mimeType,
+                            com.google.android.material.R.drawable.mtrl_ic_error,
+                            contentDescription,
+                            if (withFile) file else null
+                        )
                     }
                 }
             }
@@ -393,4 +413,18 @@ fun resolveThemeColor(context: Context, attr: Int): Int {
         }
     }
     return 0
+}
+
+private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+    val height = options.outHeight
+    val width = options.outWidth
+    var inSampleSize = 1
+    if (height > reqHeight || width > reqWidth) {
+        val halfHeight = height / 2
+        val halfWidth = width / 2
+        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            inSampleSize *= 2
+        }
+    }
+    return inSampleSize
 }

@@ -428,6 +428,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                             mediaSourcesByRowId[rowId] = source
                         }
                         mediaSourcesByName[file.name] = source
+                        mediaSourcesByName[file.name.substringAfter('_')] = source
                     }
 
                     if (mediaSourcesByName.isEmpty()) {
@@ -446,6 +447,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                                     mediaSourcesByRowId[rowId] = source
                                 }
                                 mediaSourcesByName[cleanName] = source
+                                mediaSourcesByName[cleanName.substringAfter('_')] = source
                             }
                             Timber.i("Restoring pictures from companion media directory: %s (%d files)", companionMedia.uri, docFiles.size)
                         }
