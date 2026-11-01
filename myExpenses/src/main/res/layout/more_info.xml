@@ -29,6 +29,14 @@
         <TextView
             android:id="@+id/aboutVersionCode"
             style="@style/about_text" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCheckForUpdates"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/check_for_updates" />
         <!-- Licence -->
         <TextView
             style="@style/headingStyle.WithMargin.Caps"

@@ -39,6 +39,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.compose.conditional
+import org.totschnig.myexpenses.dialog.AppUpdateDialogFragment
+import org.totschnig.myexpenses.util.updater.AppUpdateManager
 
 import org.totschnig.myexpenses.compose.filter.FilterCard
 import org.totschnig.myexpenses.compose.filter.FilterDialog
@@ -256,6 +258,21 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                             shareExport(exportFormat, uriList)
                         }
                         exportViewModel.resultProcessed()
+                    }
+                }
+            }
+        }
+
+        if (AppUpdateManager.shouldCheckAutomatically(this)) {
+            lifecycleScope.launch(Dispatchers.IO) {
+                AppUpdateManager.recordCheckTime(this@BaseMyExpenses)
+                val result = AppUpdateManager.checkUpdate(this@BaseMyExpenses)
+                result.getOrNull()?.let { releaseInfo ->
+                    withContext(Dispatchers.Main) {
+                        if (!isFinishing && !isDestroyed) {
+                            AppUpdateDialogFragment.newInstance(releaseInfo)
+                                .show(supportFragmentManager, AppUpdateDialogFragment.FRAGMENT_TAG)
+                        }
                     }
                 }
             }

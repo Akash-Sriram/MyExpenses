@@ -10,6 +10,9 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.BuildConfig
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.databinding.MoreInfoBinding
@@ -17,6 +20,7 @@ import org.totschnig.myexpenses.util.TranslatorsHelper.buildTranslationCredits
 import org.totschnig.myexpenses.util.Utils
 import org.totschnig.myexpenses.util.distrib.DistributionHelper
 import org.totschnig.myexpenses.util.ui.UiUtils
+import org.totschnig.myexpenses.util.updater.AppUpdateManager
 
 class MoreInfoDialogFragment : DialogViewBinding<MoreInfoBinding>() {
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -25,6 +29,32 @@ class MoreInfoDialogFragment : DialogViewBinding<MoreInfoBinding>() {
             MoreInfoBinding.inflate(it)
         }
         binding.aboutVersionCode.text = DistributionHelper.getVersionInfo(context)
+
+        binding.btnCheckForUpdates.setOnClickListener {
+            binding.btnCheckForUpdates.isEnabled = false
+            binding.btnCheckForUpdates.setText(R.string.checking_for_updates)
+            lifecycleScope.launch {
+                val result = AppUpdateManager.checkUpdate(context)
+                AppUpdateManager.recordCheckTime(context)
+                binding.btnCheckForUpdates.isEnabled = true
+                binding.btnCheckForUpdates.setText(R.string.check_for_updates)
+
+                result.fold(
+                    onSuccess = { releaseInfo ->
+                        if (releaseInfo != null) {
+                            AppUpdateDialogFragment.newInstance(releaseInfo)
+                                .show(parentFragmentManager, AppUpdateDialogFragment.FRAGMENT_TAG)
+                        } else {
+                            Toast.makeText(context, R.string.update_check_latest, Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onFailure = { error ->
+                        val msg = getString(R.string.update_check_failed, error.localizedMessage ?: "Unknown error")
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        }
         binding.projectContainer.text = Utils.makeBulletList(
             context,
             Utils.getProjectDependencies(context)

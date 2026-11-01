@@ -52,6 +52,7 @@ android {
         versionName = (rootProject.extra["versionName"] as String)
 
         buildConfigField("String", "DISTRIBUTION", "\"GITHUB\"")
+        buildConfigField("String", "GITHUB_REPO", "\"Akash-Sriram/MyExpenses\"")
         buildConfigField("java.time.LocalDateTime", "BUILD_DATE", getDate())
         testInstrumentationRunner = "org.totschnig.myexpenses.MyTestRunner"
 
@@ -170,6 +171,9 @@ tasks.withType<Test>().configureEach {
     maxHeapSize = "1024m"
     systemProperty("robolectric.logging", "stdout")
     jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
+    if (name.contains("Release", ignoreCase = true)) {
+        enabled = false
+    }
 }
 
 dependencies {

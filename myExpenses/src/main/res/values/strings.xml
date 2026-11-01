@@ -1306,4 +1306,18 @@
     <string name="credit_liabilities">Credit &amp; Due Liabilities</string>
     <string name="manage_accounts">Manage Accounts</string>
     <string name="create_account">Create Account</string>
+
+    <!-- In-App GitHub Updates -->
+    <string name="check_for_updates">Check for updates</string>
+    <string name="checking_for_updates">Checking for updates…</string>
+    <string name="update_check_latest">You are using the latest version</string>
+    <string name="update_check_failed">Unable to check for updates: %1$s</string>
+    <string name="in_app_update_available_title">New Update Available</string>
+    <string name="in_app_update_download_install">Download &amp; Install</string>
+    <string name="in_app_update_view_on_github">View on GitHub</string>
+    <string name="in_app_update_downloading">Downloading update… %1$s</string>
+    <string name="in_app_update_download_complete">Download complete. Ready to install.</string>
+    <string name="in_app_update_install">Install Update</string>
+    <string name="in_app_update_download_failed">Download failed: %1$s</string>
+    <string name="in_app_update_permission_prompt">Please allow My Expenses to install apps from this source.</string>
 </resources>
