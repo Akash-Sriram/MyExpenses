@@ -170,10 +170,15 @@ abstract class MainDelegate(
             it.copy(
                 amount = amount,
                 party = if (!isSplitPart) {
-                    val upiText = viewBinding.UpiId.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                    val isUpi = isUpiSelected()
+                    val upiText = if (isUpi) {
+                        viewBinding.UpiId.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                    } else null
                     val baseParty = viewBinding.Payee.partyForSave ?: upiText?.let { DisplayParty(null, it, null, it) }
                     baseParty?.let { p ->
-                        if (upiText != null) p.copy(iban = upiText) else p.copy(iban = null)
+                        if (isUpi) {
+                            if (upiText != null) p.copy(iban = upiText) else p.copy(iban = null)
+                        } else p
                     }
                 } else null,
                 debtId = this@MainDelegate.debtId,
@@ -208,6 +213,7 @@ abstract class MainDelegate(
             handleDebts()
             host.onPayeeChanged(partyId)
             viewBinding.UpiId.setText(viewBinding.Payee.party?.iban ?: "")
+            updateUpiVisibility()
             if (partyId != null) {
                 if (withAutoFill && shouldAutoFill) {
                     if (shouldStartAutoFill(prefHandler)) {
@@ -243,6 +249,7 @@ abstract class MainDelegate(
         if (!isSplitPart) {
             viewBinding.Payee.party = transaction.party
             viewBinding.UpiId.setText(transaction.party?.iban ?: "")
+            updateUpiVisibility()
         }
         transaction.equivalentAmount?.let {
             viewBinding.EquivalentAmount.setFractionDigits(it.currencyUnit.fractionDigits)

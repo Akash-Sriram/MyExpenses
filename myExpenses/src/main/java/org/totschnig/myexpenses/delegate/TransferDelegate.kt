@@ -110,6 +110,10 @@ class TransferDelegate(
         configureCategoryVisibility()
     }
 
+    override fun updateUpiVisibility() {
+        viewBinding.UpiIdRow.visibility = View.GONE
+    }
+
     override fun populateFields(transaction: TransactionEditData, withAutoFill: Boolean) {
         super.populateFields(transaction, withAutoFill)
         transaction.transferEditData?.transferAmount?.let {

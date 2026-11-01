@@ -289,7 +289,9 @@
                         android:layout_height="wrap_content" />
                 </TableRow>
 
-                <TableRow android:id="@+id/UpiIdRow">
+                <TableRow
+                    android:id="@+id/UpiIdRow"
+                    android:visibility="gone">
 
                     <TextView
                         android:id="@+id/UpiIdLabel"

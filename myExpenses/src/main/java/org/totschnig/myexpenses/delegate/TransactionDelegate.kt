@@ -378,6 +378,7 @@ abstract class TransactionDelegate(
 
     protected fun hideRowsSpecificToMain() {
         viewBinding.PayeeRow.visibility = View.GONE
+        viewBinding.UpiIdRow.visibility = View.GONE
         methodRowBinding.MethodRow.visibility = View.GONE
     }
 
@@ -506,6 +507,27 @@ abstract class TransactionDelegate(
         }
         methodRowBinding.ClearMethod.root.isVisible = methodId != null
         setReferenceNumberVisibility()
+        updateUpiVisibility()
+    }
+
+    fun isUpiSelected(): Boolean {
+        if (operationType != TYPE_TRANSACTION) return false
+        val selectedPm = if (::methodsAdapter.isInitialized) {
+            (0 until methodsAdapter.count).mapNotNull { methodsAdapter.getItem(it) }.firstOrNull { it.id == methodId }
+        } else null
+        val upiLabel = PreDefinedPaymentMethod.UPI.name
+        val upiLocalized = context.getString(PreDefinedPaymentMethod.UPI.resId)
+        return selectedPm?.label?.equals(upiLabel, ignoreCase = true) == true ||
+                selectedPm?.label?.equals(upiLocalized, ignoreCase = true) == true ||
+                methodLabel?.contains("UPI", ignoreCase = true) == true
+    }
+
+    open fun updateUpiVisibility() {
+        if (operationType != TYPE_TRANSACTION || isSplitPart) {
+            viewBinding.UpiIdRow.visibility = View.GONE
+        } else {
+            viewBinding.UpiIdRow.visibility = if (isUpiSelected()) View.VISIBLE else View.GONE
+        }
     }
 
     fun setReferenceNumberVisibility() {
@@ -540,7 +562,7 @@ abstract class TransactionDelegate(
         val allowedOperationTypes: MutableList<Int> = ArrayList()
         allowedOperationTypes.add(TYPE_TRANSACTION)
         allowedOperationTypes.add(TYPE_TRANSFER)
-        if (!isSplitPart) {
+        if (operationType == TYPE_SPLIT) {
             allowedOperationTypes.add(TYPE_SPLIT)
         }
         val objects = allowedOperationTypes.map {
@@ -654,6 +676,7 @@ abstract class TransactionDelegate(
                 methodId = if (hasSelection) parent.selectedItemId.takeIf { it > 0 } else null
                 methodRowBinding.ClearMethod.root.isVisible = hasSelection
                 setReferenceNumberVisibility()
+                updateUpiVisibility()
             }
 
             accountSpinner.id -> {

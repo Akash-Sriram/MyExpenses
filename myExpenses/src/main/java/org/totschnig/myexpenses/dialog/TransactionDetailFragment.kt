@@ -444,7 +444,8 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
                     transaction.debtLabel?.let {
                         append(" ($it)")
                     }
-                    transaction.iban?.let {
+                    val isUpi = !transaction.isTransfer && transaction.methodLabel?.contains("UPI", ignoreCase = true) == true
+                    if (isUpi && transaction.iban != null) {
                         append(" (${transaction.iban})")
                     }
                 }

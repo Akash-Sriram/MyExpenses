@@ -71,4 +71,9 @@
         android:fragment="org.totschnig.myexpenses.fragment.preferences.PreferencesAdvancedFragment"
         android:key="advanced"
         android:title="@string/expand_button_title" />
+
+    <Preference
+        android:key="@string/pref_more_info_dialog_key"
+        android:title="@string/check_for_updates"
+        android:summary="@string/pref_more_info_dialog_title" />
 </PreferenceScreen>

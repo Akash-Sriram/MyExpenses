@@ -99,13 +99,6 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
     lateinit var modelClass: Class<out MyExpensesV2ViewModel>
 
     private val currencyViewModel: CurrencyViewModel by viewModels()
-    private val upiScannerViewModel: org.totschnig.myexpenses.viewmodel.UpiScannerViewModel by viewModels()
-
-    private val upiPaymentLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        upiScannerViewModel.handlePaymentActivityResult(result.resultCode, result.data)
-    }
 
     private var showPortfolioSetup by mutableStateOf(false)
     private var portfolioToEditId by mutableStateOf<Long?>(null)
@@ -282,66 +275,6 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                             }
                         }
 
-                        val upiState by upiScannerViewModel.uiState.collectAsStateWithLifecycle()
-
-                        when (val state = upiState) {
-                            is org.totschnig.myexpenses.viewmodel.UpiUiState.AppSelection -> {
-                                org.totschnig.myexpenses.compose.upi.UpiAppChooserBottomSheet(
-                                    qrData = state.qrData,
-                                    installedApps = state.apps,
-                                    onAppSelected = { app, amount ->
-                                        val updatedQr = if (amount != null && amount > java.math.BigDecimal.ZERO) {
-                                            state.qrData.copy(amount = amount)
-                                        } else {
-                                            state.qrData
-                                        }
-                                        upiScannerViewModel.selectAppToPay(app, amount)
-                                        val intent = org.totschnig.myexpenses.util.upi.UpiAppHelper.createUpiIntent(app, updatedQr)
-                                        try {
-                                            upiPaymentLauncher.launch(intent)
-                                        } catch (e: Exception) {
-                                            showSnackBar("Could not open ${app.appName}: ${e.message}")
-                                        }
-                                    },
-                                    onDismiss = { upiScannerViewModel.reset() }
-                                )
-                            }
-                            is org.totschnig.myexpenses.viewmodel.UpiUiState.PaymentFailed -> {
-                                org.totschnig.myexpenses.compose.upi.UpiFallbackDialog(
-                                    qrData = state.qrData,
-                                    failedApp = state.failedApp,
-                                    availableApps = state.availableApps,
-                                    failureReason = state.reason,
-                                    onRetryWithApp = { app ->
-                                        upiScannerViewModel.retryWithApp(app)
-                                        val intent = org.totschnig.myexpenses.util.upi.UpiAppHelper.createUpiIntent(app, state.qrData)
-                                        try {
-                                            upiPaymentLauncher.launch(intent)
-                                        } catch (e: Exception) {
-                                            showSnackBar("Could not open ${app.appName}: ${e.message}")
-                                        }
-                                    },
-                                    onMarkAsPaidAnyway = {
-                                        upiScannerViewModel.markAsPaidAnyway()
-                                    },
-                                    onDismiss = { upiScannerViewModel.reset() }
-                                )
-                            }
-                            is org.totschnig.myexpenses.viewmodel.UpiUiState.PaymentCompleted -> {
-                                LaunchedEffect(state) {
-                                    val intent = upiScannerViewModel.createExpenseEditIntent(this@MyExpensesV2, state.qrData, state.appUsed)
-                                    startEdit(intent)
-                                    upiScannerViewModel.reset()
-                                }
-                            }
-                            is org.totschnig.myexpenses.viewmodel.UpiUiState.ScanError -> {
-                                LaunchedEffect(state) {
-                                    showSnackBar(state.message)
-                                    upiScannerViewModel.reset()
-                                }
-                            }
-                            else -> {}
-                        }
 
                         if (showPortfolioSetup || portfolioToEditId != null) {
                             PortfolioSetupDialog(
@@ -406,14 +339,6 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                         is AppEvent.CreateTransaction ->
                                             if (preCreateRowCheckForSealed()) {
                                                 when (event.action) {
-                                                    Action.ScanUpi -> {
-                                                        org.totschnig.myexpenses.util.upi.UpiQrScannerHelper.scanQrCode(
-                                                            this@MyExpensesV2,
-                                                            onSuccess = { upiScannerViewModel.onQrScanned(it) },
-                                                            onFailure = { showSnackBar("Scan error: ${it.message}") }
-                                                        )
-                                                    }
-
                                                     Action.Scan -> contribFeatureRequested(ContribFeature.OCR, true)
 
                                                     else -> createRow(
