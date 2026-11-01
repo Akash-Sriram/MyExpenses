@@ -346,6 +346,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       }
       db.cleanupPayeePrefixesAndDuplicates()
       db.healLegacyAttachmentUris()
+      org.totschnig.myexpenses.util.AttachmentHealHelper.healAllMissingPicturesAsync(context)
       if (!prefHandler.getBoolean(PrefKey.SEEDED_DEFAULT_INCOME_CATEGORIES, false)) {
         runCatching {
           setupIncomeCategories(db, context.resources)

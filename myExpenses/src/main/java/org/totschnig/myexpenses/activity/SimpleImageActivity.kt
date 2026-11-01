@@ -105,36 +105,42 @@ fun SimpleImageViewerScreen(
         isLoading = true
         loadError = false
         withContext(Dispatchers.IO) {
+            // 1. Try ImageDecoder
             try {
-                val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     val source = ImageDecoder.createSource(context.contentResolver, uri)
                     ImageDecoder.decodeBitmap(source)
                 } else {
                     @Suppress("DEPRECATION")
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }
-                bitmap = decoded
             } catch (e: Exception) {
                 CrashHandler.report(e)
+            }
+
+            // 2. Fallback to openInputStream
+            if (bitmap == null) {
                 try {
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         bitmap = BitmapFactory.decodeStream(stream)
                     }
-                } catch (ignored: Exception) {
-                    try {
-                        val file = PictureDirHelper.getFileForUri(context, uri)
-                        if (file.exists()) {
-                            bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        } else {
-                            loadError = true
-                        }
-                    } catch (_: Exception) {
-                        loadError = true
-                    }
-                }
-            } finally {
-                isLoading = false
+                } catch (_: Exception) {}
             }
+
+            // 3. Fallback to direct file resolution & recovery via PictureDirHelper
+            if (bitmap == null) {
+                try {
+                    val file = PictureDirHelper.getFileForUri(context, uri)
+                    if (file.exists() && file.length() > 0) {
+                        bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                    }
+                } catch (_: Exception) {}
+            }
+
+            if (bitmap == null) {
+                loadError = true
+            }
+            isLoading = false
         }
     }
 

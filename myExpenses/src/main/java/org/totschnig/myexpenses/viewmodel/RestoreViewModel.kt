@@ -526,6 +526,7 @@ class RestoreViewModel(application: Application) : ContentResolvingAndroidViewMo
                             }
                             operations.clear()
                         }
+                        org.totschnig.myexpenses.util.AttachmentHealHelper.clearCache()
                     }
 
                     restoreSyncState().takeIf { it.isNotEmpty() }?.let { publishProgress(it) }

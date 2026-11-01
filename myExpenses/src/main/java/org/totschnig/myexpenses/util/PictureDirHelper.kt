@@ -129,43 +129,33 @@ object PictureDirHelper {
             )
         }
         val pathSegments = pictureUri.pathSegments
-        //TODO create unit test for checking if this logic is in sync with image_path.xml
-        val file = when (val pathDomain = pathSegments[0]) {
+        val fileName = pathSegments.lastOrNull() ?: ""
+        val file = when (pathSegments.firstOrNull()) {
             "external-files" -> {
-                if (pathSegments[1] != Environment.DIRECTORY_PICTURES) {
-                    report(Exception("Access to external-files outside pictures"))
+                if (pathSegments.size > 2) {
+                    File(getPictureDir(context, false), pathSegments.last())
+                } else if (pathSegments.size == 2) {
+                    File(getPictureDir(context, false), pathSegments[1])
+                } else {
+                    File(getPictureDir(context, false), fileName)
                 }
-                File(getPictureDir(context, false), pathSegments[2])
             }
-
-            "images" -> File(getPictureDir(context, true), pathSegments[1])
-
-            "cache" -> File(context.cacheDir, pathSegments[1])
-            else -> throw IllegalArgumentException(
-                String.format(
-                    Locale.ROOT,
-                    "Unable to handle %s",
-                    pathDomain
-                )
-            )
+            "images" -> {
+                if (pathSegments.size > 1) File(getPictureDir(context, true), pathSegments[1])
+                else File(getPictureDir(context, true), fileName)
+            }
+            "cache" -> {
+                if (pathSegments.size > 1) File(context.cacheDir, pathSegments[1])
+                else File(context.cacheDir, fileName)
+            }
+            "external" -> File(getPictureDir(context, false), fileName)
+            else -> File(getPictureDir(context, false), fileName)
         }
-        if (!file.exists() && pathSegments.isNotEmpty()) {
-            val fileName = pathSegments.last()
-            val candidatePaths = listOf(
-                "/storage/emulated/0/Android/data/org.totschnig.myexpenses/files/Pictures/$fileName",
-                "/storage/emulated/0/Android/data/com.myexpenses/files/Pictures/$fileName",
-                "/storage/emulated/0/Android/data/com.myexpenses.debug/files/Pictures/$fileName"
-            )
-            for (candidatePath in candidatePaths) {
-                val candidate = File(candidatePath)
-                if (candidate.exists() && candidate.canRead()) {
-                    try {
-                        candidate.copyTo(file, overwrite = true)
-                        return file
-                    } catch (_: Exception) {
-                        return candidate
-                    }
-                }
+
+        if (!file.exists() && fileName.isNotEmpty()) {
+            val restored = AttachmentHealHelper.restoreAttachmentFile(context, fileName, file)
+            if (restored != null && restored.exists() && restored.length() > 0) {
+                return restored
             }
         }
         return file
