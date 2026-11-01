@@ -3,6 +3,7 @@ package org.totschnig.myexpenses.provider
 import androidx.datastore.preferences.core.edit
 import com.google.common.truth.Truth
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,9 +16,20 @@ class DynamicCurrenciesTest: BaseTestWithRepository() {
 
     @Before
     fun setup() {
+        contentResolver.delete(TransactionProvider.ACCOUNTS_URI, null, null)
         insertAccount("Home")
         insertAccount("ForeignStatic", currency = "VND")
         insertAccount("ForeignDynamic", currency = "PLN", dynamic = true)
+    }
+
+    @After
+    fun tearDown() {
+        contentResolver.delete(TransactionProvider.ACCOUNTS_URI, null, null)
+        runBlocking {
+            dataStore.edit {
+                it.remove(dynamicExchangeRatesDefaultKey)
+            }
+        }
     }
 
     @Test
