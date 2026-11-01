@@ -7,6 +7,7 @@ import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.util.AppDirHelper.cacheDir
 import org.totschnig.myexpenses.util.AppDirHelper.getContentUriForFile
 import org.totschnig.myexpenses.util.AppDirHelper.getFileProviderAuthority
+import org.totschnig.myexpenses.util.AppDirHelper.isMyExpensesAuthority
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler.Companion.report
 import java.io.File
 import java.time.LocalDateTime
@@ -120,14 +121,16 @@ object PictureDirHelper {
         if ("file" == pictureUri.scheme) {
             return File(pictureUri.path!!)
         }
-        Preconditions.checkArgument(
-            "authority",
-            getFileProviderAuthority(context),
-            pictureUri.authority
-        )
+        if (!isMyExpensesAuthority(pictureUri.authority)) {
+            Preconditions.checkArgument(
+                "authority",
+                getFileProviderAuthority(context),
+                pictureUri.authority
+            )
+        }
         val pathSegments = pictureUri.pathSegments
         //TODO create unit test for checking if this logic is in sync with image_path.xml
-        return when (val pathDomain = pathSegments[0]) {
+        val file = when (val pathDomain = pathSegments[0]) {
             "external-files" -> {
                 if (pathSegments[1] != Environment.DIRECTORY_PICTURES) {
                     report(Exception("Access to external-files outside pictures"))
@@ -146,5 +149,25 @@ object PictureDirHelper {
                 )
             )
         }
+        if (!file.exists() && pathSegments.isNotEmpty()) {
+            val fileName = pathSegments.last()
+            val candidatePaths = listOf(
+                "/storage/emulated/0/Android/data/org.totschnig.myexpenses/files/Pictures/$fileName",
+                "/storage/emulated/0/Android/data/com.myexpenses/files/Pictures/$fileName",
+                "/storage/emulated/0/Android/data/com.myexpenses.debug/files/Pictures/$fileName"
+            )
+            for (candidatePath in candidatePaths) {
+                val candidate = File(candidatePath)
+                if (candidate.exists() && candidate.canRead()) {
+                    try {
+                        candidate.copyTo(file, overwrite = true)
+                        return file
+                    } catch (_: Exception) {
+                        return candidate
+                    }
+                }
+            }
+        }
+        return file
     }
 }

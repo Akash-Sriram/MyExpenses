@@ -48,6 +48,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
+import org.totschnig.myexpenses.util.AppDirHelper
+import org.totschnig.myexpenses.util.PictureDirHelper
 import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.compose.AppTheme
@@ -58,11 +60,12 @@ class SimpleImageActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        val uri = intent.data
-        if (uri == null) {
+        val rawUri = intent.data
+        if (rawUri == null) {
             finish()
             return
         }
+        val uri = AppDirHelper.normalizeAttachmentUri(this, rawUri)
 
         setContent {
             AppTheme {
@@ -76,9 +79,10 @@ class SimpleImageActivity : ComponentActivity() {
     }
 
     private fun shareUri(uri: Uri) {
+        val shareUri = AppDirHelper.ensureContentUri(uri, this)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "image/*"
-            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_STREAM, shareUri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         startActivity(Intent.createChooser(shareIntent, getString(R.string.share)))
@@ -117,7 +121,16 @@ fun SimpleImageViewerScreen(
                         bitmap = BitmapFactory.decodeStream(stream)
                     }
                 } catch (ignored: Exception) {
-                    loadError = true
+                    try {
+                        val file = PictureDirHelper.getFileForUri(context, uri)
+                        if (file.exists()) {
+                            bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        } else {
+                            loadError = true
+                        }
+                    } catch (_: Exception) {
+                        loadError = true
+                    }
                 }
             } finally {
                 isLoading = false

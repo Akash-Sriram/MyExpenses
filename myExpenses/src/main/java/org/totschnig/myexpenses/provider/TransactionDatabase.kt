@@ -345,6 +345,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
         db.execSQL("ALTER TABLE $TABLE_SUBSCRIPTIONS ADD COLUMN cancel_before_renewal INTEGER DEFAULT 0;")
       }
       db.cleanupPayeePrefixesAndDuplicates()
+      db.healLegacyAttachmentUris()
       if (!prefHandler.getBoolean(PrefKey.SEEDED_DEFAULT_INCOME_CATEGORIES, false)) {
         runCatching {
           setupIncomeCategories(db, context.resources)
@@ -432,6 +433,65 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
           execSQL("DELETE FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dupId))
         }
       }
+    }
+  }
+
+  private fun SupportSQLiteDatabase.healLegacyAttachmentUris() {
+    runCatching {
+      val currentAuthority = org.totschnig.myexpenses.util.AppDirHelper.getFileProviderAuthority(context)
+      val legacyAuthorities = listOf(
+        "org.totschnig.myexpenses.fileprovider",
+        "org.totschnig.myexpenses.debug.fileprovider",
+        "com.myexpenses.fileprovider",
+        "com.myexpenses.debug.fileprovider"
+      ).filter { it != currentAuthority }
+
+      for (legacy in legacyAuthorities) {
+        val legacyPrefix = "content://$legacy/"
+        val currentPrefix = "content://$currentAuthority/"
+        query(
+          SimpleSQLiteQuery(
+            "SELECT $KEY_ROWID, $KEY_URI FROM $TABLE_ATTACHMENTS WHERE $KEY_URI LIKE ?",
+            arrayOf<Any>("$legacyPrefix%")
+          )
+        ).use { cursor ->
+          val toUpdate = mutableListOf<Pair<Long, String>>()
+          while (cursor.moveToNext()) {
+            val rowId = cursor.getLong(0)
+            val oldUri = cursor.getString(1)
+            val newUri = oldUri.replaceFirst(legacyPrefix, currentPrefix)
+            toUpdate.add(rowId to newUri)
+          }
+          for ((rowId, newUri) in toUpdate) {
+            var existingId: Long? = null
+            query(
+              SimpleSQLiteQuery(
+                "SELECT $KEY_ROWID FROM $TABLE_ATTACHMENTS WHERE $KEY_URI = ?",
+                arrayOf<Any>(newUri)
+              )
+            ).use { c ->
+              if (c.moveToFirst()) existingId = c.getLong(0)
+            }
+            if (existingId != null) {
+              execSQL(
+                "UPDATE OR IGNORE $TABLE_TRANSACTION_ATTACHMENTS SET $KEY_ATTACHMENT_ID = ? WHERE $KEY_ATTACHMENT_ID = ?",
+                arrayOf<Any>(existingId, rowId)
+              )
+              execSQL("DELETE FROM $TABLE_ATTACHMENTS WHERE $KEY_ROWID = ?", arrayOf<Any>(rowId))
+            } else {
+              execSQL("UPDATE $TABLE_ATTACHMENTS SET $KEY_URI = ? WHERE $KEY_ROWID = ?", arrayOf<Any>(newUri, rowId))
+            }
+          }
+        }
+        runCatching {
+          execSQL(
+            "UPDATE $TABLE_COMMITMENT_ATTACHMENTS SET $KEY_URI = ? || substr($KEY_URI, ?) WHERE $KEY_URI LIKE ?",
+            arrayOf<Any>(currentPrefix, legacyPrefix.length + 1, "$legacyPrefix%")
+          )
+        }
+      }
+    }.onFailure {
+      Timber.e(it, "Failed to heal legacy attachment URIs")
     }
   }
 

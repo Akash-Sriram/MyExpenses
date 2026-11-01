@@ -40,6 +40,9 @@ object PermissionHelper {
             }
             return false
         }
+        if (AppDirHelper.isMyExpensesAuthority(uri.authority)) {
+            return true
+        }
         return AppDirHelper.getFileProviderAuthority(context) == uri.authority || context.checkUriPermission(
             uri, Binder.getCallingPid(), Binder.getCallingUid(),
             Intent.FLAG_GRANT_READ_URI_PERMISSION

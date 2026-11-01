@@ -219,7 +219,7 @@ object AppDirHelper {
             throw NougatFileProviderException(e)
         }
 
-        "content" -> uri
+        "content" -> normalizeAttachmentUri(context, uri)
         else -> {
             CrashHandler.report(
                 IllegalStateException(
@@ -239,4 +239,25 @@ object AppDirHelper {
     @JvmStatic
     fun getFileProviderAuthority(context: Context): String =
         context.packageName + ".fileprovider"
+
+    @JvmStatic
+    fun isMyExpensesAuthority(authority: String?): Boolean {
+        if (authority == null) return false
+        return authority.endsWith(".fileprovider") ||
+                authority == "org.totschnig.myexpenses" ||
+                authority == "org.totschnig.myexpenses.debug" ||
+                authority == "com.myexpenses" ||
+                authority == "com.myexpenses.debug"
+    }
+
+    @JvmStatic
+    fun normalizeAttachmentUri(context: Context, uri: Uri): Uri {
+        if (uri.scheme == "content" && isMyExpensesAuthority(uri.authority)) {
+            val currentAuthority = getFileProviderAuthority(context)
+            if (uri.authority != currentAuthority) {
+                return uri.buildUpon().authority(currentAuthority).build()
+            }
+        }
+        return uri
+    }
 }

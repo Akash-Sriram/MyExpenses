@@ -60,6 +60,8 @@ import org.totschnig.myexpenses.viewmodel.ContentResolvingAndroidViewModel.Compa
 import org.totschnig.myexpenses.viewmodel.data.AttachmentInfo
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
+import org.totschnig.myexpenses.util.AppDirHelper
+import java.io.File
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -238,43 +240,80 @@ fun ImageView.setAttachmentInfo(info: AttachmentInfo) {
 fun attachmentInfoMap(context: Context, withFile: Boolean = false): Map<Uri, AttachmentInfo> {
     val contentResolver = context.contentResolver
     return lazyMap { uri ->
-        when (uri.scheme) {
+        val resolvedUri = AppDirHelper.normalizeAttachmentUri(context, uri)
+        when (resolvedUri.scheme) {
             "content" -> {
-                val contentDescription = uri.fileName(context)
-                val file = if (withFile) try {
-                    PictureDirHelper.getFileForUri(context, uri)
+                val contentDescription = resolvedUri.fileName(context)
+                val file = try {
+                    PictureDirHelper.getFileForUri(context, resolvedUri)
                 } catch (_: IllegalArgumentException) {
                     null
-                } else null
-                contentResolver.getType(uri)?.let {
+                }
+                val mimeType = contentResolver.getType(resolvedUri) ?: file?.let { getMimeType(it.name) }
+                mimeType?.let {
                     if (it.startsWith("image")) {
                         val size = UiUtils.dp2Px(48f, context.resources)
                         try {
                             AttachmentInfo.of(
                                 it,
                                 contentResolver.loadThumbnail(
-                                    uri,
+                                    resolvedUri,
                                     Size(size, size),
                                     null
-                                ), contentDescription, file
+                                ), contentDescription, if (withFile) file else null
                             )
+                        } catch (_: Exception) {
+                            val bitmap = file?.takeIf { f -> f.exists() }?.let { f ->
+                                try {
+                                    BitmapFactory.decodeFile(f.absolutePath)
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            }
+                            if (bitmap != null) {
+                                AttachmentInfo.of(it, bitmap, contentDescription, if (withFile) file else null)
+                            } else null
+                        }
+                    } else {
+                        try {
+                            val icon = contentResolver.getTypeInfo(it).icon
+                            AttachmentInfo.of(it, icon, contentDescription, if (withFile) file else null)
                         } catch (_: Exception) {
                             null
                         }
-                    } else {
-                        val icon = contentResolver.getTypeInfo(it).icon
-                        AttachmentInfo.of(it, icon, contentDescription, file)
                     }
                 }
             }
 
-            "file" -> if (uri.pathSegments.first() == "android_asset") {
-                val file = uri.pathSegments[1]
+            "file" -> if (resolvedUri.pathSegments.firstOrNull() == "android_asset") {
+                val file = resolvedUri.pathSegments[1]
                 AttachmentInfo.of(
                     getMimeType(file),
                     context.assets.open(file).use(BitmapFactory::decodeStream), file, null
                 )
-            } else null
+            } else {
+                val file = resolvedUri.path?.let { File(it) }
+                if (file != null && file.exists()) {
+                    val mimeType = getMimeType(file.name)
+                    if (mimeType.startsWith("image")) {
+                        try {
+                            val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                            if (bitmap != null) {
+                                AttachmentInfo.of(mimeType, bitmap, file.name, if (withFile) file else null)
+                            } else null
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } else {
+                        try {
+                            val icon = contentResolver.getTypeInfo(mimeType).icon
+                            AttachmentInfo.of(mimeType, icon, file.name, if (withFile) file else null)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                } else null
+            }
 
             else -> null
         } ?: AttachmentInfo.of(
