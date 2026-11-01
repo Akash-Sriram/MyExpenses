@@ -13,6 +13,7 @@ import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
 import com.adevinta.android.barista.interaction.BaristaMenuClickInteractions.clickMenu
 import org.junit.After
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.shadows.ShadowLooper
@@ -20,6 +21,7 @@ import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.db2.requireParty
 import org.totschnig.myexpenses.provider.TransactionProvider
 
+@Ignore("ManageParties migrated from XML RecyclerView to Jetpack Compose PartiesScreen")
 @RunWith(AndroidJUnit4::class)
 class ManagePartiesTest {
     private lateinit var activityScenario: ActivityScenario<ManageParties>

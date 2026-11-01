@@ -110,6 +110,7 @@ class CategoryTest : BaseTestWithRepository() {
 
     @Test
     fun shouldMergeRecursively() {
+        contentResolver.delete(TransactionProvider.CATEGORIES_URI, null, null)
         val main1 = Category(label = "Main 1", type = FLAG_EXPENSE).saveCopy
         val main2 = Category(label = "Main 2", type = FLAG_EXPENSE).saveCopy
         val sub1 = Category(label = "Sub", parentId = main1.id).saveCopy
@@ -117,9 +118,6 @@ class CategoryTest : BaseTestWithRepository() {
         val subSub1 = Category(label = "SubSub", parentId = sub1.id).saveCopy
         Category(label = "SubSub", parentId = sub2.id).saveCopy
         repository.mergeCategories(listOf(main2.id!!), main1.id!!)
-        prefHandler.defaultTransferCategory?.let {
-            repository.deleteCategory(it)
-        }
         val cursor = contentResolver.query(
             CATEGORY_TREE_URI, null, null, null, null
         )!!

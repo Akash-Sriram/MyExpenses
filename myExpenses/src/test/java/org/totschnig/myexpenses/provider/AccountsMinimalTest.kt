@@ -115,7 +115,7 @@ class AccountsMinimalTest : BaseTestWithRepository() {
             testAccount2,
             testAccount3,
             currencyContext.homeCurrencyString,
-            application.getString(R.string.grand_total)
+            application.getString(R.string.all_accounts)
         )
     }
 
@@ -129,7 +129,7 @@ class AccountsMinimalTest : BaseTestWithRepository() {
             testAccount2,
             testAccount3,
             currencyContext.homeCurrencyString,
-            application.getString(R.string.grand_total)
+            application.getString(R.string.all_accounts)
         )
     }
 }

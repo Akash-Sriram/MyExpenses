@@ -47,7 +47,9 @@ import org.totschnig.myexpenses.model.PREDEFINED_NAME_BANK
 import org.totschnig.myexpenses.model.PREDEFINED_NAME_CASH
 import org.totschnig.myexpenses.model.PreDefinedPaymentMethod
 import org.totschnig.myexpenses.model2.Account
+import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.SPLIT_CATID
+import org.totschnig.myexpenses.provider.TransactionProvider
 import org.totschnig.myexpenses.provider.filter.CategoryCriterion
 import org.totschnig.myexpenses.provider.filter.Criterion
 import org.totschnig.myexpenses.util.toEpoch
@@ -463,6 +465,9 @@ class ExportTest : BaseTestWithRepository() {
 
     @Test
     fun testCategoryExporter() {
+        prefHandler.defaultTransferCategory?.let { transferId ->
+            contentResolver.delete(TransactionProvider.CATEGORIES_URI, "$KEY_ROWID != ?", arrayOf(transferId.toString()))
+        }
         val cat1Id = writeCategory("Main")
         writeCategory("Sub", cat1Id)
         val result = CategoryExporter.export(context, "UTF-8", lazyFile)
