@@ -14,8 +14,6 @@ import org.totschnig.myexpenses.preference.PrefHandler
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.doBackup
 import org.totschnig.myexpenses.service.AutoBackupWorker
-import org.totschnig.myexpenses.service.PREF_KEY_RESOLVE_CONTACTS_PAYEE
-import org.totschnig.myexpenses.service.PREF_KEY_SMS_LOGGING_ENABLED
 import org.totschnig.myexpenses.util.AppDirHelper
 import android.content.Intent
 import org.totschnig.myexpenses.util.io.displayName
@@ -69,16 +67,6 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
     )
     val secureWindow: StateFlow<Boolean> = _secureWindow.asStateFlow()
 
-    private val _smsLoggingEnabled = MutableStateFlow(
-        prefHandler.getBoolean(PREF_KEY_SMS_LOGGING_ENABLED, true)
-    )
-    val smsLoggingEnabled: StateFlow<Boolean> = _smsLoggingEnabled.asStateFlow()
-
-    private val _resolveContactsPayee = MutableStateFlow(
-        prefHandler.getBoolean(PREF_KEY_RESOLVE_CONTACTS_PAYEE, true)
-    )
-    val resolveContactsPayee: StateFlow<Boolean> = _resolveContactsPayee.asStateFlow()
-
     private val _autoBackup = MutableStateFlow(
         prefHandler.getBoolean(PrefKey.AUTO_BACKUP, false)
     )
@@ -113,16 +101,6 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
         // ALLOW_SCREENSHOT is inverted: enabled secure window means screenshot disallowed
         prefHandler.putBoolean(PrefKey.PROTECTION_ALLOW_SCREENSHOT, !enabled)
         _secureWindow.value = enabled
-    }
-
-    fun setSmsLoggingEnabled(enabled: Boolean) {
-        prefHandler.putBoolean(PREF_KEY_SMS_LOGGING_ENABLED, enabled)
-        _smsLoggingEnabled.value = enabled
-    }
-
-    fun setResolveContactsPayee(enabled: Boolean) {
-        prefHandler.putBoolean(PREF_KEY_RESOLVE_CONTACTS_PAYEE, enabled)
-        _resolveContactsPayee.value = enabled
     }
 
     fun setAutoBackup(enabled: Boolean) {

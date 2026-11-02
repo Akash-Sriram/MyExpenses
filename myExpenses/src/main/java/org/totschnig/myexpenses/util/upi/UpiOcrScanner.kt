@@ -21,6 +21,7 @@ object UpiOcrScanner {
             val textResult = suspendCoroutine { cont ->
                 recognizer.process(image)
                     .addOnSuccessListener { visionText ->
+                        Timber.d("Raw ML Kit OCR Text:\n%s", visionText.text)
                         cont.resume(visionText.text)
                     }
                     .addOnFailureListener { e ->

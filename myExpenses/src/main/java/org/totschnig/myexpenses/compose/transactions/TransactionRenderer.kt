@@ -160,6 +160,7 @@ abstract class ItemRenderer(
         val trade = (resolvedExtraInfo as? ResolvedExtraInfo.Trade)?.trade
         val methodInfo = getMethodInfo(context)
         val methodIcon = methodInfo?.second
+        val hasSubstantiveContent = !referenceNumber.isNullOrEmpty() || !comment.isNullOrEmpty()
         return buildAnnotatedString {
             methodIcon?.let {
                 appendInlineContent(it, methodInfo.first)
@@ -178,11 +179,12 @@ abstract class ItemRenderer(
                 }
             }
             (trade?.peerAccount?.second ?: party?.displayName)?.let {
-                if (length > 0) {
+                if (length > 0 && hasSubstantiveContent) {
                     append(COMMENT_SEPARATOR)
                 }
+                val cleanParty = it.replace(Regex("""[\r\n]+"""), " ").trim()
                 withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline)) {
-                    append(it)
+                    append(cleanParty)
                 }
             }
             tagList.takeIf { withTags && it.isNotEmpty() }?.let { list ->

@@ -1401,31 +1401,19 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
     val pickScanGalleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         if (uri != null) {
             startEditFromOcrResult(null, uri)
+        } else {
+            onScanGalleryCancelled()
         }
     }
 
+    open fun onScanGalleryCancelled() {}
+
     fun showScanReceiptDialog() {
-        com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.scan_receipt_title)
-            .setItems(
-                arrayOf(
-                    getString(R.string.scan_receipt_camera),
-                    getString(R.string.scan_receipt_gallery)
-                )
-            ) { _, which ->
-                when (which) {
-                    0 -> startMediaChooserDo("SCAN")
-                    1 -> {
-                        try {
-                            pickScanGalleryLauncher.launch("image/*")
-                        } catch (e: Exception) {
-                            showSnackBar(e.message ?: "Failed to open gallery")
-                        }
-                    }
-                }
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        try {
+            pickScanGalleryLauncher.launch("image/*")
+        } catch (e: Exception) {
+            showSnackBar(e.message ?: "Failed to open gallery")
+        }
     }
 
     protected val calledFromOnboarding: Boolean

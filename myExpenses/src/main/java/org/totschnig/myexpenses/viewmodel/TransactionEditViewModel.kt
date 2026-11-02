@@ -701,9 +701,23 @@ class TransactionEditViewModel(application: Application, savedStateHandle: Saved
                 )?.use { cursor ->
                     if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
                 }
+
+                // 3. Prefix match if cleanName could be a prefix of an existing payee (e.g. "TAMILNADU MUTTON" matches "Tamilnadu mutton and chicken centre")
+                val prefix = cleanName.replace(Regex("""(?i)\s+(?:and|&)\s*$"""), "").trim()
+                if (prefix.length >= 4) {
+                    contentResolver.query(
+                        TransactionProvider.PAYEES_URI,
+                        arrayOf(KEY_ROWID),
+                        "$KEY_PAYEE_NAME LIKE ? COLLATE NOCASE",
+                        arrayOf("$prefix%"),
+                        "$KEY_ROWID DESC"
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                    }
+                }
             }
 
-            // 3. Match on UPI ID / IBAN if provided
+            // 4. Match on UPI ID / IBAN if provided
             val cleanUpi = upiId?.trim()?.takeIf { it.isNotEmpty() }
             if (cleanUpi != null) {
                 contentResolver.query(

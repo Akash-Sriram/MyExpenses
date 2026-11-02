@@ -2,7 +2,11 @@ package org.totschnig.myexpenses.compose.settings
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,24 +26,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Contacts
-import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Payment
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SettingsBrightness
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -48,13 +48,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -62,38 +64,36 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import org.totschnig.myexpenses.activity.MyExpensesV2
-import org.totschnig.myexpenses.compose.backup.ModernRestoreBottomSheet
-import org.totschnig.myexpenses.util.upi.UpiReceiptParser
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import kotlinx.coroutines.launch
+import org.totschnig.myexpenses.BuildConfig
 import org.totschnig.myexpenses.R
-import org.totschnig.myexpenses.activity.BackupRestoreActivity
 import org.totschnig.myexpenses.activity.ManageCategories
 import org.totschnig.myexpenses.activity.ManageMethods
 import org.totschnig.myexpenses.activity.ManageParties
 import org.totschnig.myexpenses.activity.ManageTags
+import org.totschnig.myexpenses.activity.MyExpensesV2
+import org.totschnig.myexpenses.compose.backup.ModernRestoreBottomSheet
+import org.totschnig.myexpenses.dialog.AppUpdateDialogFragment
+import org.totschnig.myexpenses.util.updater.AppUpdateManager
 import org.totschnig.myexpenses.viewmodel.BackupOperationState
 import org.totschnig.myexpenses.viewmodel.SettingsBackupSnapshot
 import org.totschnig.myexpenses.viewmodel.SettingsViewModel2
@@ -106,6 +106,7 @@ private val GreenAccent = Color(0xFF2E7D32)
 private val BlueAccent = Color(0xFF1565C0)
 private val PurpleAccent = Color(0xFF6A1B9A)
 private val AmberAccent = Color(0xFFE65100)
+private val TealAccent = Color(0xFF00796B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -115,11 +116,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val theme by viewModel.theme.collectAsState()
     val deviceLock by viewModel.deviceLockScreen.collectAsState()
     val secureWindow by viewModel.secureWindow.collectAsState()
-    val smsLogging by viewModel.smsLoggingEnabled.collectAsState()
-    val resolveContacts by viewModel.resolveContactsPayee.collectAsState()
     val autoBackup by viewModel.autoBackup.collectAsState()
     val backupLocation by viewModel.backupLocation.collectAsState()
     val snapshots by viewModel.backupSnapshots.collectAsState()
@@ -135,16 +135,7 @@ fun SettingsScreen(
 
     var showRestoreSheet by remember { mutableStateOf(false) }
     var restoreSheetUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var showUpiIdentityDialog by remember { mutableStateOf(false) }
-
-    val app = context.applicationContext as org.totschnig.myexpenses.MyApplication
-    val prefHandler = app.prefHandler
-    var userNamePref by remember {
-        mutableStateOf(prefHandler.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_NAME, UpiReceiptParser.DEFAULT_USER_NAME) ?: UpiReceiptParser.DEFAULT_USER_NAME)
-    }
-    var userPhonePref by remember {
-        mutableStateOf(prefHandler.getString(UpiReceiptParser.PREF_KEY_USER_PROFILE_PHONE, UpiReceiptParser.DEFAULT_USER_PHONE) ?: UpiReceiptParser.DEFAULT_USER_PHONE)
-    }
+    var isCheckingUpdate by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -177,62 +168,64 @@ fun SettingsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. General & Accounts Section
+            // 1. Appearance Section
+            item(key = "appearance_section") {
+                SettingsCard(title = "Appearance", icon = Icons.Default.SettingsBrightness, iconTint = PurpleAccent) {
+                    Text(
+                        text = "Theme Preference",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SegmentedButton(
+                            selected = theme == "auto",
+                            onClick = { viewModel.setTheme("auto") },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.SettingsBrightness,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                                )
+                            },
+                            label = { Text("System") }
+                        )
+                        SegmentedButton(
+                            selected = theme == "light",
+                            onClick = { viewModel.setTheme("light") },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.LightMode,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                                )
+                            },
+                            label = { Text("Light") }
+                        )
+                        SegmentedButton(
+                            selected = theme == "dark",
+                            onClick = { viewModel.setTheme("dark") },
+                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.DarkMode,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SegmentedButtonDefaults.IconSize)
+                                )
+                            },
+                            label = { Text("Dark") }
+                        )
+                    }
+                }
+            }
+
+            // 2. General & Accounts Section
             item(key = "general_section") {
                 SettingsCard(title = "General & Accounts", icon = Icons.Default.AccountBalance, iconTint = BlueAccent) {
-                    // Currency Locked to INR
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(GreenAccent.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CurrencyRupee,
-                                contentDescription = null,
-                                tint = GreenAccent,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Primary Currency",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = GreenAccent.copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        text = "Fixed INR (₹)",
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = GreenAccent
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "Indian Rupee is permanently locked as standard currency",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-
                     NavigationSettingTile(
                         icon = Icons.Default.Category,
                         title = "Manage Categories",
@@ -252,7 +245,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
 
                     NavigationSettingTile(
-                        icon = Icons.Default.Label,
+                        icon = Icons.AutoMirrored.Filled.Label,
                         title = "Manage Tags",
                         subtitle = "Custom tags for transaction tracking",
                         onClick = { context.startActivity(Intent(context, ManageTags::class.java)) }
@@ -262,39 +255,9 @@ fun SettingsScreen(
 
                     NavigationSettingTile(
                         icon = Icons.Default.Contacts,
-                        title = "Payees & Contacts",
-                        subtitle = "Manage merchant names and contact mappings",
+                        title = "Payees",
+                        subtitle = "Manage merchant and payee names",
                         onClick = { context.startActivity(Intent(context, ManageParties::class.java)) }
-                    )
-                }
-            }
-
-            // 2. UPI & SMS Intelligence Section
-            item(key = "sms_upi_section") {
-                SettingsCard(title = "UPI & SMS Intelligence", icon = Icons.Default.Sms, iconTint = GreenAccent) {
-                    SwitchSettingTile(
-                        title = "Bank SMS 1-Tap Log",
-                        subtitle = "Auto-parse debit SMS from HDFC, ICICI, SBI, Axis, GPay, PhonePe, Paytm with 1-tap notification",
-                        checked = smsLogging,
-                        onCheckedChange = { viewModel.setSmsLoggingEnabled(it) }
-                    )
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-
-                    SwitchSettingTile(
-                        title = "Resolve Payee via Phone Contacts",
-                        subtitle = "Automatically match mobile-number UPI IDs (e.g. 9876543210@paytm) with your contact names",
-                        checked = resolveContacts,
-                        onCheckedChange = { viewModel.setResolveContactsPayee(it) }
-                    )
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-
-                    NavigationSettingTile(
-                        icon = Icons.Default.Person,
-                        title = "Your UPI Identity Profile",
-                        subtitle = "$userNamePref • $userPhonePref\nUsed to identify payments sent TO you (Income) vs BY you (Expense)",
-                        onClick = { showUpiIdentityDialog = true }
                     )
                 }
             }
@@ -565,66 +528,120 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. Appearance Section
-            item(key = "appearance_section") {
-                SettingsCard(title = "Appearance", icon = Icons.Default.SettingsBrightness, iconTint = PurpleAccent) {
-                    Text(
-                        text = "Theme Preference",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ThemeChip(
-                            label = "System",
-                            selected = theme == "auto",
-                            onClick = { viewModel.setTheme("auto") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ThemeChip(
-                            label = "Light",
-                            selected = theme == "light",
-                            onClick = { viewModel.setTheme("light") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ThemeChip(
-                            label = "Dark",
-                            selected = theme == "dark",
-                            onClick = { viewModel.setTheme("dark") },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-
-            // 6. About App Card
+            // 5. About & Updates Section
             item(key = "about_section") {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                    )
-                ) {
-                    Column(
+                SettingsCard(title = "About & Updates", icon = Icons.Default.Info, iconTint = TealAccent) {
+                    // App Information Tile
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "My Expenses",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                        Image(
+                            painter = painterResource(id = R.mipmap.ic_myexpenses),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
                         )
-                        Text(
-                            text = "Modern India Edition • INR Native • UPI & SMS Intelligence",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "My Expenses",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = TealAccent.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "v${BuildConfig.VERSION_NAME}",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TealAccent
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Build ${BuildConfig.VERSION_CODE} • Open Source Edition",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+
+                    // Check for Updates Action Tile
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isCheckingUpdate) {
+                                coroutineScope.launch {
+                                    isCheckingUpdate = true
+                                    val result = AppUpdateManager.checkUpdate(context)
+                                    isCheckingUpdate = false
+                                    result.fold(
+                                        onSuccess = { releaseInfo ->
+                                            if (releaseInfo != null) {
+                                                val fragmentActivity = context as? FragmentActivity
+                                                if (fragmentActivity != null) {
+                                                    AppUpdateDialogFragment.newInstance(releaseInfo)
+                                                        .show(fragmentActivity.supportFragmentManager, AppUpdateDialogFragment.FRAGMENT_TAG)
+                                                } else {
+                                                    Toast.makeText(context, "Update available: ${releaseInfo.tagName}", Toast.LENGTH_LONG).show()
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "App is up to date (v${BuildConfig.VERSION_NAME})", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        onFailure = { error ->
+                                            Toast.makeText(context, "Update check failed: ${error.localizedMessage ?: "Network error"}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                }
+                            }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
                         )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Check for Updates",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isCheckingUpdate) "Checking GitHub for updates..." else "Check GitHub for the latest release",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (isCheckingUpdate) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = TealAccent
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -633,60 +650,6 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
-    }
-
-    if (showUpiIdentityDialog) {
-        var tempName by remember { mutableStateOf(userNamePref) }
-        var tempPhone by remember { mutableStateOf(userPhonePref) }
-
-        AlertDialog(
-            onDismissRequest = { showUpiIdentityDialog = false },
-            title = {
-                Text(
-                    text = "Your UPI Identity Profile",
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "Used to identify when a payment receipt or SMS was sent TO you (Income) vs BY you (Expense).",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = tempName,
-                        onValueChange = { tempName = it },
-                        label = { Text("Your Full / Bank Name") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = tempPhone,
-                        onValueChange = { tempPhone = it },
-                        label = { Text("Your 10-Digit Mobile / UPI Number") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    prefHandler.putString(UpiReceiptParser.PREF_KEY_USER_PROFILE_NAME, tempName.trim())
-                    prefHandler.putString(UpiReceiptParser.PREF_KEY_USER_PROFILE_PHONE, tempPhone.trim())
-                    userNamePref = tempName.trim()
-                    userPhonePref = tempPhone.trim()
-                    showUpiIdentityDialog = false
-                }) {
-                    Text("Save Identity")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUpiIdentityDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 
     if (showRestoreSheet) {
@@ -892,25 +855,4 @@ private fun SnapshotItemCard(
             }
         }
     }
-}
-
-@Composable
-private fun ThemeChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-            )
-        },
-        modifier = modifier
-    )
 }

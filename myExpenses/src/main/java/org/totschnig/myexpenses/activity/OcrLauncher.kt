@@ -24,11 +24,15 @@ class OcrLauncher: ProtectedFragmentActivity() {
     override fun contribFeatureCalled(feature: ContribFeature, tag: Serializable?) {
         if (feature == ContribFeature.OCR) {
             if (featureViewModel.isFeatureAvailable(this, Feature.OCR)) {
-                startMediaChooserDo("SCAN")
+                showScanReceiptDialog()
             } else {
                 featureViewModel.requestFeature(this, Feature.OCR)
             }
         }
+    }
+
+    override fun onScanGalleryCancelled() {
+        finish()
     }
 
     override fun processImageCaptureError(
@@ -44,7 +48,7 @@ class OcrLauncher: ProtectedFragmentActivity() {
     override fun onFeatureAvailable(feature: Feature) {
         super.onFeatureAvailable(feature)
         if (feature == Feature.OCR) {
-            startMediaChooserDo("SCAN")
+            showScanReceiptDialog()
         }
     }
 

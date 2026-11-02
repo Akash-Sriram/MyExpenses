@@ -970,5 +970,304 @@ class UpiReceiptParserTest {
             assertEquals("Mismatch between $catKey and $uuidKey", catCount, uuidCount)
         }
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // POCO F1 receipt regression tests (Nov 2026 testing session)
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Samsung Wallet / Zepto receipt.
+     * Bug 1: Payee was parsed as "Z155.00" (OCR misread ₹ as Z).
+     * Bug 2: UPI ID picked was sender asg98@pingpay instead of cf.zepto12@cashfreensdlpb.
+     */
+    @Test
+    fun testSamsungWalletZeptoReceipt() {
+        val rawText = """
+            Paid from
+            Samsung Wallet
+            Zepto
+            cf.zepto12@cashfreensdlpb
+            01 Nov 2026, 03:52 PM
+            Z155.00
+            Sent
+            Sender:
+            asg98@pingpay
+            Transaction ID: 428654321098
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        // Payee should be Zepto, not "Z155.00"
+        assertEquals("Zepto", result.payeeName)
+        // Amount should be 155.00
+        assertEquals(BigDecimal("155.00"), result.amount)
+        // UPI ID should be payee's VPA, not sender's
+        assertEquals("cf.zepto12@cashfreensdlpb", result.upiId)
+        assertEquals("428654321098", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    /**
+     * ICICI / Optival Health receipt.
+     * Bug: "Tr. ID:" label wasn't recognized so UTR was empty.
+     */
+    @Test
+    fun testIciciOptivalHealthTrIdLabel() {
+        val rawText = """
+            iMobile Pay
+            Payment Successful
+            OPTIVAL HEALTH SOLUT
+            Tr. ID: 111057198606
+            Amount
+            ₹3,260.10
+            01 Nov 2026, 11:47 AM
+            Sent from: 8680878355@icici
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertEquals("OPTIVAL HEALTH SOLUT", result.payeeName)
+        assertEquals(BigDecimal("3260.10"), result.amount)
+        assertEquals("111057198606", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    /**
+     * ICICI / Hathway Broadband receipt.
+     * Bug: "IC31630500000022VYFE" truncated to "IC3163050000" because OCR split it.
+     */
+    @Test
+    fun testIciciHathwayOcrSplitUtr() {
+        val rawText = """
+            iMobile Pay
+            Bill Payment Successful!
+            Hathway Broadband
+            Amount
+            ₹960.52
+            Ref No.
+            IC3163050000 0022VYFE
+            01 Nov 2026, 01:30 PM
+            Sent from: 8680878355@icici
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertEquals("Hathway Broadband", result.payeeName)
+        assertEquals(BigDecimal("960.52"), result.amount)
+        assertEquals("IC31630500000022VYFE", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    /**
+     * ICICI / Bharat Gas receipt.
+     * Bug: OCR misread gas cylinder icon as "Ö " — payee was "Ö Bharat Gas (BPCL)".
+     */
+    @Test
+    fun testIciciBharatGasLeadingOcrNoise() {
+        val rawText = """
+            iMobile Pay
+            Bill Payment Successful!
+            Ö Bharat Gas (BPCL)
+            Amount
+            ₹957.50
+            Ref No.
+            IC31825000000123ABCD
+            01 Nov 2026, 02:00 PM
+            Sent from: 8680878355@icici
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertEquals("Bharat Gas (BPCL)", result.payeeName)
+        assertEquals(BigDecimal("957.50"), result.amount)
+        assertEquals("IC31825000000123ABCD", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    /**
+     * cleanPayee: verify OCR noise stripping.
+     */
+    @Test
+    fun testCleanPayeeOcrNoise() {
+        assertEquals("Bharat Gas (BPCL)", UpiReceiptParser.cleanPayee("Ö Bharat Gas (BPCL)"))
+        assertEquals("Hathway Broadband", UpiReceiptParser.cleanPayee("© Hathway Broadband"))
+        assertEquals("Bharat Gas (BPCL)", UpiReceiptParser.cleanPayee("Bharat Gas (BPCL)"))
+        // Bengali checkmark noise from ML Kit: "Zepto ৩" -> "Zepto"
+        assertEquals("Zepto", UpiReceiptParser.cleanPayee("Zepto ৩"))
+        assertEquals("Zepto", UpiReceiptParser.cleanPayee("Zepto ✔"))
+    }
+
+    @Test
+    fun testSamsungWalletZeptoCheckmarkIndicDigitNoise() {
+        val rawText = """
+            Paid from
+            Samsung Wallet
+            Zepto ৩
+            cf.zepto12@cashfreensdlpb
+            01 NOV 2026, 09:38 AM
+            ₹155.00
+            Sent
+            Sender:
+            asg98@pingpay
+            Sent from:
+            ICICI Bank
+            Transaction ID:
+            294430763056
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertEquals("Zepto", result.payeeName)
+        assertEquals(BigDecimal("155.00"), result.amount)
+        assertEquals("cf.zepto12@cashfreensdlpb", result.upiId)
+        assertEquals("294430763056", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testSamsungWalletSenderVpaNeverUsedAsPayeeVpa() {
+        // If merchant VPA is missing or unreadable, sender VPA (asg98@pingpay) must NOT be returned as upiId!
+        val rawText = """
+            Paid from
+            Samsung Wallet
+            Zepto
+            NSDL Payments Bank
+            01 NOV 2026, 09:38 AM
+            ₹155.00
+            Sent
+            Sender:
+            asg98@pingpay
+            Transaction ID:
+            294430763056
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertEquals("Zepto", result.payeeName)
+        assertEquals(BigDecimal("155.00"), result.amount)
+        assertNull("Sender VPA must never be returned as payee VPA", result.upiId)
+        assertEquals("294430763056", result.referenceNumber)
+    }
+
+    /**
+     * Exact raw ML Kit OCR output from POCO F1 on Zepto Samsung Wallet receipt (Nov 2, 2026).
+     */
+    @Test
+    fun testSamsungWalletPocoF1ActualMlKitLogcatScan() {
+        val rawText = """
+            Sender:
+            Paid from
+            Samsung Wallet
+            Sent from:
+            cf.zepto12@cashfreernsdlpb
+            NSDL Payments Bank
+            Zepto ৩
+            ০1 NOV 2026, 09:38 AM
+            Z155.00
+            Transaction ID:
+            Sent
+            asg98 @pingpay
+            ICICI Bank
+            294430763056
+            Powered by AXIS BANK
+            UPI»
+            | UNIFED PAYENTIS INাEAEACE
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertEquals("Zepto", result.payeeName)
+        assertEquals(BigDecimal("155.00"), result.amount)
+        assertEquals("cf.zepto12@cashfreensdlpb", result.upiId)
+        assertEquals("294430763056", result.referenceNumber)
+        assertTrue(result.accountOrBankHint?.contains("ICICI", ignoreCase = true) == true || result.accountOrBankHint?.contains("Samsung", ignoreCase = true) == true)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testIciciPotluckReceipt() {
+        val rawText = """
+            i ICICI Bank
+            Paid successfully!
+            ₹ 290
+            for potluck
+            To TAMILNADU MUTTON AND
+            44117073@idfcbank
+            From G AKASH SRIRAM
+            8680878355@icici
+            Paid at 01:11PM, 02 Nov '26 IST
+            Tr. ID: 111065040686
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+        assertEquals(BigDecimal("290"), result.amount)
+        assertEquals("TAMILNADU MUTTON", result.payeeName)
+        assertEquals("for potluck", result.comment)
+        assertEquals("88117073@idfcbank", result.upiId)
+        assertEquals(LocalDateTime.of(2026, 11, 2, 13, 11), result.dateTime)
+        assertEquals("111065040686", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testIciciPotluckReceiptWithLetterOInTime() {
+        val rawText = """
+            i ICICI Bank
+            Paid successfully!
+            ₹ 290
+            for potluck
+            To TAMILNADU MUTTON AND
+            44117073@idfcbank
+            From G AKASH SRIRAM
+            8680878355@icici
+            Paid at O1:11PM, 02 Nov '26 IST
+            Tr. ID: 111065040686
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+        assertEquals(BigDecimal("290"), result.amount)
+        assertEquals("TAMILNADU MUTTON", result.payeeName)
+        assertEquals("for potluck", result.comment)
+        assertEquals("88117073@idfcbank", result.upiId)
+        assertEquals(LocalDateTime.of(2026, 11, 2, 13, 11), result.dateTime)
+        assertEquals("111065040686", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testExtractCommentsLabeledAndDefaultFiltering() {
+        // Labeled comment
+        val textWithRemarks = """
+            Amount: ₹ 500
+            Paid to Supermarket
+            Remarks: Diwali sweets
+            01 Nov 2026, 10:00 AM
+        """.trimIndent()
+        val res1 = UpiReceiptParser.parse(textWithRemarks)
+        assertEquals("Diwali sweets", res1.comment)
+
+        // Default bank placeholder ignored
+        val textWithDefaultRemark = """
+            Amount: ₹ 500
+            Paid to Supermarket
+            Remarks: UPI Payment
+            01 Nov 2026, 10:00 AM
+        """.trimIndent()
+        val res2 = UpiReceiptParser.parse(textWithDefaultRemark)
+        assertNull(res2.comment)
+
+        // Notes duplicating payee ignored
+        val textWithPayeeNotes = """
+            Amount: ₹ 500
+            Paid to Swiggy
+            Notes: Swiggy
+            01 Nov 2026, 10:00 AM
+        """.trimIndent()
+        val res3 = UpiReceiptParser.parse(textWithPayeeNotes)
+        assertNull(res3.comment)
+    }
 }
+
 

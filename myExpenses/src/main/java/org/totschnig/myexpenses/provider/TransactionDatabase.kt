@@ -361,8 +361,8 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
 
   private fun SupportSQLiteDatabase.cleanupPayeePrefixesAndDuplicates() {
     runCatching {
-      // 1. Find payees starting with Sender: or To: or To
-      query("SELECT _id, name, iban FROM $TABLE_PAYEES WHERE name LIKE 'Sender:%' OR name LIKE 'To %' OR name LIKE 'To:%'").use { cursor ->
+      // 1. Find payees starting with Sender: or To: or To, or containing newlines
+      query("SELECT _id, name, iban FROM $TABLE_PAYEES WHERE name LIKE 'Sender:%' OR name LIKE 'To %' OR name LIKE 'To:%' OR instr(name, char(10)) > 0 OR instr(name, char(13)) > 0").use { cursor ->
         val toClean = mutableListOf<Triple<Long, String, String?>>()
         while (cursor.moveToNext()) {
           val id = cursor.getLong(0)

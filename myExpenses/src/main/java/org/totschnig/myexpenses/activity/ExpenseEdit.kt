@@ -837,9 +837,14 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             delegate.methodRowBinding.Number.setText(utr)
             delegate.setReferenceNumberVisibility()
         }
-        val cleanedComment = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanComment(rootBinding.Comment.text?.toString())
-        if (cleanedComment != rootBinding.Comment.text?.toString().orEmpty()) {
-            rootBinding.Comment.setText(cleanedComment)
+        val receiptComment = data.comment?.let { org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanComment(it) }
+        if (!receiptComment.isNullOrBlank()) {
+            rootBinding.Comment.setText(receiptComment)
+        } else {
+            val cleanedComment = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanComment(rootBinding.Comment.text?.toString())
+            if (cleanedComment != rootBinding.Comment.text?.toString().orEmpty()) {
+                rootBinding.Comment.setText(cleanedComment)
+            }
         }
         val amountStr = data.amount?.let { "₹$it" } ?: ""
         val targetEntity = if (isIncome) {
@@ -848,7 +853,8 @@ open class ExpenseEdit : AmountActivity<TransactionEditViewModel>(), ContribIFac
             data.payeeName?.takeIf { it.isNotBlank() }?.let { "to $it" } ?: "Expense"
         }
         val typeLabel = if (isIncome) "Income" else "Expense"
-        val msg = "UPI $typeLabel: $amountStr $targetEntity"
+        val methodPrefix = if (data.paymentMethodHint != "UPI" && data.upiId == null) data.paymentMethodHint else "UPI"
+        val msg = "$methodPrefix $typeLabel: $amountStr $targetEntity"
         val actionLabel = if (isIncome) "Record Income" else "Record Expense"
         com.google.android.material.snackbar.Snackbar.make(
             rootBinding.root,

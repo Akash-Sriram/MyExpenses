@@ -94,7 +94,7 @@ fun ContentResolver.findParty(party: String, iban: String? = null): Long? {
 }
 
 fun ContentResolver.requireRootParty(name: String): Long? {
-    val trimmed = name.trim()
+    val trimmed = name.replace(Regex("""[\r\n]+"""), " ").replace(Regex("""\s+"""), " ").trim()
     if (trimmed.isEmpty()) return null
 
     // 1. Look for root party (parent_id IS NULL) with this name (case-insensitive)

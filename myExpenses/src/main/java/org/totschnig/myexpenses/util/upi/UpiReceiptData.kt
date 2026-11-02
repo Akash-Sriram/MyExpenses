@@ -13,6 +13,7 @@ data class UpiReceiptData(
     val upiId: String? = null,
     val dateTime: LocalDateTime? = null,
     val referenceNumber: String? = null,
+    val comment: String? = null,
     val accountOrBankHint: String? = null,
     val paymentMethodHint: String = "UPI",
     val isExpense: Boolean = true,

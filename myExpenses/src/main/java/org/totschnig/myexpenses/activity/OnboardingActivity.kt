@@ -22,8 +22,6 @@ import org.totschnig.myexpenses.dialog.RestoreFromCloudDialogFragment
 import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.preference.PrefKey
 import org.totschnig.myexpenses.provider.KEY_SYNC_ACCOUNT_NAME
-import org.totschnig.myexpenses.service.PREF_KEY_RESOLVE_CONTACTS_PAYEE
-import org.totschnig.myexpenses.service.PREF_KEY_SMS_LOGGING_ENABLED
 import org.totschnig.myexpenses.sync.json.AccountMetaData
 import org.totschnig.myexpenses.util.crashreporting.CrashHandler
 import org.totschnig.myexpenses.util.distrib.DistributionHelper.versionNumber
@@ -74,11 +72,9 @@ class OnboardingActivity : SyncBackendSetupActivity() {
 
                 ModernOnboardingScreen(
                     availableAccountTypes = accountTypes,
-                    onSaveAndFinish = { account, enableSms, enableContacts ->
+                    onSaveAndFinish = { account ->
                         doWithEncryptionCheck {
                             prefHandler.putString(PrefKey.HOME_CURRENCY, "INR")
-                            prefHandler.putBoolean(PREF_KEY_SMS_LOGGING_ENABLED, enableSms)
-                            prefHandler.putBoolean(PREF_KEY_RESOLVE_CONTACTS_PAYEE, enableContacts)
                             viewModel.saveAccount(account)
                         }
                     },
