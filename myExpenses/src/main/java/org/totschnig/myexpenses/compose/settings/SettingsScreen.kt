@@ -539,7 +539,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Image(
-                            painter = painterResource(id = R.mipmap.ic_myexpenses),
+                            painter = painterResource(id = R.drawable.ic_app_logo),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(40.dp)
