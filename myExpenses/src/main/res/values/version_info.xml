@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="versions">
+        <item>889;1.0.3;Enhanced UPI receipt OCR for Samsung Wallet and Devanagari/Bengali numerals, and preserve subcategories in category search tree</item>
         <item>888;1.0.2;Fix Settings screen crash when scrolling to About &amp; Updates section</item>
         <item>887;1.0.1;Receipt scanner direct gallery picker, UPI comment extraction, time normalization, payee prefix matching, and category management M3 Compose UI</item>
         <item>886;1.0.0;Initial release with in-app updater and UPI enhancements</item>

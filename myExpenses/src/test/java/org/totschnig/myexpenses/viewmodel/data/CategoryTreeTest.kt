@@ -125,4 +125,27 @@ class CategoryTreeTest {
         Truth.assertThat(filterCategory("uber")).containsExactly("Über")
         Truth.assertThat(filterCategory("restauracion")).containsExactly("Restauración")
     }
+
+    @Test
+    fun shouldKeepAllChildrenWhenParentMatches() {
+        val category = Category(
+            label = "ROOT", children = listOf(
+                Category(
+                    label = "Food", isMatching = true, children = listOf(
+                        Category(label = "Groceries", isMatching = false),
+                        Category(label = "Restaurants", isMatching = false)
+                    )
+                ),
+                Category(
+                    label = "Health", isMatching = false, children = listOf(
+                        Category(label = "Gym", isMatching = false)
+                    )
+                )
+            )
+        )
+        val pruned = category.pruneNonMatching()
+        Truth.assertThat(pruned).isNotNull()
+        Truth.assertThat(pruned!!.children.map { it.label }).containsExactly("Food")
+        Truth.assertThat(pruned.children.first().children.map { it.label }).containsExactly("Groceries", "Restaurants")
+    }
 }

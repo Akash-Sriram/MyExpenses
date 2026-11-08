@@ -1268,6 +1268,124 @@ class UpiReceiptParserTest {
         val res3 = UpiReceiptParser.parse(textWithPayeeNotes)
         assertNull(res3.comment)
     }
+
+    @Test
+    fun testGeethamOmrSamsungWalletReceipt() {
+        val rawText = """
+            Paid from
+            Samsung Wallet
+            
+            GEETHAM OMR
+            geethamomr@icici
+            08 NOV 2026, 08:17 PM
+            
+            ₹441.00
+            Sent
+            
+            Sent from: asg98@pingpay
+            Transaction ID: 341082813126
+            Notes: GEETHAM OMR
+            
+            Powered by AXIS BANK | UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("441.00"), result.amount)
+        assertEquals("GEETHAM OMR", result.payeeName)
+        assertEquals("geethamomr@icici", result.upiId)
+        assertEquals(LocalDateTime.of(2026, 11, 8, 20, 17), result.dateTime)
+        assertEquals("341082813126", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testGeethamOmrSamsungWalletReceiptAttachedSentAndNoise() {
+        val rawText = """
+            GEETHAM OMR
+            geethamomr@icici
+            08 n0v 2026, 8:17 pm
+            441.00 Sent
+            Transaction ID: 341082813126
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("441.00"), result.amount)
+        assertEquals("GEETHAM OMR", result.payeeName)
+        assertEquals(LocalDateTime.of(2026, 11, 8, 20, 17), result.dateTime)
+        assertEquals("341082813126", result.referenceNumber)
+    }
+
+    @Test
+    fun testOcrMisreadRupeeSymbolAndLetterOInDecimals() {
+        val rawText = """
+            Paid to GEETHAM OMR
+            रु 441.OO
+            Completed
+            08 NOV 2026, 20:17
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("441.00"), result.amount)
+        assertEquals("GEETHAM OMR", result.payeeName)
+        assertEquals(LocalDateTime.of(2026, 11, 8, 20, 17), result.dateTime)
+    }
+
+    @Test
+    fun testDevanagariDigitsNormalization() {
+        val rawText = """
+            GEETHAM OMR
+            ₹४४१.००
+            Sent
+            ०८ NOV २०२६, ०८:१७ PM
+            Transaction ID: ३४१०८२८१३१२६
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("441.00"), result.amount)
+        assertEquals(LocalDateTime.of(2026, 11, 8, 20, 17), result.dateTime)
+        assertEquals("341082813126", result.referenceNumber)
+    }
+
+    @Test
+    fun testExactPocoF1SamsungWalletGeethamOmrLogcat() {
+        val rawText = """
+            Sender
+            Paid from
+            Samsung Wallet
+            GEETHAM OMR
+            Sent from:
+            Q337112731@ybl
+            Yes Bank
+            ০৪ NOV 2026, 08:17 PM
+            T441.00
+            Transaction ID:
+            Sent
+            asg98 @pingpay
+            ICICI Bank
+            341082813126
+            Powered by AXIS BANK
+            UPI»
+            | UNIFED PAYENTIS INাEAEACE
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("441.00"), result.amount)
+        assertEquals("GEETHAM OMR", result.payeeName)
+        assertEquals("Q337112731@ybl", result.upiId)
+        assertEquals(LocalDateTime.of(2026, 11, 8, 20, 17), result.dateTime)
+        assertEquals("341082813126", result.referenceNumber)
+        assertTrue(result.isExpense)
+    }
 }
 
 

@@ -55,8 +55,11 @@ data class Category(
 
     fun pruneByCriterion(criterion: ((Category) -> Boolean)?): Category? {
         if (criterion == null) return this
+        if (label != "ROOT" && criterion(this)) {
+            return this
+        }
         val prunedChildren = children.mapNotNull { it.pruneByCriterion(criterion) }
-        return if (criterion(this) || prunedChildren.isNotEmpty()) {
+        return if (prunedChildren.isNotEmpty()) {
             copy(children = prunedChildren)
         } else null
     }

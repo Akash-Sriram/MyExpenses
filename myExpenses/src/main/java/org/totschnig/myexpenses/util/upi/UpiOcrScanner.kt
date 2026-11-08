@@ -2,6 +2,7 @@ package org.totschnig.myexpenses.util.upi
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
@@ -21,10 +22,12 @@ object UpiOcrScanner {
             val textResult = suspendCoroutine { cont ->
                 recognizer.process(image)
                     .addOnSuccessListener { visionText ->
+                        Log.i("UpiOcrScanner", "Raw ML Kit Devanagari OCR Text:\n${visionText.text}")
                         Timber.d("Raw ML Kit OCR Text:\n%s", visionText.text)
                         cont.resume(visionText.text)
                     }
                     .addOnFailureListener { e ->
+                        Log.e("UpiOcrScanner", "ML Kit OCR failed", e)
                         cont.resumeWithException(e)
                     }
             }
@@ -40,6 +43,8 @@ object UpiOcrScanner {
                 userPhone = userPhone,
                 userVpa = userVpa
             )
+
+            Log.i("UpiOcrScanner", "UPI receipt parsed: amount=${parsed.amount}, payee=${parsed.payeeName}, dt=${parsed.dateTime}, utr=${parsed.referenceNumber}")
             Timber.d(
                 "UPI receipt parsed: isExpense=%b, amount=%s, payee=%s, recipient=%s, upiId=%s, utr=%s",
                 parsed.isExpense,
@@ -51,7 +56,8 @@ object UpiOcrScanner {
             )
             Result.success(parsed)
         } catch (e: Exception) {
-            Timber.e(e, "Error scanning UPI receipt from %s", uri)
+            Log.e("UpiOcrScanner", "Failed to scan UPI receipt", e)
+            Timber.e(e, "Failed to scan UPI receipt")
             Result.failure(e)
         }
     }

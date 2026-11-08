@@ -445,6 +445,8 @@ fun CategoriesScreen(
                     is LoadingState.Data -> {
                         val rootCategory = categoryTreeState.data
                         val expandedIds = remember { mutableStateListOf<Long>() }
+                        val collapsedSearchIds = remember(searchQuery) { mutableStateListOf<Long>() }
+                        val isSearchQueryActive = searchQuery.isNotBlank()
 
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -460,11 +462,18 @@ fun CategoriesScreen(
                                     level = 0,
                                     action = action,
                                     isSelectionMode = isSelectionMode,
+                                    isSearchActive = isSearchQueryActive,
                                     selectedCategoryIds = selectedCategoryIds,
                                     expandedIds = expandedIds,
+                                    collapsedSearchIds = collapsedSearchIds,
                                     onToggleExpand = { id ->
-                                        if (expandedIds.contains(id)) expandedIds.remove(id)
-                                        else expandedIds.add(id)
+                                        if (isSearchQueryActive) {
+                                            if (collapsedSearchIds.contains(id)) collapsedSearchIds.remove(id)
+                                            else collapsedSearchIds.add(id)
+                                        } else {
+                                            if (expandedIds.contains(id)) expandedIds.remove(id)
+                                            else expandedIds.add(id)
+                                        }
                                     },
                                     onCategoryClick = onCategoryClick,
                                     onToggleSelect = onToggleSelectCategory,
@@ -493,8 +502,10 @@ private fun ModernCategoryNode(
     level: Int,
     action: Action,
     isSelectionMode: Boolean,
+    isSearchActive: Boolean,
     selectedCategoryIds: Set<Long>,
     expandedIds: List<Long>,
+    collapsedSearchIds: List<Long>,
     onToggleExpand: (Long) -> Unit,
     onCategoryClick: (Category) -> Unit,
     onToggleSelect: (Long) -> Unit,
@@ -503,7 +514,11 @@ private fun ModernCategoryNode(
     onMoveCategory: (Category) -> Unit,
     onDeleteCategory: (Category) -> Unit
 ) {
-    val isExpanded = expandedIds.contains(category.id)
+    val isExpanded = if (isSearchActive) {
+        !collapsedSearchIds.contains(category.id)
+    } else {
+        expandedIds.contains(category.id)
+    }
     val isSelected = selectedCategoryIds.contains(category.id)
     val hasChildren = category.children.isNotEmpty()
     var showMenu by remember { mutableStateOf(false) }
@@ -536,7 +551,11 @@ private fun ModernCategoryNode(
                         if (isSelectionMode) {
                             onToggleSelect(category.id)
                         } else if (action == Action.SELECT_MAPPING) {
-                            onCategoryClick(category)
+                            if (hasChildren) {
+                                onToggleExpand(category.id)
+                            } else {
+                                onCategoryClick(category)
+                            }
                         } else if (action == Action.SELECT_FILTER) {
                             onToggleSelect(category.id)
                         } else {
@@ -548,7 +567,11 @@ private fun ModernCategoryNode(
                         }
                     },
                     onLongClick = {
-                        onToggleSelect(category.id)
+                        if (isSelectionMode) {
+                            onToggleSelect(category.id)
+                        } else {
+                            showMenu = true
+                        }
                     }
                 ),
             colors = CardDefaults.cardColors(
@@ -632,6 +655,20 @@ private fun ModernCategoryNode(
                     }
                 }
 
+                // In SELECT_MAPPING mode, if category has children, allow direct selection via checkmark button
+                if (action == Action.SELECT_MAPPING && hasChildren) {
+                    IconButton(
+                        onClick = { onCategoryClick(category) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = stringResource(R.string.select_category),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
                 // Expand/Collapse Chevron if it has children
                 if (hasChildren) {
                     IconButton(
@@ -648,7 +685,7 @@ private fun ModernCategoryNode(
                 }
 
                 // 3-dots Context Menu
-                if (action == Action.MANAGE && !isSelectionMode) {
+                if (!isSelectionMode) {
                     Box {
                         IconButton(
                             onClick = { showMenu = true },
@@ -672,6 +709,16 @@ private fun ModernCategoryNode(
                                     onAddSubcategory(category)
                                 }
                             )
+                            if (action == Action.SELECT_MAPPING) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.select_category)) },
+                                    leadingIcon = { Icon(Icons.Default.Check, contentDescription = null) },
+                                    onClick = {
+                                        showMenu = false
+                                        onCategoryClick(category)
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_edit)) },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
@@ -680,22 +727,24 @@ private fun ModernCategoryNode(
                                     onEditCategory(category)
                                 }
                             )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_move)) },
-                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = null) },
-                                onClick = {
-                                    showMenu = false
-                                    onMoveCategory(category)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_delete), color = MaterialTheme.colorScheme.error) },
-                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                                onClick = {
-                                    showMenu = false
-                                    onDeleteCategory(category)
-                                }
-                            )
+                            if (action == Action.MANAGE) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.menu_move)) },
+                                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = null) },
+                                    onClick = {
+                                        showMenu = false
+                                        onMoveCategory(category)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.menu_delete), color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        showMenu = false
+                                        onDeleteCategory(category)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -716,8 +765,10 @@ private fun ModernCategoryNode(
                         level = level + 1,
                         action = action,
                         isSelectionMode = isSelectionMode,
+                        isSearchActive = isSearchActive,
                         selectedCategoryIds = selectedCategoryIds,
                         expandedIds = expandedIds,
+                        collapsedSearchIds = collapsedSearchIds,
                         onToggleExpand = onToggleExpand,
                         onCategoryClick = onCategoryClick,
                         onToggleSelect = onToggleSelect,
