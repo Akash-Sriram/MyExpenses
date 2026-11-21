@@ -18,11 +18,10 @@ import androidx.preference.PreferenceFragmentCompat
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.AccountWidgetConfigure
-import org.totschnig.myexpenses.adapter.SortableItem
-import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_SPLIT
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_TRANSACTION
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_TRANSFER
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TransactionType
+import org.totschnig.myexpenses.adapter.SortableItem
 import org.totschnig.myexpenses.dialog.SortUtilityDialogFragment
 import org.totschnig.myexpenses.fragment.AccountWidgetConfigurationFragment.Button.Companion.marshall
 import org.totschnig.myexpenses.fragment.AccountWidgetConfigurationFragment.Button.Companion.unmarshall
@@ -76,7 +75,6 @@ class AccountWidgetConfigurationFragment : PreferenceFragmentCompat() {
     ) {
         TRANSACTION(R.string.menu_create_transaction, R.drawable.ic_menu_add, TYPE_TRANSACTION),
         TRANSFER(R.string.menu_create_transfer, R.drawable.ic_menu_forward, TYPE_TRANSFER),
-        SPLIT(R.string.menu_create_split, R.drawable.ic_menu_split, TYPE_SPLIT),
         SCAN(R.string.button_scan, R.drawable.ic_scan, null);
 
         companion object {

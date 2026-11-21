@@ -58,8 +58,8 @@ import org.totschnig.myexpenses.compose.transactions.TransactionEvent
 import org.totschnig.myexpenses.compose.transactions.TransactionEventHandler
 import org.totschnig.myexpenses.compose.transactions.TransactionList
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions
-import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_SPLIT
 import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_TRANSFER
+
 import org.totschnig.myexpenses.db2.SealedCheckResult
 import org.totschnig.myexpenses.db2.countAccounts
 import org.totschnig.myexpenses.dialog.ArchiveDialogFragment
@@ -768,11 +768,11 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
         transferEnabled: Boolean,
         isIncome: Boolean = false,
     ) {
-        when (type) {
-            TYPE_SPLIT -> contribFeatureRequested(ContribFeature.SPLIT_TRANSACTION)
-            TYPE_TRANSFER if !transferEnabled -> showTransferAccountMissingMessage()
+        when {
+            type == TYPE_TRANSFER && !transferEnabled -> showTransferAccountMissingMessage()
             else -> createRowDo(type, isIncome)
         }
+
     }
 
     fun createRowDo(type: Int, isIncome: Boolean) {
@@ -882,18 +882,7 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             }
 
             ContribFeature.SPLIT_TRANSACTION -> {
-                if (tag != null) {
-                    showConfirmationDialog(
-                        tag = "SPLIT_TRANSACTION",
-                        message = getString(R.string.warning_split_transactions),
-                        commandPositive = R.id.SPLIT_TRANSACTION_COMMAND,
-                        commandPositiveLabel = R.string.menu_split_transaction
-                    ) {
-                        putLongArray(KEY_ROW_IDS, tag as LongArray?)
-                    }
-                } else {
-                    createRowDo(TYPE_SPLIT, false)
-                }
+                // Split transactions dropped
             }
 
             ContribFeature.PRINT -> {
@@ -990,22 +979,33 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                     }
 
                     else -> {
-                        startEdit(
-                            Intent(this@BaseMyExpenses, ExpenseEdit::class.java).apply {
-                                putExtra(
-                                    KEY_ROWID,
-                                    transaction.transferPeerParent ?: transaction.id
-                                )
-                                putExtra(
-                                    KEY_COLOR,
-                                    transaction.color ?: currentAccount?.color(resources)
-                                )
-                                if (clone) {
-                                    putExtra(ExpenseEdit.KEY_CLONE, true)
-                                }
+                        val v2 = this@BaseMyExpenses as? MyExpensesV2
+                        if (v2 != null) {
+                            if (clone) {
+                                v2.cloneTransaction(transaction.transferPeerParent ?: transaction.id)
+                            } else {
+                                v2.editTransaction(transaction.transferPeerParent ?: transaction.id)
                             }
-                        )
+                        } else {
+                            startEdit(
+                                Intent(this@BaseMyExpenses, ExpenseEdit::class.java).apply {
+                                    putExtra(
+                                        KEY_ROWID,
+                                        transaction.transferPeerParent ?: transaction.id
+                                    )
+                                    putExtra(
+                                        KEY_COLOR,
+                                        transaction.color ?: currentAccount?.color(resources)
+                                    )
+                                    if (clone) {
+                                        putExtra(ExpenseEdit.KEY_CLONE, true)
+                                    }
+                                }
+                            )
+                        }
                     }
+
+
                 }
             }
         }
@@ -1122,7 +1122,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
             R.id.REMAP_PAYEE_COMMAND -> !hasTransfer && !hasTrade
             R.id.REMAP_CATEGORY_COMMAND -> !hasSplit
             R.id.REMAP_METHOD_COMMAND -> !hasTransfer && !hasTrade
-            R.id.SPLIT_TRANSACTION_COMMAND -> !hasSplit && !hasVoid
             R.id.LINK_TRANSFER_COMMAND ->
                 selectionState.count() == 2 &&
                         !hasSplit && !hasTransfer && !hasVoid &&
@@ -1162,7 +1161,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
         when (itemId) {
             R.id.DELETE_COMMAND -> delete(selectionState.map { it.id to it.crStatus })
             R.id.MAP_TAG_COMMAND -> tagHandler.tag()
-            R.id.SPLIT_TRANSACTION_COMMAND -> split(selectionState.map { it.id })
             R.id.LINK_TRANSFER_COMMAND -> linkTransfer()
             R.id.SELECT_ALL_COMMAND -> selectAll()
             R.id.UNDELETE_COMMAND -> undelete(selectionState.map { it.id })
@@ -1171,16 +1169,7 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
         return true
     }
 
-    private fun split(itemIds: List<Long>) {
-        lifecycleScope.launch {
-            if (checkSealed(itemIds)) {
-                contribFeatureRequested(
-                    ContribFeature.SPLIT_TRANSACTION,
-                    itemIds.toLongArray()
-                )
-            }
-        }
-    }
+
 
     private fun selectAll() {
         viewModel.selectAllState.value = true
@@ -1219,31 +1208,7 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                 finishActionMode()
             }
 
-            R.id.SPLIT_TRANSACTION_COMMAND -> {
-                finishActionMode()
-                val ids = args.getLongArray(KEY_ROW_IDS)!!
-                viewModel.split(ids).observe(this) { result ->
-                    showSnackBar(
-                        result.fold(
-                            onSuccess = {
-                                if (it) {
-                                    recordUsage(ContribFeature.SPLIT_TRANSACTION)
-                                    if (ids.size > 1)
-                                        getString(
-                                            R.string.split_transaction_group_success,
-                                            ids.size
-                                        )
-                                    else
-                                        getString(R.string.split_transaction_one_success)
-                                } else getString(R.string.split_transaction_not_possible)
-                            },
-                            onFailure = {
-                                report(it)
-                                it.safeMessage
-                            }
-                        ))
-                }
-            }
+
 
             R.id.UNGROUP_SPLIT_COMMAND -> {
                 viewModel.revokeSplit(args.getLong(KEY_ROWID)).observe(this) { result ->

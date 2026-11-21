@@ -1,11 +1,15 @@
 package org.totschnig.myexpenses.compose.main
 
+import android.content.Intent
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.annotation.IdRes
 import androidx.annotation.StringRes
+import org.totschnig.myexpenses.activity.ManageTags
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +28,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
@@ -274,7 +279,7 @@ fun MainScreenAdaptive(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     var showBottomSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val calculatedLayoutType = NavigationSuiteScaffoldDefaults.navigationSuiteType(adaptiveInfo)
     val layoutType = when (preferredNavMode) {
@@ -300,7 +305,7 @@ fun MainScreenAdaptive(
                     (isRail && fontScale >= 1.3f && isAdLoaded.value)
             )
 
-    val maxQuickItems = 2
+    val maxQuickItems = if (!is2Pane) 1 else 2
 
     val quickItems = menuConfig.take(maxQuickItems)
     val overflowItems = menuConfig.drop(maxQuickItems)
@@ -362,7 +367,8 @@ fun MainScreenAdaptive(
                 }
                 if (!is2Pane) {
                     listOfNotNull(
-                        Screen.Transactions.takeIf { accounts.isNotEmpty() }
+                        Screen.Transactions.takeIf { accounts.isNotEmpty() },
+                        Screen.Accounts.takeIf { accounts.isNotEmpty() }
                     ).forEach { screen ->
                         item(
                             selected = navigator.currentDestination?.pane == screen.paneRole,
@@ -561,6 +567,7 @@ fun MainScreenAdaptive(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(bottom = 24.dp)
             ) {
                 Text(
@@ -649,6 +656,28 @@ fun MainScreenAdaptive(
 
                 renderSection("Reports & Insights", reports)
                 renderSection("People & Commitments", manage)
+
+                Text(
+                    text = "Tags & Labels",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 4.dp)
+                )
+                ListItem(
+                    modifier = Modifier.clickable {
+                        showBottomSheet = false
+                        context.startActivity(Intent(context, ManageTags::class.java))
+                    },
+                    headlineContent = { Text(stringResource(R.string.tags)) },
+                    supportingContent = { Text("Search, create, and organize tags") },
+                    leadingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Label,
+                            contentDescription = null
+                        )
+                    }
+                )
+
                 renderSection("Tools & System", system)
             }
         }

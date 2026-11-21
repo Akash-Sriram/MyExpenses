@@ -1508,6 +1508,25 @@ class UpiReceiptParserTest {
         assertEquals(BigDecimal("411"), result.amount)
         assertEquals("CAFE COFFEE DAY", result.payeeName)
     }
+
+    @Test
+    fun testParseIciciIMobileWithRupeeMisreadAs3() {
+        val rawText = """
+            iMobile Pay
+            Payment Successful
+            3411.00
+            Paid to
+            COFFEE DAY
+            coffee@icici
+            Ref No: 301966032876
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("411.00"), result.amount)
+        assertEquals("COFFEE DAY", result.payeeName)
+    }
 }
 
 

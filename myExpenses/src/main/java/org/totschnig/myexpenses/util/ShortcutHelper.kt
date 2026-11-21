@@ -26,9 +26,6 @@ object ShortcutHelper {
     const val ID_SPLIT = "split"
     fun idTemplate(templateId: Long) = "template-$templateId"
 
-    fun createIntentForNewSplit(context: Context) =
-        createIntentForNewTransaction(context, Transactions.TYPE_SPLIT)
-
     private fun createIntentForNewTransfer(context: Context) =
         createIntentForNewTransaction(context, Transactions.TYPE_TRANSFER)
 
@@ -52,18 +49,13 @@ object ShortcutHelper {
         }
 
     fun configureSplitShortcut(context: Context, contribEnabled: Boolean) {
-        val intent: Intent = createIntentForNewSplit(context)
-        val shortcut = ShortcutInfoCompat.Builder(context, ID_SPLIT)
-            .setShortLabel(context.getString(R.string.split_transaction))
-            .setIcon(IconCompat.createWithResource(context, R.drawable.ic_menu_split_shortcut))
-            .setIntent(intent)
-            .build()
         try {
-            ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+            ShortcutManagerCompat.removeDynamicShortcuts(context, listOf(ID_SPLIT))
         } catch (e: Exception) {
             CrashHandler.report(e)
         }
     }
+
 
     fun configureTransferShortcut(context: Context, transferEnabled: Boolean) {
         val intent: Intent = if (transferEnabled) {

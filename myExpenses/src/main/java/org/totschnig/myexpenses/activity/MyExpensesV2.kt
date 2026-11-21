@@ -53,11 +53,14 @@ import org.totschnig.myexpenses.compose.main.AppEvent
 import org.totschnig.myexpenses.compose.main.AppEventHandler
 import org.totschnig.myexpenses.compose.main.MainScreenAdaptive
 import org.totschnig.myexpenses.compose.transactions.Action
+import org.totschnig.myexpenses.compose.transactions.ExpenseEditScreen
 import org.totschnig.myexpenses.compose.transactions.ImportTradesDialog
 import org.totschnig.myexpenses.compose.transactions.RenderType
 import org.totschnig.myexpenses.compose.transactions.TradeEvent
 import org.totschnig.myexpenses.compose.transactions.TradeList
 import org.totschnig.myexpenses.compose.transactions.TradeScreen
+import org.totschnig.myexpenses.db2.FLAG_EXPENSE
+import org.totschnig.myexpenses.db2.FLAG_INCOME
 import org.totschnig.myexpenses.dialog.SortSelect
 import org.totschnig.myexpenses.dialog.SortUtilityDialogFragment
 import org.totschnig.myexpenses.injector
@@ -75,6 +78,7 @@ import org.totschnig.myexpenses.viewmodel.data.AggregateAccount
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.FullAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
+import org.totschnig.myexpenses.viewmodel.data.toAccount
 import timber.log.Timber
 import java.math.RoundingMode
 import javax.inject.Inject
@@ -225,6 +229,7 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                         val currencies by currencyViewModel.currencyUnits.collectAsState(emptyList())
                         val accountTypes by viewModel.accountTypes.collectAsState(emptyList())
                         val tradeToEdit by viewModel.tradeToEdit.collectAsStateWithLifecycle()
+                        val transactionToEdit by viewModel.transactionToEdit.collectAsStateWithLifecycle()
 
                         tradeToEdit?.let { trade ->
                             accounts.find { it.id == trade.portfolioId }?.let { fullAccount ->
@@ -273,6 +278,25 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                     }
                                 )
                             }
+                        }
+
+                        transactionToEdit?.let { editData ->
+                            ExpenseEditScreen(
+                                initialData = editData,
+                                accounts = accounts.filter { !it.isPortfolio && !it.sealed }.map { it.toAccount() },
+                                quickCategories = viewModel.getQuickCategories(if (editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
+                                allTags = viewModel.getAllTags(),
+                                onSave = { savedData ->
+                                    viewModel.saveTransaction(savedData)
+                                    viewModel.clearTransactionToEdit()
+                                },
+                                onClose = {
+                                    viewModel.clearTransactionToEdit()
+                                },
+                                onAddTag = { label ->
+                                    viewModel.createTag(label)
+                                }
+                            )
                         }
 
 
@@ -341,6 +365,14 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                                 when (event.action) {
                                                     Action.Scan -> contribFeatureRequested(ContribFeature.OCR, true)
 
+                                                    Action.Expense, Action.Income, Action.Transfer -> {
+                                                        val cur = accounts.find { it.id == selectedAccountIdFromState } ?: accounts.firstOrNull { !it.isPortfolio && !it.sealed }
+                                                        if (cur != null) {
+                                                            val target = accounts.firstOrNull { !it.isPortfolio && !it.sealed && it.id != cur.id }
+                                                            viewModel.createTransaction(event.action, cur, target)
+                                                        }
+                                                    }
+
                                                     else -> createRow(
                                                         event.action.type,
                                                         event.transferEnabled,
@@ -348,6 +380,7 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                                     )
                                                 }
                                             }
+
 
                                         is AppEvent.SetAccountGrouping -> viewModel.setGrouping(
                                             event.newGrouping
@@ -543,6 +576,14 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
 
     fun editTrade(transactionId: Long) {
         viewModel.loadTrade(transactionId)
+    }
+
+    fun editTransaction(transactionId: Long) {
+        viewModel.loadTransaction(transactionId)
+    }
+
+    fun cloneTransaction(transactionId: Long) {
+        viewModel.cloneTransaction(transactionId)
     }
 
     override fun onSortOrderConfirmed(sortedIds: LongArray) {

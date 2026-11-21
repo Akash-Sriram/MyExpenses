@@ -28,12 +28,6 @@
         android:title="@string/menu_tag"
         app:showAsAction="never" />
 
-   <item
-        android:id="@id/SPLIT_TRANSACTION_COMMAND"
-        android:icon="@drawable/ic_menu_split_transaction"
-        android:orderInCategory="40"
-        android:title="@string/menu_split_transaction"
-        app:showAsAction="never" />
     <item
         android:id="@id/UNDELETE_COMMAND"
         android:icon="@drawable/ic_menu_undelete"

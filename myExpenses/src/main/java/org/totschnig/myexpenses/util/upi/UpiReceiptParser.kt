@@ -251,13 +251,28 @@ object UpiReceiptParser {
         return cleaned.trim()
     }
 
+    private fun stripMisreadDigitRupee(candidate: String, originalLine: String): String {
+        var result = candidate
+        if (!originalLine.contains("₹") && !originalLine.contains("Rs", ignoreCase = true) && !originalLine.contains("INR", ignoreCase = true)) {
+            if (result.matches(Regex("""^[37\u0969]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
+                val stripped = result.substring(1)
+                val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
+                if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
+                    result = stripped
+                }
+            }
+        }
+        return result
+    }
+
     private fun extractAmount(lines: List<String>, fullText: String): BigDecimal? {
-        // Priority 0a: Status keyword on the SAME line as the amount (e.g. "₹441.00 Sent", "441.00 Sent")
+        // Priority 0a: Status keyword on the SAME line as the amount (e.g. "₹441.00 Sent", "441.00 Sent", "3411.00 Sent")
         for (line in lines) {
             if (isReferenceOrAccountLine(line)) continue
             val combinedMatch = Regex("""(?i)^\s*([₹\u20B9\u0969\u09B9\u0930\u0939?zZrR#*FEeTtXx~=रु\s]*[0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s+(?:sent|completed|payment\s+successful!?|successful!?)\s*${'$'}""").find(line)
             if (combinedMatch != null) {
-                val candidateCleaned = cleanAmountCandidate(combinedMatch.groupValues[1])
+                var candidateCleaned = cleanAmountCandidate(combinedMatch.groupValues[1])
+                candidateCleaned = stripMisreadDigitRupee(candidateCleaned, line)
                 val parsed = candidateCleaned.replace(",", "").toBigDecimalOrNull()
                 if (parsed != null && isValidAmount(parsed)) {
                     return parsed
@@ -276,16 +291,7 @@ object UpiReceiptParser {
                 if (candidateIdx >= 0) {
                     val candidateLine = lines[candidateIdx].trim()
                     if (!isReferenceOrAccountLine(candidateLine) && !containsDate(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}${'$'}"""))) {
-                        var candidateCleaned = cleanAmountCandidate(candidateLine)
-                        if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
-                            if (candidateCleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
-                                val stripped = candidateCleaned.substring(1)
-                                val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
-                                if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
-                                    candidateCleaned = stripped
-                                }
-                            }
-                        }
+                        var candidateCleaned = stripMisreadDigitRupee(cleanAmountCandidate(candidateLine), candidateLine)
                         val m = STANDALONE_AMOUNT_PATTERN.matcher(candidateCleaned)
                         if (m.matches()) {
                             val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
@@ -302,16 +308,7 @@ object UpiReceiptParser {
                 if (candidateIdx < lines.size) {
                     val candidateLine = lines[candidateIdx].trim()
                     if (!isReferenceOrAccountLine(candidateLine) && !containsDate(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}${'$'}"""))) {
-                        var candidateCleaned = cleanAmountCandidate(candidateLine)
-                        if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
-                            if (candidateCleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
-                                val stripped = candidateCleaned.substring(1)
-                                val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
-                                if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
-                                    candidateCleaned = stripped
-                                }
-                            }
-                        }
+                        var candidateCleaned = stripMisreadDigitRupee(cleanAmountCandidate(candidateLine), candidateLine)
                         val m = STANDALONE_AMOUNT_PATTERN.matcher(candidateCleaned)
                         if (m.matches()) {
                             val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
@@ -340,7 +337,7 @@ object UpiReceiptParser {
             for (idx in startIdx until endIdx) {
                 val line = lines[idx]
                 if (isReferenceOrAccountLine(line) || containsDate(line) || line.contains("@")) continue
-                val cleaned = cleanAmountCandidate(line)
+                val cleaned = stripMisreadDigitRupee(cleanAmountCandidate(line), line)
                 val m = STANDALONE_AMOUNT_PATTERN.matcher(cleaned)
                 if (m.matches()) {
                     val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
@@ -366,16 +363,7 @@ object UpiReceiptParser {
                     if (i + offset < lines.size) {
                         val candidateLine = lines[i + offset].trim()
                         if (!isReferenceOrAccountLine(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}${'$'}"""))) {
-                            var cleaned = cleanAmountCandidate(candidateLine)
-                            if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
-                                if (cleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
-                                    val stripped = cleaned.substring(1)
-                                    val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
-                                    if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
-                                        cleaned = stripped
-                                    }
-                                }
-                            }
+                            var cleaned = stripMisreadDigitRupee(cleanAmountCandidate(candidateLine), candidateLine)
                             val m = STANDALONE_AMOUNT_PATTERN.matcher(cleaned)
                             if (m.matches()) {
                                 val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
@@ -419,16 +407,7 @@ object UpiReceiptParser {
         var fallbackIntegerAmount: BigDecimal? = null
         for (line in lines) {
             if (isReferenceOrAccountLine(line) || containsDate(line) || line.contains("@")) continue
-            var cleaned = cleanAmountCandidate(line)
-            if (!line.contains("₹") && !line.contains("Rs", ignoreCase = true) && !line.contains("INR", ignoreCase = true)) {
-                if (cleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
-                    val stripped = cleaned.substring(1)
-                    val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
-                    if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
-                        cleaned = stripped
-                    }
-                }
-            }
+            var cleaned = stripMisreadDigitRupee(cleanAmountCandidate(line), line)
             val matcher = STANDALONE_AMOUNT_PATTERN.matcher(cleaned)
             if (matcher.matches()) {
                 val raw = matcher.group(1)?.replace(",", "")

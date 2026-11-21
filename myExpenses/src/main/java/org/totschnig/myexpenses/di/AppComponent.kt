@@ -18,9 +18,6 @@ import org.totschnig.myexpenses.db2.RepositoryCreditCard
 import org.totschnig.myexpenses.db2.RepositoryLoan
 import org.totschnig.myexpenses.db2.RepositoryCommitment
 import org.totschnig.myexpenses.db2.RepositoryInsights
-import org.totschnig.myexpenses.delegate.CategoryDelegate
-import org.totschnig.myexpenses.delegate.SplitDelegate
-import org.totschnig.myexpenses.delegate.TransferDelegate
 import org.totschnig.myexpenses.dialog.ArchiveDialogFragment
 import org.totschnig.myexpenses.dialog.BaseDialogFragment
 import org.totschnig.myexpenses.dialog.DebtDetailsDialogFragment
@@ -234,12 +231,6 @@ interface AppComponent {
     fun inject(debtViewModel: DebtViewModel)
 
     fun inject(debtDetailsDialogFragment: DebtDetailsDialogFragment)
-
-    fun inject(transactionDelegate: CategoryDelegate)
-
-    fun inject(transactionDelegate: SplitDelegate)
-
-    fun inject(transactionDelegate: TransferDelegate)
 
     fun inject(exportViewModel: ExportViewModel)
 

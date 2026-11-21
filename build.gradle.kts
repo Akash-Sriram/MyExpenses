@@ -8,8 +8,8 @@ plugins {
 }
 
 extra["resConfig"] = listOf("en")
-extra["versionCode"] = 892
-extra["versionName"] = "1.0.6"
+extra["versionCode"] = 893
+extra["versionName"] = "1.0.7"
 extra["compileSdkVersion"] = 37
 extra["minSdkVersion"] = 35
 extra["targetSdkVersion"] = 35

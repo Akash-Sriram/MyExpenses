@@ -157,18 +157,16 @@ class PreferenceUiFragment : BasePreferenceFragment() {
             }
         }
 
-        requirePreference<Preference>(PrefKey.SHORTCUT_CREATE_SPLIT).isEnabled = true
-
-        with(requirePreference<Preference>(PrefKey.SHORTCUT_CREATE_TRANSFER)) {
+        findPreference<Preference>(PrefKey.SHORTCUT_CREATE_TRANSFER)?.let { pref ->
             lifecycleScope.launch {
                 withContext(Dispatchers.IO) {
                     val transferEnabled = viewModel.isTransferEnabled
                     withContext(Dispatchers.Main) {
                         if (transferEnabled) {
-                            isEnabled = true
+                            pref.isEnabled = true
                         } else {
-                            summary =
-                                context.getString(R.string.dialog_command_disabled_insert_transfer)
+                            pref.summary =
+                                context?.getString(R.string.dialog_command_disabled_insert_transfer)
                         }
                     }
                 }
@@ -248,12 +246,7 @@ class PreferenceUiFragment : BasePreferenceFragment() {
             true
         }
 
-        matches(preference, PrefKey.SHORTCUT_CREATE_SPLIT) -> {
-            addShortcut(
-                TransactionsContract.Transactions.TYPE_SPLIT
-            )
-            true
-        }
+
 
         matches(preference, PrefKey.CUSTOMIZE_MAIN_MENU) -> {
             CustomizeMenuDialogFragment.newInstance()

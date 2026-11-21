@@ -3,7 +3,6 @@ package org.totschnig.myexpenses.compose.transactions
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.TrendingFlat
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -31,11 +30,6 @@ enum class Action(
         Icons.AutoMirrored.Default.ArrowForward,
         R.string.transfer,
         TransactionsContract.Transactions.TYPE_TRANSFER
-    ),
-    Split(
-        Icons.AutoMirrored.Default.CallSplit,
-        R.string.split_transaction,
-        TransactionsContract.Transactions.TYPE_SPLIT
     ),
     Scan(Icons.Default.Scanner, R.string.button_scan),
     Buy(Icons.Default.ArrowUpward, R.string.trade_buy),
@@ -65,9 +59,9 @@ enum class Action(
             ) + ")"
 
             Transfer -> stringResource(R.string.menu_create_transfer)
-            Split -> stringResource(R.string.menu_create_split)
             else -> stringResource(label)
         }
+
 
     companion object {
         val PORTFOLIO_ACTIONS = listOf(Buy, Sell, Deposit, Withdraw, AssetTransfer)

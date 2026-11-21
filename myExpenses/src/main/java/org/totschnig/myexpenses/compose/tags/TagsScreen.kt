@@ -1,6 +1,5 @@
 package org.totschnig.myexpenses.compose.tags
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -52,12 +51,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -104,18 +106,23 @@ fun TagsScreen(
     val allowSelection = action != Action.MANAGE
     val allowModifications = action != Action.SELECT_FILTER
 
-    var newTagInput by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
     var searchQuery by remember { mutableStateOf("") }
-    var isSearchActive by remember { mutableStateOf(false) }
+    val trimmedQuery = searchQuery.trim()
+    val exactMatch = tags.any { it.label.equals(trimmedQuery, ignoreCase = true) }
+    val canAddTag = allowModifications && trimmedQuery.isNotBlank() && !exactMatch
 
     var tagToEdit by remember { mutableStateOf<Tag?>(null) }
     var tagToDelete by remember { mutableStateOf<Tag?>(null) }
 
     // Filter tags
     val filteredTags = remember(tags, searchQuery) {
-        val query = searchQuery.trim()
-        if (query.isEmpty()) tags
-        else tags.filter { it.label.contains(query, ignoreCase = true) }
+        if (trimmedQuery.isEmpty()) tags
+        else tags.filter { it.label.contains(trimmedQuery, ignoreCase = true) }
     }
 
     // Edit Tag Dialog
@@ -272,15 +279,6 @@ fun TagsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        isSearchActive = !isSearchActive
-                        if (!isSearchActive) searchQuery = ""
-                    }) {
-                        Icon(
-                            imageVector = if (isSearchActive) Icons.Default.Close else Icons.Default.Search,
-                            contentDescription = "Search"
-                        )
-                    }
                     if (allowSelection) {
                         IconButton(onClick = onConfirm) {
                             Icon(
@@ -316,71 +314,87 @@ fun TagsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Search Bar
-            AnimatedVisibility(visible = isSearchActive) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Filter tags...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
+            // Consolidated Search & Create Bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = {
+                    Text(if (allowModifications) "Search or create tag..." else "Filter tags...")
+                },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                trailingIcon = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
                         if (searchQuery.isNotEmpty()) {
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
                         }
-                    },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+                        if (canAddTag) {
+                            IconButton(
+                                onClick = {
+                                    onAddTag(trimmedQuery)
+                                    searchQuery = ""
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add Tag",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = if (canAddTag) ImeAction.Done else ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        if (canAddTag) {
+                            onAddTag(trimmedQuery)
+                            searchQuery = ""
+                        }
+                    }
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+            )
 
-            // Quick Add Tag input (when modifications allowed)
-            if (allowModifications) {
+            // Inline Create Tag Action (when typing a new tag that doesn't already exist)
+            if (canAddTag) {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onAddTag(trimmedQuery)
+                            searchQuery = ""
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedTextField(
-                            value = newTagInput,
-                            onValueChange = { newTagInput = it },
-                            placeholder = { Text("Type new tag name...") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = {
-                                val trimmed = newTagInput.trim()
-                                if (trimmed.isNotEmpty()) {
-                                    onAddTag(trimmed)
-                                    newTagInput = ""
-                                }
-                            }),
-                            modifier = Modifier.weight(1f)
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(Modifier.width(8.dp))
-                        IconButton(
-                            onClick = {
-                                val trimmed = newTagInput.trim()
-                                if (trimmed.isNotEmpty()) {
-                                    onAddTag(trimmed)
-                                    newTagInput = ""
-                                }
-                            },
-                            enabled = newTagInput.isNotBlank()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Add Tag",
-                                tint = if (newTagInput.isNotBlank()) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
-                        }
+                        Text(
+                            text = "Create tag \"$trimmedQuery\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -420,7 +434,7 @@ fun TagsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Label,
+                            imageVector = Icons.AutoMirrored.Filled.Label,
                             contentDescription = null,
                             modifier = Modifier.size(56.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -432,7 +446,7 @@ fun TagsScreen(
                         )
                         if (allowModifications) {
                             Text(
-                                text = "Type above to create your first tag",
+                                text = if (trimmedQuery.isNotEmpty()) "Tap \"Create tag\" above to add it" else "Type above to create your first tag",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -491,7 +505,7 @@ fun TagsScreen(
                                     )
                                 }
                             },
-                            trailingIcon = if (allowModifications && !allowSelection) {
+                            trailingIcon = if (allowModifications) {
                                 {
                                     IconButton(
                                         onClick = { tagToEdit = tag },

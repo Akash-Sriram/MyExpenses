@@ -111,11 +111,17 @@ import org.totschnig.myexpenses.provider.KEY_CURRENCY
 import org.totschnig.myexpenses.provider.KEY_DATE
 import org.totschnig.myexpenses.provider.KEY_DISPLAY_AMOUNT
 import org.totschnig.myexpenses.provider.KEY_DYNAMIC
+import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_LABEL
+import org.totschnig.myexpenses.provider.KEY_LAST_USED
 import org.totschnig.myexpenses.provider.KEY_PARENTID
 import org.totschnig.myexpenses.provider.KEY_ROWID
 import org.totschnig.myexpenses.provider.KEY_TRANSFER_PEER
+import org.totschnig.myexpenses.provider.KEY_TYPE
+import org.totschnig.myexpenses.provider.KEY_USAGES
 import org.totschnig.myexpenses.provider.KEY_UUID
+import org.totschnig.myexpenses.provider.getIntOrNull
+import org.totschnig.myexpenses.provider.getStringIfExists
 import org.totschnig.myexpenses.provider.PORTFOLIO_ASSET
 import org.totschnig.myexpenses.provider.PORTFOLIO_CASH
 import org.totschnig.myexpenses.provider.PORTFOLIO_CONTAINER
@@ -138,8 +144,10 @@ import org.totschnig.myexpenses.viewmodel.data.Trade
 import org.totschnig.myexpenses.viewmodel.data.TradeIntent
 import org.totschnig.myexpenses.viewmodel.data.TradeType
 import org.totschnig.myexpenses.viewmodel.data.Transaction2
+import org.totschnig.myexpenses.viewmodel.data.Tag
 import org.totschnig.myexpenses.viewmodel.data.TransactionEditData
 import org.totschnig.myexpenses.viewmodel.data.TransferEditData
+import org.totschnig.myexpenses.viewmodel.data.mapper.TransactionMapper
 import org.totschnig.myexpenses.viewmodel.data.mapper.TransactionMapper.mapTransaction
 import timber.log.Timber
 import java.math.BigDecimal
@@ -162,6 +170,9 @@ open class MyExpensesV2ViewModel(
 
     private val _tradeToEdit = MutableStateFlow<Trade?>(null)
     val tradeToEdit = _tradeToEdit.asStateFlow()
+
+    private val _transactionToEdit = MutableStateFlow<TransactionEditData?>(null)
+    val transactionToEdit = _transactionToEdit.asStateFlow()
 
     fun handleIntent(intent: Intent) {
         viewModelScope.launch {
@@ -731,6 +742,160 @@ open class MyExpensesV2ViewModel(
 
     fun clearTradeToEdit() {
         _tradeToEdit.value = null
+    }
+
+    fun createTransaction(
+        action: Action,
+        defaultAccount: FullAccount,
+        targetAccount: FullAccount? = null
+    ) {
+        val isTransfer = action == Action.Transfer
+        val isIncome = action == Action.Income
+        _transactionToEdit.value = TransactionEditData(
+            uuid = generateUuid(),
+            amount = Money(defaultAccount.currencyUnit, 0L),
+            accountId = defaultAccount.id,
+            date = LocalDateTime.now(),
+            valueDate = LocalDate.now(),
+            transferEditData = if (isTransfer) TransferEditData(
+                transferAccountId = targetAccount?.id ?: 0L
+            ) else null
+        )
+    }
+
+    fun loadTransaction(transactionId: Long) {
+        viewModelScope.launch(coroutineDispatcher) {
+            try {
+                val repoTx = repository.loadTransaction(
+                    transactionId,
+                    withTransfer = true,
+                    withTags = true,
+                    extended = true
+                )
+                _transactionToEdit.value = TransactionMapper.map(repoTx, currencyContext)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to load transaction $transactionId for edit")
+            }
+        }
+    }
+
+    fun cloneTransaction(transactionId: Long) {
+        viewModelScope.launch(coroutineDispatcher) {
+            try {
+                val repoTx = repository.loadTransaction(
+                    transactionId,
+                    withTransfer = true,
+                    withTags = true,
+                    extended = true
+                )
+                val editData = TransactionMapper.map(repoTx, currencyContext)
+                val isCurrentDate = prefHandler.getBoolean(PrefKey.CLONE_WITH_CURRENT_DATE, true)
+                val date = if (isCurrentDate) LocalDateTime.now() else editData.date
+                val valueDate = if (isCurrentDate) LocalDate.now() else editData.valueDate
+                _transactionToEdit.value = editData.copy(
+                    id = 0L,
+                    uuid = generateUuid(),
+                    date = date,
+                    valueDate = valueDate
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to clone transaction $transactionId")
+            }
+        }
+    }
+
+
+    fun editTransaction(data: TransactionEditData) {
+        _transactionToEdit.value = data
+    }
+
+    fun clearTransactionToEdit() {
+        _transactionToEdit.value = null
+    }
+
+    fun getAllTags(): List<Tag> {
+        return try {
+            contentResolver.query(
+                TransactionProvider.TAGS_URI,
+                arrayOf(KEY_ROWID, KEY_LABEL, KEY_COLOR),
+                null,
+                null,
+                "$KEY_LABEL COLLATE LOCALIZED"
+            )?.use { cursor ->
+                val list = mutableListOf<Tag>()
+                while (cursor.moveToNext()) {
+                    list.add(Tag.fromCursor(cursor))
+                }
+                list
+            } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun createTag(label: String): Tag? {
+        val trimmed = label.trim()
+        if (trimmed.isBlank()) return null
+        val uri = contentResolver.insert(
+            TransactionProvider.TAGS_URI,
+            android.content.ContentValues().apply { put(KEY_LABEL, trimmed) }
+        )
+        val id = uri?.lastPathSegment?.toLongOrNull() ?: return null
+        return Tag(id, trimmed)
+    }
+
+    fun saveTransaction(data: TransactionEditData) {
+        viewModelScope.launch(coroutineDispatcher) {
+            val repoTx = mapTransaction(data)
+            if (data.id != 0L) {
+                repository.updateTransaction(repoTx)
+            } else {
+                repository.createTransaction(repoTx)
+            }
+            contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, 0)
+            contentResolver.notifyChange(TransactionProvider.ACCOUNTS_URI, null, 0)
+            contentResolver.notifyChange(TransactionProvider.CATEGORIES_URI, null, 0)
+        }
+    }
+
+    fun getQuickCategories(type: Byte = FLAG_EXPENSE): List<org.totschnig.myexpenses.compose.transactions.QuickCategory> {
+        val list = try {
+            contentResolver.query(
+                TransactionProvider.CATEGORIES_URI,
+                arrayOf(KEY_ROWID, KEY_LABEL, KEY_ICON, KEY_COLOR, KEY_TYPE),
+                "$KEY_ROWID != $SPLIT_CATID AND ($KEY_TYPE = ? OR $KEY_TYPE = $FLAG_NEUTRAL) AND $KEY_PARENTID IS NULL",
+                arrayOf(type.toString()),
+                "$KEY_USAGES DESC, $KEY_LAST_USED DESC, $KEY_LABEL ASC LIMIT 10"
+            )?.use { cursor ->
+                val result = mutableListOf<org.totschnig.myexpenses.compose.transactions.QuickCategory>()
+                while (cursor.moveToNext()) {
+                    result.add(
+                        org.totschnig.myexpenses.compose.transactions.QuickCategory(
+                            id = cursor.getLong(0),
+                            label = cursor.getString(1),
+                            icon = if (cursor.isNull(2)) null else cursor.getString(2),
+                            color = if (cursor.isNull(3)) null else cursor.getInt(3),
+                            type = cursor.getInt(4).toByte()
+                        )
+
+                    )
+                }
+                result
+            } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        return if (list.isNotEmpty()) list else listOf(
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(1, "Food & Dining"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(2, "Groceries"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(3, "Shopping"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(4, "Transport & Fuel"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(5, "Bills & Utilities"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(6, "Entertainment"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(7, "Health & Medical"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(8, "Salary", type = FLAG_INCOME)
+        )
     }
 
     suspend fun saveTrades(

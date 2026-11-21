@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="versions">
+        <item>893;1.0.7;100% Jetpack Compose transaction editor, dropped split transactions, and legacy debt elimination</item>
         <item>892;1.0.6;Hide account balance in account switcher carousel tabs for privacy</item>
         <item>891;1.0.5;Option to hide account balance and running micro-totals for privacy</item>
         <item>890;1.0.4;Daily incremental &amp; full backup automation, and enhanced UPI receipt OCR for ICICI Bank and Samsung Pay</item>

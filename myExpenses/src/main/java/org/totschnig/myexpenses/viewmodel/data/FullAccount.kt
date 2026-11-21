@@ -456,3 +456,16 @@ data class PageAccount(
     val queryKey: Any
         get() = QueryKey(stableId, sortBy, sortDirection, grouping)
 }
+
+fun FullAccount.toAccount() = Account(
+    id = id,
+    label = label,
+    currency = currencyUnit,
+    color = color,
+    type = type,
+    criterion = null,
+    isDynamic = false,
+    flag = flag,
+    exchangeRate = java.math.BigDecimal.ONE,
+    currentBalance = currentBalance
+)

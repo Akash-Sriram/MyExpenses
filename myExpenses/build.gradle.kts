@@ -95,7 +95,7 @@ android {
         }
         debug {
             applicationIdSuffix = ".debug"
-            manifestPlaceholders["appName"] = "My Expenses Debug"
+            manifestPlaceholders["appName"] = "Expenses Debug"
             buildConfigField("int", "TEST_SCENARIO", getPropertyIfDefined("testScenario", "1"))
             buildConfigField("String", "OPEN_EXCHANGE_RATES_API_KEY", "\"${getPropertyIfDefined("OPEN_EXCHANGE_RATES_API_KEY", "")}\"")
             buildConfigField("String", "COIN_API_API_KEY", "\"${getPropertyIfDefined("COIN_API_API_KEY", "")}\"")

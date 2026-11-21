@@ -601,6 +601,19 @@ fun TransactionScreen(
 
                     if (action in Action.PORTFOLIO_ACTIONS) {
                         showTradeScreen = action
+                    } else if (action == Action.Expense || action == Action.Income || action == Action.Transfer) {
+                        val fullAccount = currentAccount as? FullAccount ?: accounts.firstOrNull { !it.isPortfolio && !it.sealed }
+                        if (fullAccount != null) {
+                            val target = accounts.firstOrNull { !it.isPortfolio && !it.sealed && it.id != fullAccount.id }
+                            viewModel.createTransaction(action, fullAccount, target)
+                        } else {
+                            onEvent(
+                                AppEvent.CreateTransaction(
+                                    action = action,
+                                    transferEnabled = accountList.size > 1
+                                )
+                            )
+                        }
                     } else {
                         onEvent(
                             AppEvent.CreateTransaction(
@@ -609,6 +622,7 @@ fun TransactionScreen(
                             )
                         )
                     }
+
                 }
             }
         }
