@@ -717,6 +717,7 @@ abstract class BaseActivity : AppCompatActivity(), MessageDialogFragment.Message
                 PrefKey.PROTECTION_ALLOW_SCREENSHOT,
                 PrefKey.PROTECTION_DEVICE_LOCK_SCREEN,
                 PrefKey.PROTECTION_LEGACY,
+                PrefKey.PROTECTION_HIDE_BALANCES,
                 PrefKey.UI_FONT_SIZE,
                 PrefKey.CUSTOMIZE_MAIN_MENU,
                 PrefKey.UI_ITEM_RENDERER_ORIGINAL_AMOUNT,

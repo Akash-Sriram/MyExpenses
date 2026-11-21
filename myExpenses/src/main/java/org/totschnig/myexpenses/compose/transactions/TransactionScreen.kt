@@ -200,6 +200,7 @@ fun TransactionScreen(
     }
 
     val activeFilter by viewModel.activeFilter.collectAsStateWithLifecycle()
+    val hideBalances by viewModel.hideBalances.collectAsStateWithLifecycle(initialValue = false)
     val coroutineScope = rememberCoroutineScope()
     val tabRowState = rememberCollapsingTabRowState()
 
@@ -486,7 +487,8 @@ fun TransactionScreen(
                                         },
                                         bankIcon = bankIcon,
                                         onAccountEvent = onAccountEvent,
-                                        onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) }
+                                        onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) },
+                                        hideBalances = hideBalances
                                     )
                                 },
                                 actions = {
@@ -762,13 +764,14 @@ private fun BalanceHeader(
     onSetNewBalance: (() -> Unit)? = null,
     onAccountEvent: AccountEventHandler,
     onLoadPeriodSummary: (suspend (BaseAccount, BalancePeriod) -> PeriodBalanceSummary)? = null,
+    hideBalances: Boolean = false,
 ) {
     var isSummaryPopupVisible by rememberSaveable { mutableStateOf(false) }
     var selectedPeriod by rememberSaveable { mutableStateOf(BalancePeriod.SALARY_CYCLE) }
     var periodSummary by remember { mutableStateOf<PeriodBalanceSummary?>(null) }
 
     LaunchedEffect(currentAccount, selectedPeriod, isSummaryPopupVisible) {
-        if (isSummaryPopupVisible && onLoadPeriodSummary != null) {
+        if (!hideBalances && isSummaryPopupVisible && onLoadPeriodSummary != null) {
             periodSummary = onLoadPeriodSummary(currentAccount, selectedPeriod)
         }
     }
@@ -787,11 +790,13 @@ private fun BalanceHeader(
     Row(
         modifier = modifier
             .testTag(TEST_TAG_BALANCE_HEADER)
-            .semantics {
-                role = Role.Button
-            }
-            .clickable(onClickLabel = stringResource(R.string.content_description_show_balance_details)) {
-                isSummaryPopupVisible = !isSummaryPopupVisible
+            .conditional(!hideBalances) {
+                semantics {
+                    role = Role.Button
+                }
+                .clickable(onClickLabel = stringResource(R.string.content_description_show_balance_details)) {
+                    isSummaryPopupVisible = !isSummaryPopupVisible
+                }
             },
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -812,24 +817,30 @@ private fun BalanceHeader(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     AccountLabel(currentAccount, Modifier.weight(1f, fill = false))
-                    BalanceSection(displayBalance, currentAccount)
+                    if (!hideBalances) {
+                        BalanceSection(displayBalance, currentAccount)
+                    }
                 }
             } else {
                 Column {
                     AccountLabel(currentAccount)
-                    BalanceSection(displayBalance, currentAccount)
+                    if (!hideBalances) {
+                        BalanceSection(displayBalance, currentAccount)
+                    }
                 }
             }
         }
 
-        Icon(
-            modifier = Modifier.rotate(rotationAngle),
-            imageVector = Icons.Default.ExpandLess,
-            contentDescription = null
-        )
+        if (!hideBalances) {
+            Icon(
+                modifier = Modifier.rotate(rotationAngle),
+                imageVector = Icons.Default.ExpandLess,
+                contentDescription = null
+            )
+        }
 
         // The Popup that shows the full summary
-        if (isSummaryPopupVisible) {
+        if (!hideBalances && isSummaryPopupVisible) {
 
             val currencyFormatter = LocalCurrencyFormatter.current
 

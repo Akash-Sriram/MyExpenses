@@ -233,6 +233,7 @@ fun TransactionList(
     windowInsets: WindowInsets = WindowInsets(),
     splitInfoResolver: suspend (Transaction2) -> ResolvedExtraInfo? = { null },
     accountCount: Int,
+    hideBalances: Boolean = false,
 ) {
 
     val listState = rememberLazyListState()
@@ -408,7 +409,8 @@ fun TransactionList(
                                                     headerCorrection.value = -it
                                                 }
                                             } else null,
-                                            onHeaderEvent = onHeaderEvent
+                                            onHeaderEvent = onHeaderEvent,
+                                            hideBalances = hideBalances
                                         ) {
                                             headersWithSumDetails[headerId] = it
                                         }
@@ -540,62 +542,67 @@ fun HeaderData(
     showOnlyDelta: Boolean,
     updateShowSumDetails: (Boolean) -> Unit,
     alignStart: Boolean = false,
+    hideBalances: Boolean = false,
 ) {
     val amountFormatter = LocalCurrencyFormatter.current
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = if (hideBalances) 6.dp else 0.dp),
         horizontalAlignment = if (alignStart) Alignment.Start else Alignment.CenterHorizontally
     ) {
         Text(
             text = displayTitle,
             style = MaterialTheme.typography.titleMedium,
         )
-        val delta = " " +
-                (if (headerRow.delta.amountMinor >= 0) "+" else "\u2212") + " " + amountFormatter.formatMoney(
-            Money(
-                headerRow.delta.currencyUnit,
-                headerRow.delta.amountMinor.absoluteValue
-            )
-        )
-        FlowRow(
-            modifier = Modifier
-                .testTag(TEST_TAG_GROUP_SUMMARY)
-                .fillMaxWidth(),
-            horizontalArrangement = if (alignStart) Arrangement.Start else Arrangement.Center
-        ) {
-            if (!showOnlyDelta) {
-                Text(
-                    modifier = Modifier.amountSemantics(headerRow.previousBalance),
-                    text = amountFormatter.formatMoney(headerRow.previousBalance)
+        if (!hideBalances) {
+            val delta = " " +
+                    (if (headerRow.delta.amountMinor >= 0) "+" else "\u2212") + " " + amountFormatter.formatMoney(
+                Money(
+                    headerRow.delta.currencyUnit,
+                    headerRow.delta.amountMinor.absoluteValue
                 )
-            }
-            Text(
+            )
+            FlowRow(
                 modifier = Modifier
-                    .amountSemantics(headerRow.delta)
-                    .padding(horizontal = 6.dp)
-                    .clearAndSetSemantics {
-                        contentDescription = delta
-                    }
-                    .clickable {
-                        updateShowSumDetails(!showSumDetails)
-                    },
-                text = delta
-            )
-            if (!showOnlyDelta) {
+                    .testTag(TEST_TAG_GROUP_SUMMARY)
+                    .fillMaxWidth(),
+                horizontalArrangement = if (alignStart) Arrangement.Start else Arrangement.Center
+            ) {
+                if (!showOnlyDelta) {
+                    Text(
+                        modifier = Modifier.amountSemantics(headerRow.previousBalance),
+                        text = amountFormatter.formatMoney(headerRow.previousBalance)
+                    )
+                }
                 Text(
-                    modifier = Modifier.amountSemantics(headerRow.interimBalance),
-                    text = " = " + amountFormatter.formatMoney(headerRow.interimBalance)
+                    modifier = Modifier
+                        .amountSemantics(headerRow.delta)
+                        .padding(horizontal = 6.dp)
+                        .clearAndSetSemantics {
+                            contentDescription = delta
+                        }
+                        .clickable {
+                            updateShowSumDetails(!showSumDetails)
+                        },
+                    text = delta
+                )
+                if (!showOnlyDelta) {
+                    Text(
+                        modifier = Modifier.amountSemantics(headerRow.interimBalance),
+                        text = " = " + amountFormatter.formatMoney(headerRow.interimBalance)
+                    )
+                }
+            }
+            if (showSumDetails) {
+                SumDetails(
+                    headerRow.incomeSum,
+                    headerRow.expenseSum,
+                    headerRow.transferSum,
+                    alignStart
                 )
             }
-        }
-        if (showSumDetails) {
-            SumDetails(
-                headerRow.incomeSum,
-                headerRow.expenseSum,
-                headerRow.transferSum,
-                alignStart
-            )
         }
     }
 }
@@ -615,6 +622,7 @@ fun HeaderRenderer(
     showOnlyDelta: Boolean,
     onHeaderSize: ((Int) -> Unit)? = null,
     onHeaderEvent: HeaderEventHandler? = null,
+    hideBalances: Boolean = false,
     updateShowSumDetails: (Boolean) -> Unit = {},
 ) {
 
@@ -653,7 +661,7 @@ fun HeaderRenderer(
                         toggle = toggle
                     )
                 }
-                if (budget?.second != null && budget.second != 0L) {
+                if (!hideBalances && budget?.second != null && budget.second != 0L) {
                     val progress = (-headerRow.expenseSum.amountMinor * 100F / budget.second)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         DonutInABox(
@@ -673,7 +681,8 @@ fun HeaderRenderer(
                             showSumDetails,
                             showOnlyDelta,
                             updateShowSumDetails,
-                            alignStart = true
+                            alignStart = true,
+                            hideBalances = hideBalances
                         )
                     }
                 } else {
@@ -682,7 +691,9 @@ fun HeaderRenderer(
                         headerRow,
                         showSumDetails,
                         showOnlyDelta,
-                        updateShowSumDetails
+                        updateShowSumDetails,
+                        alignStart = false,
+                        hideBalances = hideBalances
                     )
                 }
                 onHeaderEvent?.let {

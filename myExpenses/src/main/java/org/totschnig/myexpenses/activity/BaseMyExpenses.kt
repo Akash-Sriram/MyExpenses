@@ -1640,7 +1640,8 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                         },
                         windowInsets = transactionListWindowInsets,
                         modificationsAllowed = modificationAllowed,
-                        accountCount = accountCount
+                        accountCount = accountCount,
+                        hideBalances = viewModel.hideBalances.collectAsState(initial = false).value
                     )
                 }
         }

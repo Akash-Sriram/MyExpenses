@@ -359,6 +359,13 @@ open class MyExpensesViewModel(
         }
     }
 
+    val hideBalances: Flow<Boolean> by lazy {
+        dataStore.data.map {
+            it[prefHandler.getBooleanPreferencesKey(PrefKey.PROTECTION_HIDE_BALANCES)]
+                ?: prefHandler.getBoolean(PrefKey.PROTECTION_HIDE_BALANCES, false)
+        }
+    }
+
     val futureCriterion: Flow<FutureCriterion> by lazy {
         dataStore.data.map {
             enumValueOrDefault(

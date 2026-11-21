@@ -8,6 +8,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.MyApplication
 import org.totschnig.myexpenses.preference.PrefHandler
@@ -67,6 +69,11 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
     )
     val secureWindow: StateFlow<Boolean> = _secureWindow.asStateFlow()
 
+    private val _hideBalances = MutableStateFlow(
+        prefHandler.getBoolean(PrefKey.PROTECTION_HIDE_BALANCES, false)
+    )
+    val hideBalances: StateFlow<Boolean> = _hideBalances.asStateFlow()
+
     private val _autoBackup = MutableStateFlow(
         prefHandler.getBoolean(PrefKey.AUTO_BACKUP, false)
     )
@@ -82,6 +89,19 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
     val backupOpState: StateFlow<BackupOperationState> = _backupOpState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            try {
+                val app = getApplication<Application>() as MyApplication
+                app.dataStore.data.firstOrNull()?.let { prefs ->
+                    val key = prefHandler.getBooleanPreferencesKey(PrefKey.PROTECTION_HIDE_BALANCES)
+                    if (prefs.contains(key)) {
+                        _hideBalances.value = prefs[key] == true
+                    }
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error reading hideBalances from dataStore")
+            }
+        }
         loadBackupLocation()
         loadBackups()
     }
@@ -101,6 +121,21 @@ class SettingsViewModel2(application: Application) : AndroidViewModel(applicatio
         // ALLOW_SCREENSHOT is inverted: enabled secure window means screenshot disallowed
         prefHandler.putBoolean(PrefKey.PROTECTION_ALLOW_SCREENSHOT, !enabled)
         _secureWindow.value = enabled
+    }
+
+    fun setHideBalances(enabled: Boolean) {
+        prefHandler.putBoolean(PrefKey.PROTECTION_HIDE_BALANCES, enabled)
+        _hideBalances.value = enabled
+        viewModelScope.launch {
+            try {
+                val app = getApplication<Application>() as MyApplication
+                app.dataStore.edit {
+                    it[prefHandler.getBooleanPreferencesKey(PrefKey.PROTECTION_HIDE_BALANCES)] = enabled
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error saving hideBalances to dataStore")
+            }
+        }
     }
 
     fun setAutoBackup(enabled: Boolean) {

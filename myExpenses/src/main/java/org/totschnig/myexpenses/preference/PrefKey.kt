@@ -34,6 +34,7 @@ enum class PrefKey(internal val resId: Int, internal val _key: String?) {
     PROTECTION_ENABLE_TEMPLATE_WIDGET(R.string.pref_protection_enable_template_widget_key),
     PROTECTION_ENABLE_BUDGET_WIDGET(R.string.pref_protection_enable_budget_widget_key),
     PROTECTION_ENABLE_DATA_ENTRY_FROM_WIDGET(R.string.pref_protection_enable_data_entry_from_widget_key),
+    PROTECTION_HIDE_BALANCES("protection_hide_balances"),
     EXPORT_FORMAT(R.string.pref_export_format_key),
     SEND_FEEDBACK(R.string.pref_send_feedback_key),
     MORE_INFO_DIALOG(R.string.pref_more_info_dialog_key),

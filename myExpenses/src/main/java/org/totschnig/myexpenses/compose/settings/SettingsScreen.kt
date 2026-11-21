@@ -120,6 +120,7 @@ fun SettingsScreen(
     val theme by viewModel.theme.collectAsState()
     val deviceLock by viewModel.deviceLockScreen.collectAsState()
     val secureWindow by viewModel.secureWindow.collectAsState()
+    val hideBalances by viewModel.hideBalances.collectAsState()
     val autoBackup by viewModel.autoBackup.collectAsState()
     val backupLocation by viewModel.backupLocation.collectAsState()
     val snapshots by viewModel.backupSnapshots.collectAsState()
@@ -279,6 +280,15 @@ fun SettingsScreen(
                         subtitle = "Mask financial details in app switcher and block unauthorized screenshots",
                         checked = secureWindow,
                         onCheckedChange = { viewModel.setSecureWindow(it) }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+
+                    SwitchSettingTile(
+                        title = "Hide Balances & Micro-Totals",
+                        subtitle = "Hide current balance at top and group running totals in transaction list for privacy",
+                        checked = hideBalances,
+                        onCheckedChange = { viewModel.setHideBalances(it) }
                     )
                 }
             }

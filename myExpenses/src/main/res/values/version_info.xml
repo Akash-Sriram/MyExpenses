@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="versions">
+        <item>891;1.0.5;Option to hide account balance and running micro-totals for privacy</item>
         <item>890;1.0.4;Daily incremental &amp; full backup automation, and enhanced UPI receipt OCR for ICICI Bank and Samsung Pay</item>
         <item>889;1.0.3;Enhanced UPI receipt OCR for Samsung Wallet and Devanagari/Bengali numerals, and preserve subcategories in category search tree</item>
         <item>888;1.0.2;Fix Settings screen crash when scrolling to About &amp; Updates section</item>
