@@ -657,6 +657,7 @@ fun TransactionScreen(
                     },
                     onCreateAccount = { onEvent(AppEvent.CreateAccount) },
                     onManageAccounts = { onEvent(AppEvent.ManageAccounts) },
+                    hideBalances = hideBalances,
                     modifier = Modifier
                         .optional(tabRowState.heightPx) {
                             height(with(LocalDensity.current) { it.toDp() })
@@ -981,6 +982,7 @@ private fun AccountSwitcherCarousel(
     onCreateAccount: () -> Unit,
     onManageAccounts: () -> Unit,
     modifier: Modifier = Modifier,
+    hideBalances: Boolean = false,
 ) {
     val lazyListState = rememberLazyListState()
     val resources = LocalResources.current
@@ -1067,18 +1069,20 @@ private fun AccountSwitcherCarousel(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        Text(
-                            text = currencyFormatter.convAmount(balanceAmount, account.currencyUnit),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (balanceAmount < 0) {
-                                MaterialTheme.colorScheme.error
-                            } else if (isSelected) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
+                        if (!hideBalances) {
+                            Text(
+                                text = currencyFormatter.convAmount(balanceAmount, account.currencyUnit),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (balanceAmount < 0) {
+                                    MaterialTheme.colorScheme.error
+                                } else if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
                     }
                 }
             }
