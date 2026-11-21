@@ -91,7 +91,7 @@ object UpiReceiptParser {
             .replace(Regex("""(?i)\b(amount|total(?:\s+amount)?|paid|sent|grand\s+total|net\s+amount|bill\s+amount)\s*[:=]?\s*[\u0969]\s*(?=[0-9])""")) { m ->
                 m.value.replace('\u0969', '₹')
             }
-            .replace(Regex("""(^|\n|\s)[\u0969]\s+(?=[0-9])"""), "$1₹ ")
+            .replace(Regex("""(^|\n|\s)[\u0969]\s*(?=[0-9])"""), "$1₹ ")
             // Bengali digit 4 ('৪' \u09EA) visually resembles English digit '8' in Samsung One / mobile receipt fonts.
             // When preceding an English month token (e.g. "০৪ NOV", "0৪ NOV", "৪ NOV"), it is an OCR misread of the English digit '8'.
             .replace(Regex("""(?i)([০0]?)\u09ea\s+(?=(?:$monthTokens)\b)"""), "08 ")
@@ -239,7 +239,7 @@ object UpiReceiptParser {
         // Strip leading OCR symbol misreads when followed by space or digits (e.g. "₹30.00" -> "30.00", "7 618.00" -> "618.00", "? 1,250.00" -> "1,250.00", "३ 201.72" -> "201.72", "R600.00" -> "600.00")
         var cleaned = line.trim().replace(Regex("""^(?:[₹\u20B9\u0969\u09B9\u0930\u0939?zZrR#*FEeTtXx~=]|रु|\u0930\u0941)\s*(?=\d)"""), "")
         cleaned = cleaned.replace(Regex("""^(?:Rs\.?|INR|Re\.?|R(?=[\d|:JỊ]))[\s|JỊ:\-]*"""), "")
-        cleaned = cleaned.replace(Regex("""^(?:7)\s+(?=\d)"""), "")
+        cleaned = cleaned.replace(Regex("""^[37\u0969]\s+(?=\d)"""), "")
         cleaned = cleaned.replace(Regex("""^[|:JỊ\-\s]+(?=\d)"""), "")
         // Letter O in decimals
         cleaned = cleaned.replace(Regex("""(\d+)\.[oO]{2}\b"""), "$1.00")
@@ -265,9 +265,9 @@ object UpiReceiptParser {
             }
         }
 
-        // Priority 0b: Status line (Sent / Completed / Successful) preceded or followed by amount line
+        // Priority 0b: Status line (Sent / Completed / Successful / Paid successfully!) preceded or followed by amount line
         val statusIndex = lines.indexOfFirst {
-            it.matches(Regex("""(?i)^\s*(?:sent|completed|payment\s+successful!?|transaction\s+successful!?|successful!?)\s*${'$'}"""))
+            it.matches(Regex("""(?i)^\s*(?:paid\s+successfully!?|bill\s+payment\s+successful!?|payment\s+successful!?|transaction\s+successful!?|sent|completed|successful!?)\s*${'$'}"""))
         }
         if (statusIndex >= 0) {
             // Check preceding lines up to 3 offsets (in case OCR placed Transaction ID: or empty lines between amount and Sent)
@@ -278,7 +278,7 @@ object UpiReceiptParser {
                     if (!isReferenceOrAccountLine(candidateLine) && !containsDate(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}${'$'}"""))) {
                         var candidateCleaned = cleanAmountCandidate(candidateLine)
                         if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
-                            if (candidateCleaned.matches(Regex("""^7\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
+                            if (candidateCleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
                                 val stripped = candidateCleaned.substring(1)
                                 val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
                                 if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
@@ -296,13 +296,22 @@ object UpiReceiptParser {
                     }
                 }
             }
-            // Check following line (e.g. "Sent \n 441.00")
+            // Check following line (e.g. "Sent \n 441.00", "Paid successfully! \n ₹ 411", "Paid successfully! \n 3411")
             for (offset in 1..2) {
                 val candidateIdx = statusIndex + offset
                 if (candidateIdx < lines.size) {
                     val candidateLine = lines[candidateIdx].trim()
                     if (!isReferenceOrAccountLine(candidateLine) && !containsDate(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}${'$'}"""))) {
-                        val candidateCleaned = cleanAmountCandidate(candidateLine)
+                        var candidateCleaned = cleanAmountCandidate(candidateLine)
+                        if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
+                            if (candidateCleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
+                                val stripped = candidateCleaned.substring(1)
+                                val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
+                                if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
+                                    candidateCleaned = stripped
+                                }
+                            }
+                        }
                         val m = STANDALONE_AMOUNT_PATTERN.matcher(candidateCleaned)
                         if (m.matches()) {
                             val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
@@ -349,15 +358,24 @@ object UpiReceiptParser {
             }
         }
 
-        // Priority 1: Multi-line amount label followed by value on next line (e.g. ICICI: "Amount \n 618.00", "Amount \n ₹ 618.00", "Bill payment successful! \n 453")
+        // Priority 1: Multi-line amount label followed by value on next line (e.g. ICICI: "Amount \n 618.00", "Amount \n ₹ 618.00", "Paid successfully! \n 411", "Bill payment successful! \n 453")
         for (i in lines.indices) {
             val line = lines[i].trim()
-            if (line.matches(Regex("""(?i)^\s*(?:amount|total(?:\s+amount|\s+payable|\s+bill)?|grand\s+total|net\s+(?:payable|amount)|bill\s+amount|transfer\s+amount|bill\s+payments?(?:\s+successful!?)?|amount\s+paid)\s*[:=]?${'$'}"""))) {
+            if (line.matches(Regex("""(?i)^\s*(?:paid\s+successfully!?|amount|total(?:\s+amount|\s+payable|\s+bill)?|grand\s+total|net\s+(?:payable|amount)|bill\s+amount|transfer\s+amount|bill\s+payments?(?:\s+successful!?)?|amount\s+paid)\s*[:=]?${'$'}"""))) {
                 for (offset in 1..2) {
                     if (i + offset < lines.size) {
                         val candidateLine = lines[i + offset].trim()
                         if (!isReferenceOrAccountLine(candidateLine) && !candidateLine.matches(Regex("""^\d{10,24}${'$'}"""))) {
-                            val cleaned = cleanAmountCandidate(candidateLine)
+                            var cleaned = cleanAmountCandidate(candidateLine)
+                            if (!candidateLine.contains("₹") && !candidateLine.contains("Rs", ignoreCase = true) && !candidateLine.contains("INR", ignoreCase = true)) {
+                                if (cleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
+                                    val stripped = cleaned.substring(1)
+                                    val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
+                                    if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
+                                        cleaned = stripped
+                                    }
+                                }
+                            }
                             val m = STANDALONE_AMOUNT_PATTERN.matcher(cleaned)
                             if (m.matches()) {
                                 val parsed = m.group(1)?.replace(",", "")?.toBigDecimalOrNull()
@@ -403,7 +421,7 @@ object UpiReceiptParser {
             if (isReferenceOrAccountLine(line) || containsDate(line) || line.contains("@")) continue
             var cleaned = cleanAmountCandidate(line)
             if (!line.contains("₹") && !line.contains("Rs", ignoreCase = true) && !line.contains("INR", ignoreCase = true)) {
-                if (cleaned.matches(Regex("""^7\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
+                if (cleaned.matches(Regex("""^[37]\d{2,}(?:\.\d{1,2})?${'$'}"""))) {
                     val stripped = cleaned.substring(1)
                     val strippedVal = stripped.replace(",", "").toBigDecimalOrNull()
                     if (strippedVal != null && strippedVal >= BigDecimal.ONE) {
@@ -1196,6 +1214,33 @@ object UpiReceiptParser {
                 }
             }
         }
+
+        // 3. ICICI iMobile note between amount and payee line:
+        // E.g.:
+        //   Paid successfully!
+        //   ₹ 411
+        //   dinner
+        //   To Nandavanam RESTAURANT
+        val toIndex = lines.indexOfFirst { line ->
+            line.matches(Regex("""(?i)^\s*to\s+.+""")) || (payeeName != null && line.contains(payeeName, ignoreCase = true))
+        }
+        if (toIndex > 0) {
+            for (idx in (toIndex - 1) downTo 0) {
+                val candidateLine = lines[idx].trim()
+                if (candidateLine.isEmpty()) continue
+                if (isReferenceOrAccountLine(candidateLine) || containsDate(candidateLine)) break
+                if (candidateLine.matches(Regex("""(?i).*(?:paid\s+successfully!?|payment\s+successful!?|transaction\s+successful!?).*"""))) break
+                val cleanedAmt = cleanAmountCandidate(candidateLine)
+                if (STANDALONE_AMOUNT_PATTERN.matcher(cleanedAmt).matches() || RUPEE_AMOUNT_PATTERN.matcher(candidateLine).find()) {
+                    break
+                }
+                val cleaned = cleanComment(candidateLine)
+                if (isValidUserComment(cleaned, payeeName)) {
+                    return cleaned
+                }
+            }
+        }
+
         return null
     }
 

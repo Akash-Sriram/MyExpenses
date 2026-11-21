@@ -1386,6 +1386,129 @@ class UpiReceiptParserTest {
         assertEquals("341082813126", result.referenceNumber)
         assertTrue(result.isExpense)
     }
+
+    @Test
+    fun testParseIciciReceiptNandavanamDinner() {
+        val rawText = """
+            ICICI Bank
+            Paid successfully!
+            ₹ 411
+            dinner
+            To Nandavanam RESTAURANT
+            paytmqr67g4vv@ptys
+            From G AKASH SRIRAM
+            Paid at 09:29PM, 20 Nov '26 IST
+            Tr. ID: 111242090508
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("411"), result.amount)
+        assertEquals("Nandavanam RESTAURANT", result.payeeName)
+        assertEquals("paytmqr67g4vv@ptys", result.upiId)
+        assertEquals("dinner", result.comment)
+        assertEquals(LocalDateTime.of(2026, 11, 20, 21, 29), result.dateTime)
+        assertEquals("111242090508", result.referenceNumber)
+        assertTrue(result.accountOrBankHint?.contains("ICICI", ignoreCase = true) == true)
+        assertTrue(result.isExpense)
+    }
+
+    @Test
+    fun testParseIciciReceiptWithRupeeMisreadAs3WithoutSpace() {
+        // ML Kit often reads curved Rupee symbol '₹' as digit '3', turning '₹ 411' into '3411'
+        val rawText = """
+            ICICI Bank
+            Paid successfully!
+            3411
+            dinner
+            To Nandavanam RESTAURANT
+            paytmqr67g4vv@ptys
+            From G AKASH SRIRAM
+            Paid at 09:29PM, 20 Nov '26 IST
+            Tr. ID: 111242090508
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("411"), result.amount)
+        assertEquals("Nandavanam RESTAURANT", result.payeeName)
+        assertEquals("dinner", result.comment)
+    }
+
+    @Test
+    fun testParseIciciReceiptWithRupeeMisreadAs3WithSpace() {
+        val rawText = """
+            ICICI Bank
+            Paid successfully!
+            3 411
+            dinner
+            To Nandavanam RESTAURANT
+            paytmqr67g4vv@ptys
+            From G AKASH SRIRAM
+            Paid at 09:29PM, 20 Nov '26 IST
+            Tr. ID: 111242090508
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("411"), result.amount)
+        assertEquals("Nandavanam RESTAURANT", result.payeeName)
+        assertEquals("dinner", result.comment)
+    }
+
+    @Test
+    fun testParseIciciReceiptWithRupeeMisreadAsDevanagari3() {
+        val rawText = """
+            ICICI Bank
+            Paid successfully!
+            ३411
+            dinner
+            To Nandavanam RESTAURANT
+            paytmqr67g4vv@ptys
+            From G AKASH SRIRAM
+            Paid at 09:29PM, 20 Nov '26 IST
+            Tr. ID: 111242090508
+            POWERED BY UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("411"), result.amount)
+        assertEquals("Nandavanam RESTAURANT", result.payeeName)
+        assertEquals("dinner", result.comment)
+    }
+
+    @Test
+    fun testParseSamsungWalletWithRupeeMisreadAs3() {
+        val rawText = """
+            Paid from
+            Samsung Wallet
+            
+            CAFE COFFEE DAY
+            ccd@axb
+            20 NOV 2026, 04:15 PM
+            
+            3411
+            Sent
+            
+            Transaction ID: 301966032876
+            Powered by AXIS BANK | UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("411"), result.amount)
+        assertEquals("CAFE COFFEE DAY", result.payeeName)
+    }
 }
+
 
 

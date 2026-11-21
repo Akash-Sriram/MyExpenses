@@ -76,7 +76,29 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
 
     override suspend fun doWork(): Result {
         Timber.w("now doWork $WORK_NAME")
-        doBackup(applicationContext, prefHandler, true, mode = org.totschnig.myexpenses.provider.BackupMode.FULL_ZIP).onSuccess { (_, oldBackups) ->
+
+        // 1. Run daily incremental backup (media sync + DB snapshot)
+        val incrementalResult = doBackup(
+            applicationContext,
+            prefHandler,
+            withSync = true,
+            mode = org.totschnig.myexpenses.provider.BackupMode.INCREMENTAL
+        )
+        incrementalResult.onSuccess { (snapshot, pruned) ->
+            Timber.i("Auto-backup: daily incremental snapshot created (${snapshot.name}), pruned ${pruned.size} older snapshots")
+        }.onFailure { e ->
+            Timber.e(e, "Auto-backup: daily incremental backup failed")
+        }
+
+        // 2. Run daily solid full backup (complete ZIP archive + SQLite integrity validation)
+        val fullResult = doBackup(
+            applicationContext,
+            prefHandler,
+            withSync = true,
+            mode = org.totschnig.myexpenses.provider.BackupMode.FULL_ZIP
+        )
+        fullResult.onSuccess { (backupFile, oldBackups) ->
+            Timber.i("Auto-backup: daily full solid backup created (${backupFile.name})")
             if (oldBackups.isNotEmpty()) {
                 val keep = prefHandler.getInt(PrefKey.PURGE_BACKUP_KEEP, 1)
                 val requireConfirmation =
@@ -133,7 +155,13 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
             val notification = builder.build()
             notification.flags = Notification.FLAG_AUTO_CANCEL
             notify(notification)
+            return Result.failure()
         }
+
+        if (incrementalResult.isFailure && fullResult.isFailure) {
+            return Result.failure()
+        }
+
         return Result.success()
     }
 }

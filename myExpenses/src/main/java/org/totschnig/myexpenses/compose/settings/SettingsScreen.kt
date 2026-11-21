@@ -287,7 +287,7 @@ fun SettingsScreen(
             item(key = "backup_section") {
                 SettingsCard(title = "Backup & Data Safety", icon = Icons.Default.Storage, iconTint = AmberAccent) {
                     Text(
-                        text = "Automated SQLite integrity check guarantees solid, uncorrupted backups. Exactly 3 healthy snapshots are preserved.",
+                        text = "Automated daily routine creates fast incremental snapshots with media sync and verified full backups.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -521,7 +521,7 @@ fun SettingsScreen(
 
                     SwitchSettingTile(
                         title = "Automated Daily Backup",
-                        subtitle = "Automatically runs integrity validation and backs up data overnight",
+                        subtitle = "Creates both incremental snapshots (with media sync) and verified full archives daily",
                         checked = autoBackup,
                         onCheckedChange = { viewModel.setAutoBackup(it) }
                     )
