@@ -1779,13 +1779,16 @@ fun AttachmentSection(
 ) {
     val context = LocalContext.current
     if (pictureUri != null) {
+        val normalizedUri = remember(pictureUri) {
+            org.totschnig.myexpenses.util.AppDirHelper.normalizeAttachmentUri(context, pictureUri)
+        }
         // Thumbnail & Info Card
         Card(
             modifier = modifier
                 .fillMaxWidth()
                 .clickable {
                     try {
-                        val viewIntent = SystemViewIntentProvider().getViewIntent(context, pictureUri, "image/*")
+                        val viewIntent = SystemViewIntentProvider().getViewIntent(context, normalizedUri, "image/*")
                         context.startActivity(viewIntent)
                     } catch (e: Exception) {
                         Timber.e(e, "Failed to open image viewer")
@@ -1811,27 +1814,27 @@ fun AttachmentSection(
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                     contentAlignment = Alignment.Center
                 ) {
-                    var thumbnail by remember(pictureUri) { mutableStateOf<Bitmap?>(null) }
-                    var isLoading by remember(pictureUri) { mutableStateOf(true) }
+                    var thumbnail by remember(normalizedUri) { mutableStateOf<Bitmap?>(null) }
+                    var isLoading by remember(normalizedUri) { mutableStateOf(true) }
 
-                    LaunchedEffect(pictureUri) {
+                    LaunchedEffect(normalizedUri) {
                         isLoading = true
                         withContext(Dispatchers.IO) {
                             try {
                                 val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                    val source = ImageDecoder.createSource(context.contentResolver, pictureUri)
+                                    val source = ImageDecoder.createSource(context.contentResolver, normalizedUri)
                                     ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
                                         decoder.setTargetSampleSize(4)
                                     }
                                 } else {
-                                    context.contentResolver.openInputStream(pictureUri)?.use {
+                                    context.contentResolver.openInputStream(normalizedUri)?.use {
                                         BitmapFactory.decodeStream(it)
                                     }
                                 }
                                 thumbnail = decoded
                             } catch (_: Exception) {
                                 try {
-                                    val file = PictureDirHelper.getFileForUri(context, pictureUri)
+                                    val file = PictureDirHelper.getFileForUri(context, normalizedUri)
                                     if (file.exists() && file.length() > 0) {
                                         thumbnail = BitmapFactory.decodeFile(file.absolutePath)
                                     }
