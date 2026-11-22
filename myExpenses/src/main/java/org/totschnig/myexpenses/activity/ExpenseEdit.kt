@@ -1,9 +1,15 @@
 package org.totschnig.myexpenses.activity
 
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.totschnig.myexpenses.compose.AppTheme
@@ -15,8 +21,10 @@ import org.totschnig.myexpenses.db2.FLAG_INCOME
 import org.totschnig.myexpenses.injector
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.model.generateUuid
+import org.totschnig.myexpenses.feature.OcrResultFlat
 import org.totschnig.myexpenses.provider.KEY_ACCOUNTID
 import org.totschnig.myexpenses.provider.KEY_ROWID
+import org.totschnig.myexpenses.provider.KEY_URI
 import org.totschnig.myexpenses.viewmodel.CurrencyViewModel
 import org.totschnig.myexpenses.viewmodel.MyExpensesV2ViewModel
 import org.totschnig.myexpenses.viewmodel.data.Account
@@ -50,14 +58,19 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
         val accountId = extras?.getLong(KEY_ACCOUNTID, 0L) ?: 0L
         val operationType = extras?.getInt(OPERATION_TYPE, 0) ?: 0
         val isIncome = extras?.getBoolean(KEY_INCOME, false) == true
+        val extractOcr = extras?.getBoolean(KEY_EXTRACT_OCR, false) == true || extras?.getParcelable<OcrResultFlat>(KEY_OCR_RESULT) != null
+        val scanUri = extras?.getParcelable<Uri>(KEY_URI) ?: intent.data
 
-        if (rowId != 0L) {
+        if (extractOcr && scanUri != null) {
+            viewModel.scanAndCreateFromReceipt(scanUri)
+        } else if (rowId != 0L) {
             viewModel.loadTransaction(rowId)
         }
 
         setContent {
             AppTheme {
                 val accounts by viewModel.accountDataV2.collectAsStateWithLifecycle(null)
+                val isScanningOcr by viewModel.isScanningOcr.collectAsStateWithLifecycle()
                 val fullAccounts = accounts?.getOrNull()?.filter { !it.isPortfolio && !it.sealed } ?: emptyList()
                 val targetAccounts = fullAccounts.map { it.toAccount() }
 
@@ -66,7 +79,16 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                 val defaultAccount = fullAccounts.find { it.id == accountId }
                     ?: fullAccounts.firstOrNull()
 
-                val editData = transactionToEdit ?: defaultAccount?.let { acc ->
+                if (isScanningOcr) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                val editData = transactionToEdit ?: if (!extractOcr && !isScanningOcr) defaultAccount?.let { acc ->
                     TransactionEditData(
                         uuid = generateUuid(),
                         amount = Money(acc.currencyUnit, 0L),
@@ -75,13 +97,14 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                         valueDate = LocalDate.now(),
                         transferEditData = if (operationType == TYPE_TRANSFER) TransferEditData() else null
                     )
-                }
+                } else null
 
                 editData?.let { data ->
                     ExpenseEditScreen(
                         initialData = data,
                         accounts = targetAccounts,
                         quickCategories = viewModel.getQuickCategories(if (isIncome || data.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
+                        allCategories = viewModel.getAllCategories(),
                         allTags = viewModel.getAllTags(),
                         onSave = { savedData ->
                             viewModel.saveTransaction(savedData)

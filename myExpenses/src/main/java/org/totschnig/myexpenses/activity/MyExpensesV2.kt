@@ -1,7 +1,9 @@
 package org.totschnig.myexpenses.activity
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import org.totschnig.myexpenses.feature.OcrResultFlat
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
@@ -285,6 +287,7 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                 initialData = editData,
                                 accounts = accounts.filter { !it.isPortfolio && !it.sealed }.map { it.toAccount() },
                                 quickCategories = viewModel.getQuickCategories(if (editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
+                                allCategories = viewModel.getAllCategories(),
                                 allTags = viewModel.getAllTags(),
                                 onSave = { savedData ->
                                     viewModel.saveTransaction(savedData)
@@ -297,6 +300,28 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                     viewModel.createTag(label)
                                 }
                             )
+                        }
+
+                        val isScanningOcr by viewModel.isScanningOcr.collectAsStateWithLifecycle()
+                        if (isScanningOcr) {
+                            androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
+                                androidx.compose.material3.Surface(
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                    tonalElevation = 6.dp
+                                ) {
+                                    androidx.compose.foundation.layout.Row(
+                                        modifier = Modifier.padding(24.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        CircularProgressIndicator()
+                                        Text(
+                                            text = stringResource(R.string.scan_receipt_title),
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
+                                }
+                            }
                         }
 
 
@@ -691,5 +716,10 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                 }
             )
         }
+    }
+
+    override fun startEditFromOcrResult(result: OcrResultFlat?, scanUri: Uri) {
+        recordUsage(ContribFeature.OCR)
+        viewModel.scanAndCreateFromReceipt(scanUri)
     }
 }

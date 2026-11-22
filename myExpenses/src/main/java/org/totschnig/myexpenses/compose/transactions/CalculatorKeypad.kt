@@ -250,8 +250,8 @@ fun CalculatorKeypad(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // Live Expression & Evaluation Display
             Row(
@@ -307,7 +307,7 @@ fun CalculatorKeypad(
             for (row in rows) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     for (btn in row) {
                         val isOp = btn in listOf("÷", "×", "-", "+", "=")
@@ -342,8 +342,8 @@ fun CalculatorKeypad(
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(44.dp),
-                            shape = RoundedCornerShape(10.dp),
+                                .height(38.dp),
+                            shape = RoundedCornerShape(8.dp),
                             colors = colors,
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                         ) {

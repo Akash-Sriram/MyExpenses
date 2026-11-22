@@ -1,6 +1,7 @@
 package org.totschnig.myexpenses.viewmodel.data
 
 import android.content.Context
+import android.net.Uri
 import android.os.Parcelable
 import androidx.annotation.VisibleForTesting
 import kotlinx.parcelize.IgnoredOnParcel
@@ -91,7 +92,8 @@ data class TransactionEditData(
     val isSplitPart: Boolean = false,
     val splitParts: List<TransactionEditData>? = null,
     val planInstanceId: Long? = null,
-    val type: Byte = FLAG_NEUTRAL
+    val type: Byte = FLAG_NEUTRAL,
+    val pictureUri: Uri? = null
 ) : Parcelable {
     @IgnoredOnParcel
     val isSplit = categoryId == SPLIT_CATID

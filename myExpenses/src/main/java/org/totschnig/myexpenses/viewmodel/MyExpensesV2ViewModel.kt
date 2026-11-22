@@ -3,7 +3,16 @@ package org.totschnig.myexpenses.viewmodel
 import android.app.Application
 import android.content.ContentValues
 import android.content.Intent
+import android.net.Uri
 import java.math.RoundingMode
+import org.totschnig.myexpenses.db2.addAttachments
+import org.totschnig.myexpenses.db2.getCategoryPath
+import org.totschnig.myexpenses.db2.requireRootParty
+import org.totschnig.myexpenses.provider.BaseTransactionProvider
+import org.totschnig.myexpenses.provider.KEY_DESCRIPTION
+import org.totschnig.myexpenses.provider.KEY_IBAN
+import org.totschnig.myexpenses.ui.DisplayParty
+import org.totschnig.myexpenses.viewmodel.data.Category
 import androidx.annotation.OpenForTesting
 import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.edit
@@ -173,6 +182,9 @@ open class MyExpensesV2ViewModel(
 
     private val _transactionToEdit = MutableStateFlow<TransactionEditData?>(null)
     val transactionToEdit = _transactionToEdit.asStateFlow()
+
+    private val _isScanningOcr = MutableStateFlow(false)
+    val isScanningOcr = _isScanningOcr.asStateFlow()
 
     fun handleIntent(intent: Intent) {
         viewModelScope.launch {
@@ -847,10 +859,18 @@ open class MyExpensesV2ViewModel(
     fun saveTransaction(data: TransactionEditData) {
         viewModelScope.launch(coroutineDispatcher) {
             val repoTx = mapTransaction(data)
-            if (data.id != 0L) {
+            val txId = if (data.id != 0L) {
                 repository.updateTransaction(repoTx)
+                data.id
             } else {
-                repository.createTransaction(repoTx)
+                repository.createTransaction(repoTx).id
+            }
+            data.pictureUri?.let { picUri ->
+                try {
+                    repository.addAttachments(txId, listOf(picUri))
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to attach receipt picture $picUri to transaction $txId")
+                }
             }
             contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, 0)
             contentResolver.notifyChange(TransactionProvider.ACCOUNTS_URI, null, 0)
@@ -858,26 +878,303 @@ open class MyExpensesV2ViewModel(
         }
     }
 
+    fun scanAndCreateFromReceipt(uri: Uri) {
+        viewModelScope.launch {
+            _isScanningOcr.value = true
+            try {
+                val scanResult = org.totschnig.myexpenses.util.upi.UpiOcrScanner.scanReceipt(getApplication(), uri)
+                val allAccounts = accountDataV2.value?.getOrNull()?.filter { !it.isPortfolio && !it.sealed } ?: emptyList()
+                val receipt = scanResult.getOrNull()
+
+                val currentSelectedId = selectedAccountId.value
+                val curAcc = allAccounts.find { it.id == currentSelectedId } ?: allAccounts.firstOrNull()
+
+                val matchedAccountId = receipt?.accountOrBankHint?.let { findAccountIdForHint(it) }
+                    ?: findDefaultBaseAccountId()
+                    ?: curAcc?.id
+                    ?: allAccounts.firstOrNull()?.id
+                    ?: 0L
+
+                val targetAccount = allAccounts.find { it.id == matchedAccountId }
+                    ?: curAcc
+                    ?: allAccounts.firstOrNull()
+
+                val currency = targetAccount?.currencyUnit ?: currencyContext.homeCurrencyUnit
+
+                if (receipt != null && receipt.isValid) {
+                    val payeeName = receipt.payeeName ?: receipt.recipientName
+                    val payeeId = payeeName?.let { resolvePayeeId(it, receipt.upiId) }
+                    val party = payeeId?.let { id ->
+                        val name = getPayeeName(id) ?: payeeName
+                        DisplayParty(id = id, name = name)
+                    } ?: payeeName?.let { DisplayParty(id = 0L, name = it) }
+
+                    val methodId = findMethodIdForLabel("UPI") ?: findMethodIdForLabel("Electronic payment")
+                    val methodLabel = if (methodId != null) "UPI" else null
+
+                    val amountMinor = receipt.amount?.let {
+                        it.movePointRight(currency.fractionDigits).toLong()
+                    } ?: 0L
+
+                    // Expenses have negative minor amount in MyExpenses data model
+                    val amount = Money(currency, -amountMinor)
+
+                    val date = receipt.dateTime ?: java.time.LocalDateTime.now()
+                    val valueDate = date.toLocalDate()
+
+                    _transactionToEdit.value = TransactionEditData(
+                        uuid = generateUuid(),
+                        amount = amount,
+                        accountId = targetAccount?.id ?: 0L,
+                        date = date,
+                        valueDate = valueDate,
+                        party = party,
+                        methodId = methodId,
+                        methodLabel = methodLabel,
+                        comment = receipt.comment,
+                        referenceNumber = receipt.referenceNumber,
+                        pictureUri = uri
+                    )
+                } else {
+                    _transactionToEdit.value = TransactionEditData(
+                        uuid = generateUuid(),
+                        amount = Money(currency, 0L),
+                        accountId = targetAccount?.id ?: 0L,
+                        date = java.time.LocalDateTime.now(),
+                        valueDate = java.time.LocalDate.now(),
+                        pictureUri = uri
+                    )
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Error scanning receipt $uri")
+                val allAccounts = accountDataV2.value?.getOrNull()?.filter { !it.isPortfolio && !it.sealed } ?: emptyList()
+                val curAcc = allAccounts.find { it.id == selectedAccountId.value } ?: allAccounts.firstOrNull()
+                val currency = curAcc?.currencyUnit ?: currencyContext.homeCurrencyUnit
+                _transactionToEdit.value = TransactionEditData(
+                    uuid = generateUuid(),
+                    amount = Money(currency, 0L),
+                    accountId = curAcc?.id ?: 0L,
+                    date = java.time.LocalDateTime.now(),
+                    valueDate = java.time.LocalDate.now(),
+                    pictureUri = uri
+                )
+            } finally {
+                _isScanningOcr.value = false
+            }
+        }
+    }
+
+    suspend fun resolvePayeeId(name: String, upiId: String? = null): Long? = withContext(Dispatchers.IO) {
+        val cleanName = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(name)
+        if (cleanName.isBlank() && upiId.isNullOrBlank()) return@withContext null
+
+        try {
+            // 1. Direct case-insensitive match on cleanName
+            if (cleanName.isNotBlank()) {
+                contentResolver.query(
+                    TransactionProvider.PAYEES_URI,
+                    arrayOf(KEY_ROWID),
+                    "$KEY_PAYEE_NAME = ? COLLATE NOCASE",
+                    arrayOf(cleanName),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                }
+
+                // 2. Space-normalized match (e.g. "Hunger Box" vs "Hungerbox")
+                val noSpaces = cleanName.replace(" ", "")
+                contentResolver.query(
+                    TransactionProvider.PAYEES_URI,
+                    arrayOf(KEY_ROWID),
+                    "REPLACE($KEY_PAYEE_NAME, ' ', '') = ? COLLATE NOCASE",
+                    arrayOf(noSpaces),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                }
+
+                // 3. Prefix match if cleanName could be a prefix of an existing payee
+                val prefix = cleanName.replace(Regex("""(?i)\s+(?:and|&)\s*$"""), "").trim()
+                if (prefix.length >= 4) {
+                    contentResolver.query(
+                        TransactionProvider.PAYEES_URI,
+                        arrayOf(KEY_ROWID),
+                        "$KEY_PAYEE_NAME LIKE ? COLLATE NOCASE",
+                        arrayOf("$prefix%"),
+                        "$KEY_ROWID DESC"
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                    }
+                }
+            }
+
+            // 4. Match on UPI ID / IBAN if provided
+            val cleanUpi = upiId?.trim()?.takeIf { it.isNotEmpty() }
+            if (cleanUpi != null) {
+                contentResolver.query(
+                    TransactionProvider.PAYEES_URI,
+                    arrayOf(KEY_ROWID),
+                    "$KEY_IBAN = ? COLLATE NOCASE",
+                    arrayOf(cleanUpi),
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+                }
+            }
+
+            // 5. Fallback: find or create root party with cleanName if available
+            if (cleanName.isNotBlank()) {
+                repository.requireRootParty(cleanName)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error resolving payee id for %s", name)
+            if (cleanName.isNotBlank()) repository.requireRootParty(cleanName) else null
+        }
+    }
+
+    suspend fun getPayeeName(payeeId: Long): String? = withContext(Dispatchers.IO) {
+        try {
+            contentResolver.query(
+                android.content.ContentUris.withAppendedId(TransactionProvider.PAYEES_URI, payeeId),
+                arrayOf(KEY_PAYEE_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(KEY_PAYEE_NAME)
+                    if (idx != -1 && !cursor.isNull(idx)) cursor.getString(idx) else cursor.getString(0)
+                } else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun findMethodIdForLabel(label: String): Long? = withContext(Dispatchers.IO) {
+        try {
+            contentResolver.query(
+                TransactionProvider.METHODS_URI,
+                arrayOf(KEY_ROWID),
+                "$KEY_LABEL = ? COLLATE NOCASE",
+                arrayOf(label),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun findAccountIdForHint(hint: String): Long? = withContext(Dispatchers.IO) {
+        try {
+            // 1. Direct match on label or description
+            contentResolver.query(
+                TransactionProvider.ACCOUNTS_URI,
+                arrayOf(KEY_ROWID),
+                "$KEY_LABEL LIKE ? OR $KEY_DESCRIPTION LIKE ?",
+                arrayOf("%$hint%", "%$hint%"),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+            }
+
+            // 2. Routing sponsors & Card aliases in India
+            val normalizedHint = when {
+                hint.contains("Samsung", ignoreCase = true) || hint.contains("Axis", ignoreCase = true) -> "ICICI"
+                hint.contains("Coral", ignoreCase = true) || hint.contains("Visa", ignoreCase = true) -> "Coral"
+                hint.contains("Amazon", ignoreCase = true) -> "Amazon"
+                else -> hint
+            }
+            contentResolver.query(
+                TransactionProvider.ACCOUNTS_URI,
+                arrayOf(KEY_ROWID),
+                "$KEY_LABEL LIKE ? OR $KEY_DESCRIPTION LIKE ?",
+                arrayOf("%$normalizedHint%", "%$normalizedHint%"),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+            }
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun findDefaultBaseAccountId(): Long? = withContext(Dispatchers.IO) {
+        try {
+            contentResolver.query(
+                TransactionProvider.ACCOUNTS_URI,
+                arrayOf(KEY_ROWID),
+                "$KEY_LABEL LIKE ? OR $KEY_DESCRIPTION LIKE ?",
+                arrayOf("%ICICI%", "%Salary%"),
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) return@withContext cursor.getLong(0)
+            }
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun getAllCategories(type: Byte? = null): List<Category> {
+        return try {
+            val uri = BaseTransactionProvider.CATEGORY_TREE_URI.buildUpon().apply {
+                if (type != null) {
+                    appendQueryParameter(KEY_TYPE, type.toString())
+                }
+            }.build()
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    CategoryViewModel.ingest(
+                        withColors = true,
+                        cursor = cursor,
+                        parentId = null,
+                        level = 1
+                    )
+                } else emptyList()
+            } ?: emptyList()
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error loading category tree")
+            emptyList()
+        }
+    }
+
     fun getQuickCategories(type: Byte = FLAG_EXPENSE): List<org.totschnig.myexpenses.compose.transactions.QuickCategory> {
         val list = try {
             contentResolver.query(
                 TransactionProvider.CATEGORIES_URI,
-                arrayOf(KEY_ROWID, KEY_LABEL, KEY_ICON, KEY_COLOR, KEY_TYPE),
-                "$KEY_ROWID != $SPLIT_CATID AND ($KEY_TYPE = ? OR $KEY_TYPE = $FLAG_NEUTRAL) AND $KEY_PARENTID IS NULL",
+                arrayOf(KEY_ROWID, KEY_LABEL, KEY_ICON, KEY_COLOR, KEY_TYPE, KEY_PARENTID),
+                "$KEY_ROWID != $SPLIT_CATID AND ($KEY_TYPE = ? OR $KEY_TYPE = $FLAG_NEUTRAL)",
                 arrayOf(type.toString()),
-                "$KEY_USAGES DESC, $KEY_LAST_USED DESC, $KEY_LABEL ASC LIMIT 10"
+                "$KEY_USAGES DESC, $KEY_LAST_USED DESC, $KEY_LABEL ASC LIMIT 15"
             )?.use { cursor ->
                 val result = mutableListOf<org.totschnig.myexpenses.compose.transactions.QuickCategory>()
                 while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val label = cursor.getString(1)
+                    val icon = if (cursor.isNull(2)) null else cursor.getString(2)
+                    val color = if (cursor.isNull(3)) null else cursor.getInt(3)
+                    val catType = cursor.getInt(4).toByte()
+                    val parentId = if (cursor.isNull(5)) null else cursor.getLong(5)
+                    val path = if (parentId != null) {
+                        repository.getCategoryPath(id) ?: label
+                    } else {
+                        label
+                    }
                     result.add(
                         org.totschnig.myexpenses.compose.transactions.QuickCategory(
-                            id = cursor.getLong(0),
-                            label = cursor.getString(1),
-                            icon = if (cursor.isNull(2)) null else cursor.getString(2),
-                            color = if (cursor.isNull(3)) null else cursor.getInt(3),
-                            type = cursor.getInt(4).toByte()
+                            id = id,
+                            label = label,
+                            path = path,
+                            icon = icon,
+                            color = color,
+                            type = catType
                         )
-
                     )
                 }
                 result
@@ -887,14 +1184,14 @@ open class MyExpensesV2ViewModel(
         }
 
         return if (list.isNotEmpty()) list else listOf(
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(1, "Food & Dining"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(2, "Groceries"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(3, "Shopping"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(4, "Transport & Fuel"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(5, "Bills & Utilities"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(6, "Entertainment"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(7, "Health & Medical"),
-            org.totschnig.myexpenses.compose.transactions.QuickCategory(8, "Salary", type = FLAG_INCOME)
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(1, "Food & Dining", "Food & Dining"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(2, "Groceries", "Groceries"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(3, "Shopping", "Shopping"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(4, "Transport & Fuel", "Transport & Fuel"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(5, "Bills & Utilities", "Bills & Utilities"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(6, "Entertainment", "Entertainment"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(7, "Health & Medical", "Health & Medical"),
+            org.totschnig.myexpenses.compose.transactions.QuickCategory(8, "Salary", "Salary", type = FLAG_INCOME)
         )
     }
 
