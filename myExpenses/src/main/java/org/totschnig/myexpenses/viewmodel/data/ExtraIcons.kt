@@ -26,5 +26,22 @@ val ExtraIcons: Map<String, ExtraIcon> = mapOf(
     "town-hall" to ExtraIcon(R.drawable.town_hall, R.string.icon_town_hall_label),
     "toys" to ExtraIcon(R.drawable.toys, R.string.icon_toys_label),
     "tray" to ExtraIcon(R.drawable.tray, R.string.icon_tray_label),
-    "unemployment" to ExtraIcon(R.drawable.unemployment, R.string.icon_unemployment_label)
+    "unemployment" to ExtraIcon(R.drawable.unemployment, R.string.icon_unemployment_label),
+    "auto" to ExtraIcon(R.drawable.ic_auto_rickshaw, R.string.icon_auto_rickshaw_label),
+    "auto-rickshaw" to ExtraIcon(R.drawable.ic_auto_rickshaw, R.string.icon_auto_rickshaw_label),
+    "gas-cylinder" to ExtraIcon(R.drawable.ic_gas_cylinder, R.string.icon_gas_cylinder_label),
+    "water-can" to ExtraIcon(R.drawable.ic_water_can, R.string.icon_water_can_label),
+    "milk-packet" to ExtraIcon(R.drawable.ic_milk_packet, R.string.icon_milk_packet_label),
+    "temple" to ExtraIcon(R.drawable.ic_temple_gopuram, R.string.icon_temple_gopuram_label),
+    "temple-gopuram" to ExtraIcon(R.drawable.ic_temple_gopuram, R.string.icon_temple_gopuram_label),
+    "diya" to ExtraIcon(R.drawable.ic_diya, R.string.icon_diya_label),
+    "upi" to ExtraIcon(R.drawable.ic_upi_rupee, R.string.icon_upi_rupee_label),
+    "upi-rupee" to ExtraIcon(R.drawable.ic_upi_rupee, R.string.icon_upi_rupee_label),
+    "chai" to ExtraIcon(R.drawable.ic_cutting_chai, R.string.icon_cutting_chai_label),
+    "cutting-chai" to ExtraIcon(R.drawable.ic_cutting_chai, R.string.icon_cutting_chai_label),
+    "food-delivery" to ExtraIcon(R.drawable.ic_food_delivery, R.string.icon_food_delivery_label),
+    "ration-shop" to ExtraIcon(R.drawable.ic_ration_shop, R.string.icon_ration_shop_label),
+    "eb-meter" to ExtraIcon(R.drawable.ic_eb_meter, R.string.icon_eb_meter_label),
+    "fastag" to ExtraIcon(R.drawable.ic_fastag, R.string.icon_fastag_label),
+    "gold-jewellery" to ExtraIcon(R.drawable.ic_gold_jewellery, R.string.icon_gold_jewellery_label)
 )

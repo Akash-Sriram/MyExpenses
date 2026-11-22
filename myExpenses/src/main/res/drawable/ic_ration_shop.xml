@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Tied Top Ears & Rope -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M8,2L7,5h10L16,2H8zM8.5,5.5h7v1.5h-7V5.5z"/>
+    <!-- Burlap Grain Sack Body -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M6,8c-1.5,1.5 -2,4.5 -2,7.5c0,3.5 1.5,6.5 4,6.5h8c2.5,0 4,-3 4,-6.5c0,-3 -0.5,-6 -2,-7.5H6zM12,18.5c-1.7,0 -3,-1.3 -3,-3c0,-1.7 3,-5.5 3,-5.5s3,3.8 3,5.5C15,17.2 13.7,18.5 12,18.5z"/>
+    <!-- Wheat / Rice Grain stalk inside -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M11.5,14.5l-1,-1l1,-0.5v1.5zM12.5,14.5v-1.5l1,0.5l-1,1z"/>
+</vector>

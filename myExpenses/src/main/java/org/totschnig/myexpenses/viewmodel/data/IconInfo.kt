@@ -32,12 +32,14 @@ sealed interface IIconInfo {
 
         fun resolveIconsForCategory(resources: Resources, category: IconCategory): Map<String, IIconInfo> =
             buildMap {
-                resources.getStringArray(category.fontAweSomeIcons).forEach {
-                    put(
-                        it,
-                        FontAwesomeIcons[it]
-                            ?: throw IllegalArgumentException("no icon $it")
-                    )
+                category.fontAweSomeIcons?.let { resId ->
+                    resources.getStringArray(resId).forEach {
+                        put(
+                            it,
+                            FontAwesomeIcons[it]
+                                ?: throw IllegalArgumentException("no icon $it")
+                        )
+                    }
                 }
                 category.extraIcons?.let { resId ->
                     resources.getStringArray(resId).forEach {

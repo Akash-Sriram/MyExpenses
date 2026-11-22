@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Top Crimped Seal with Cut Corner -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M5,2h11l3,3v1H5V2z"/>
+    <!-- Pouring Droplet from corner cut -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M19.5,2c-0.4,0 -0.8,0.4 -0.8,0.8c0,0.5 0.8,1.2 0.8,1.2s0.8,-0.7 0.8,-1.2C20.3,2.4 19.9,2 19.5,2z"/>
+    <!-- Packet Main Body -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M5,7h14v11H5V7zM12,9c-1.4,0 -2.5,1.1 -2.5,2.5c0,1.2 1.8,3.5 2.5,4.3c0.7,-0.8 2.5,-3.1 2.5,-4.3C14.5,10.1 13.4,9 12,9z"/>
+    <!-- Bottom Crimped Seal -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M5,19h14v3H5V19z"/>
+</vector>

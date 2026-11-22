@@ -23,5 +23,19 @@
     <string name="icon_town_hall_label">Town Hall</string>
     <string name="icon_toys_label">Toys</string>
     <string name="icon_tray_label">Tray</string>
+    <string name="category_india_label">India</string>
+    <string name="icon_auto_rickshaw_label">Auto Rickshaw</string>
+    <string name="icon_gas_cylinder_label">LPG Gas Cylinder</string>
+    <string name="icon_water_can_label">20L Water Can</string>
+    <string name="icon_milk_packet_label">Milk Packet</string>
+    <string name="icon_temple_gopuram_label">Temple (Gopuram)</string>
+    <string name="icon_diya_label">Diya / Pooja</string>
+    <string name="icon_upi_rupee_label">UPI / Rupee Pay</string>
+    <string name="icon_cutting_chai_label">Cutting Chai / Tea</string>
+    <string name="icon_food_delivery_label">Food Delivery</string>
+    <string name="icon_ration_shop_label">Ration / Grain</string>
+    <string name="icon_eb_meter_label">Electricity / EB Meter</string>
+    <string name="icon_fastag_label">FASTag / Toll</string>
+    <string name="icon_gold_jewellery_label">Gold / Jewellery</string>
     <string name="icon_unemployment_label">Unemployment</string>
 </resources>

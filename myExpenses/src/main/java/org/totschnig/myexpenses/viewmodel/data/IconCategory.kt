@@ -6,9 +6,10 @@ import org.totschnig.myexpenses.R
 
 sealed class IconCategory(
     @StringRes val label: Int,
-    @ArrayRes val fontAweSomeIcons: Int,
+    @ArrayRes val fontAweSomeIcons: Int? = null,
     @ArrayRes val extraIcons: Int? = null
 ) {
+    data object India: IconCategory(R.string.category_india_label, null, R.array.extra_india_icons)
     data object Accessibility: IconCategory(R.string.category_accessibility_label, R.array.category_accessibility_icons)
     data object Alert: IconCategory(R.string.category_alert_label, R.array.category_alert_icons)
     data object Alphabet: IconCategory(R.string.category_alphabet_label, R.array.category_alphabet_icons)
@@ -33,10 +34,10 @@ sealed class IconCategory(
     data object Editing: IconCategory(R.string.category_editing_label, R.array.category_editing_icons)
     data object Education: IconCategory(R.string.category_education_label, R.array.category_education_icons)
     data object Emoji: IconCategory(R.string.category_emoji_label, R.array.category_emoji_icons)
-    data object Energy: IconCategory(R.string.category_energy_label, R.array.category_energy_icons)
+    data object Energy: IconCategory(R.string.category_energy_label, R.array.category_energy_icons, R.array.extra_energy_icons)
     data object Files: IconCategory(R.string.category_files_label, R.array.category_files_icons)
     data object FilmVideo: IconCategory(R.string.category_film_video_label, R.array.category_film_video_icons)
-    data object FoodBeverage: IconCategory(R.string.category_food_beverage_label, R.array.category_food_beverage_icons)
+    data object FoodBeverage: IconCategory(R.string.category_food_beverage_label, R.array.category_food_beverage_icons, R.array.extra_food_beverage_icons)
     data object FruitsVegetables: IconCategory(R.string.category_fruits_vegetables_label, R.array.category_fruits_vegetables_icons)
     data object Gaming: IconCategory(R.string.category_gaming_label, R.array.category_gaming_icons, R.array.extra_gaming_icons)
     data object Gender: IconCategory(R.string.category_gender_label, R.array.category_gender_icons)
@@ -60,7 +61,7 @@ sealed class IconCategory(
     data object PhotosImages: IconCategory(R.string.category_photos_images_label, R.array.category_photos_images_icons)
     data object Political: IconCategory(R.string.category_political_label, R.array.category_political_icons, R.array.extra_political_icons)
     data object PunctuationSymbols: IconCategory(R.string.category_punctuation_symbols_label, R.array.category_punctuation_symbols_icons)
-    data object Religion: IconCategory(R.string.category_religion_label, R.array.category_religion_icons)
+    data object Religion: IconCategory(R.string.category_religion_label, R.array.category_religion_icons, R.array.extra_religion_icons)
     data object Science: IconCategory(R.string.category_science_label, R.array.category_science_icons)
     data object ScienceFiction: IconCategory(R.string.category_science_fiction_label, R.array.category_science_fiction_icons)
     data object Security: IconCategory(R.string.category_security_label, R.array.category_security_icons, R.array.extra_security_icons)
@@ -72,7 +73,7 @@ sealed class IconCategory(
     data object TextFormatting: IconCategory(R.string.category_text_formatting_label, R.array.category_text_formatting_icons)
     data object Time: IconCategory(R.string.category_time_label, R.array.category_time_icons)
     data object Toggle: IconCategory(R.string.category_toggle_label, R.array.category_toggle_icons)
-    data object Transportation: IconCategory(R.string.category_transportation_label, R.array.category_transportation_icons)
+    data object Transportation: IconCategory(R.string.category_transportation_label, R.array.category_transportation_icons, R.array.extra_transportation_icons)
     data object TravelHotel: IconCategory(R.string.category_travel_hotel_label, R.array.category_travel_hotel_icons, R.array.extra_travel_hotel_icons)
     data object UsersPeople: IconCategory(R.string.category_users_people_label, R.array.category_users_people_icons, R.array.extra_users_people_icons)
     data object Weather: IconCategory(R.string.category_weather_label, R.array.category_weather_icons)
@@ -82,6 +83,7 @@ sealed class IconCategory(
     companion object {
         val values: List<IconCategory> by lazy {
             listOf(
+                India,
                 Accessibility, Alert, Alphabet, Animals, Arrows, Astronomy, Automotive,
                 Buildings, Business, Camping, Charity, ChartsDiagrams, Childhood,
                 ClothingFashion, Coding, Communication, Connectivity, Construction,

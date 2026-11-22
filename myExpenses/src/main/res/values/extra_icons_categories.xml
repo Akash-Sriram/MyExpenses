@@ -6,6 +6,9 @@
         <item>family</item>
         <item>garden</item>
         <item>tray</item>
+        <item>gas-cylinder</item>
+        <item>water-can</item>
+        <item>eb-meter</item>
     </string-array>
     <string-array name="extra_childhood_icons">
         <item>bottle</item>
@@ -39,6 +42,8 @@
         <item>toll</item>
         <item>unemployment</item>
         <item>card-travel</item>
+        <item>upi-rupee</item>
+        <item>gold-jewellery</item>
     </string-array>
     <string-array name="extra_buildings_icons">
         <item>mortgage</item>
@@ -62,8 +67,44 @@
     </string-array>
     <string-array name="extra_shopping_icons">
         <item>retweet-cancel</item>
+        <item>ration-shop</item>
+        <item>gold-jewellery</item>
+        <item>food-delivery</item>
     </string-array>
     <string-array name="extra_security_icons">
         <item>fence</item>
+    </string-array>
+    <string-array name="extra_india_icons">
+        <item>auto-rickshaw</item>
+        <item>gas-cylinder</item>
+        <item>water-can</item>
+        <item>milk-packet</item>
+        <item>temple-gopuram</item>
+        <item>diya</item>
+        <item>upi-rupee</item>
+        <item>cutting-chai</item>
+        <item>food-delivery</item>
+        <item>ration-shop</item>
+        <item>eb-meter</item>
+        <item>fastag</item>
+        <item>gold-jewellery</item>
+    </string-array>
+    <string-array name="extra_transportation_icons">
+        <item>auto-rickshaw</item>
+        <item>fastag</item>
+    </string-array>
+    <string-array name="extra_food_beverage_icons">
+        <item>cutting-chai</item>
+        <item>milk-packet</item>
+        <item>water-can</item>
+        <item>food-delivery</item>
+    </string-array>
+    <string-array name="extra_religion_icons">
+        <item>temple-gopuram</item>
+        <item>diya</item>
+    </string-array>
+    <string-array name="extra_energy_icons">
+        <item>gas-cylinder</item>
+        <item>eb-meter</item>
     </string-array>
 </resources>

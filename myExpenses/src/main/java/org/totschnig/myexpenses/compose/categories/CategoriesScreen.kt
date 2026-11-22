@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
@@ -603,35 +604,35 @@ private fun ModernCategoryNode(
                     )
                 }
 
-                // Category Icon or Color Dot
-                if (category.icon != null) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(typeColor.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
+                // Uniform Category Icon Badge
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(typeColor.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (category.icon != null) {
                         Icon(
                             icon = category.icon,
                             color = category.color?.let { Color(it) } ?: typeColor,
                             modifier = Modifier.size(20.dp)
                         )
+                    } else if (category.color != null) {
+                        ColorCircle(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .padding(2.dp),
+                            color = category.color
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Category,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = typeColor
+                        )
                     }
-                } else if (category.color != null) {
-                    ColorCircle(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .padding(2.dp),
-                        color = category.color
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(typeColor)
-                    )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))

@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 3 Kalasams (Finials on top) -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M12,1L11,3h2L12,1zM8.5,2L7.8,3.5h1.4L8.5,2zM15.5,2l-0.7,1.5h1.4L15.5,2z"/>
+    <!-- Stepped Gopuram Tiers -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M7,4h10v1.5H7V4zM6.2,6h11.6v1.5H6.2V6zM5.5,8h13v2H5.5V8zM4.8,10.5h14.4v2H4.8V10.5zM4,13h16v2.5H4V13z"/>
+    <!-- Base Temple Gate & Dwaram Archway -->
+    <path
+        android:fillColor="?colorOnSurface"
+        android:pathData="M3,16h18v6.5H3V16zM10,22.5h4v-3.8c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2V22.5z"/>
+</vector>
