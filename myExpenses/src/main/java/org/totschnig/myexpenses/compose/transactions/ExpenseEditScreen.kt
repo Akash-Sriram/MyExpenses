@@ -136,6 +136,7 @@ import org.totschnig.myexpenses.contract.TransactionsContract.Transactions.TYPE_
 import org.totschnig.myexpenses.db2.FLAG_EXPENSE
 import org.totschnig.myexpenses.db2.FLAG_INCOME
 import org.totschnig.myexpenses.db2.FLAG_NEUTRAL
+import org.totschnig.myexpenses.db2.FLAG_TRANSFER
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model.Money
 import org.totschnig.myexpenses.model.generateUuid
@@ -767,11 +768,11 @@ fun ExpenseEditScreen(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            Icons.Default.Category,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
+                                        CategoryIconBadge(
+                                            icon = selectedCategoryIcon,
+                                            color = null,
+                                            type = if (selectedType == TransactionTypeOption.INCOME) FLAG_INCOME else FLAG_EXPENSE,
+                                            size = 32.dp
                                         )
                                         Spacer(Modifier.width(10.dp))
                                         Column(modifier = Modifier.weight(1f)) {
@@ -818,12 +819,20 @@ fun ExpenseEditScreen(
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            Icons.Default.Folder,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Category,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
                                         Spacer(Modifier.width(10.dp))
                                         Text(
                                             text = "Select Category...",
@@ -866,11 +875,20 @@ fun ExpenseEditScreen(
                                         },
                                         label = { Text(cat.label, style = MaterialTheme.typography.labelMedium) },
                                         leadingIcon = {
-                                            Icon(
-                                                Icons.Default.Category,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp)
-                                            )
+                                            if (!cat.icon.isNullOrBlank()) {
+                                                org.totschnig.myexpenses.compose.Icon(
+                                                    icon = cat.icon,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else (cat.color?.let { Color(it) } ?: MaterialTheme.colorScheme.onSurfaceVariant),
+                                                    size = 14.sp,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            } else {
+                                                Icon(
+                                                    Icons.Default.Category,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp)
+                                                )
+                                            }
                                         },
                                         shape = RoundedCornerShape(10.dp),
                                         colors = FilterChipDefaults.filterChipColors(
@@ -1241,6 +1259,47 @@ fun ExpenseEditScreen(
     }
 }
 
+@Composable
+fun CategoryIconBadge(
+    icon: String?,
+    color: Int?,
+    type: Byte = FLAG_EXPENSE,
+    size: androidx.compose.ui.unit.Dp = 32.dp,
+    modifier: Modifier = Modifier
+) {
+    val typeColor = when (type) {
+        FLAG_EXPENSE -> LocalColors.current.expense
+        FLAG_INCOME -> LocalColors.current.income
+        FLAG_TRANSFER -> LocalColors.current.transfer
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val tintColor = color?.let { Color(it) } ?: typeColor
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(tintColor.copy(alpha = 0.12f)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (!icon.isNullOrBlank()) {
+            org.totschnig.myexpenses.compose.Icon(
+                icon = icon,
+                color = tintColor,
+                size = (size.value * 0.55f).sp,
+                modifier = Modifier.size((size.value * 0.6f).dp)
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Category,
+                contentDescription = null,
+                tint = tintColor,
+                modifier = Modifier.size((size.value * 0.55f).dp)
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryPickerDialog(
@@ -1385,12 +1444,20 @@ fun CategoryPickerDialog(
                                 .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             Spacer(Modifier.width(12.dp))
                             Text(
                                 text = stringResource(R.string.unmapped),
@@ -1500,11 +1567,11 @@ private fun CategorySearchResultRow(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.Category,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            CategoryIconBadge(
+                icon = category.icon,
+                color = category.color,
+                type = category.typeFlags,
+                size = 32.dp
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1616,12 +1683,11 @@ private fun CategoryTreeNodeRow(
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Icon
-            Icon(
-                if (level == 0) Icons.Default.Folder else Icons.Default.Category,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            CategoryIconBadge(
+                icon = category.icon,
+                color = category.color,
+                type = category.typeFlags,
+                size = 32.dp
             )
 
             Spacer(Modifier.width(10.dp))
