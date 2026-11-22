@@ -47,8 +47,10 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Description
 import android.content.Context
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
@@ -356,8 +358,11 @@ fun ExpenseEditScreen(
     var referenceNumber by rememberSaveable {
         mutableStateOf(initialData?.referenceNumber ?: "")
     }
+    var attachments by remember {
+        mutableStateOf(initialData?.allAttachments ?: emptyList())
+    }
     var pictureUri by remember {
-        mutableStateOf(initialData?.pictureUri)
+        mutableStateOf(initialData?.pictureUri ?: initialData?.allAttachments?.firstOrNull())
     }
 
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -367,7 +372,8 @@ fun ExpenseEditScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             val copiedUri = copyUriToAppStorage(context, uri)
-            pictureUri = copiedUri
+            attachments = attachments + copiedUri
+            pictureUri = attachments.firstOrNull()
         }
     }
 
@@ -375,7 +381,18 @@ fun ExpenseEditScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success: Boolean ->
         if (success && tempCameraUri != null) {
-            pictureUri = tempCameraUri
+            attachments = attachments + tempCameraUri!!
+            pictureUri = attachments.firstOrNull()
+        }
+    }
+
+    val documentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val copiedUri = copyUriToAppStorage(context, uri)
+            attachments = attachments + copiedUri
+            pictureUri = attachments.firstOrNull()
         }
     }
 
@@ -398,6 +415,14 @@ fun ExpenseEditScreen(
         }
     }
 
+    val launchDocument = {
+        try {
+            documentLauncher.launch(arrayOf("*/*"))
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to launch document picker")
+        }
+    }
+
     // Update state when initialData changes (e.g. OCR completes asynchronously)
     LaunchedEffect(initialData) {
         if (initialData != null) {
@@ -414,7 +439,8 @@ fun ExpenseEditScreen(
             selectedMethodId = initialData.methodId
             comment = initialData.comment ?: ""
             referenceNumber = initialData.referenceNumber ?: ""
-            pictureUri = initialData.pictureUri
+            attachments = initialData.allAttachments
+            pictureUri = initialData.pictureUri ?: initialData.allAttachments.firstOrNull()
             selectedType = when {
                 initialData.isTransfer -> TransactionTypeOption.TRANSFER
                 initialData.amount.amountMajor.signum() == 1 -> TransactionTypeOption.INCOME
@@ -464,7 +490,8 @@ fun ExpenseEditScreen(
             methodLabel = availableMethods.find { it.id == selectedMethodId }?.label,
             comment = comment.takeIf { it.isNotBlank() },
             referenceNumber = referenceNumber.takeIf { it.isNotBlank() },
-            pictureUri = pictureUri,
+            pictureUri = attachments.firstOrNull(),
+            attachments = attachments,
             transferEditData = if (isTransfer) TransferEditData(transferAccountId = transferAccountId) else null
         )
 
@@ -1078,12 +1105,16 @@ fun ExpenseEditScreen(
                         }
                     }
 
-                    // Receipt / Picture Attachment Section
+                    // Receipt / Attachment Section
                     AttachmentSection(
-                        pictureUri = pictureUri,
+                        attachments = attachments,
                         onAttachCamera = launchCamera,
                         onAttachGallery = launchGallery,
-                        onRemove = { pictureUri = null }
+                        onAttachDocument = launchDocument,
+                        onRemove = { removedUri ->
+                            attachments = attachments - removedUri
+                            pictureUri = attachments.firstOrNull()
+                        }
                     )
 
                     // Reference Number / UTR Field
@@ -1771,200 +1802,271 @@ private fun CategoryTreeNodeRow(
 
 @Composable
 fun AttachmentSection(
-    pictureUri: Uri?,
+    attachments: List<Uri>,
     onAttachCamera: () -> Unit,
     onAttachGallery: () -> Unit,
-    onRemove: () -> Unit,
+    onAttachDocument: () -> Unit,
+    onRemove: (Uri) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    if (pictureUri != null) {
-        val normalizedUri = remember(pictureUri) {
-            org.totschnig.myexpenses.util.AppDirHelper.normalizeAttachmentUri(context, pictureUri)
-        }
-        // Thumbnail & Info Card
-        Card(
-            modifier = modifier
-                .fillMaxWidth()
-                .clickable {
-                    try {
-                        val viewIntent = SystemViewIntentProvider().getViewIntent(context, normalizedUri, "image/*")
-                        context.startActivity(viewIntent)
-                    } catch (e: Exception) {
-                        Timber.e(e, "Failed to open image viewer")
-                    }
-                },
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Async Thumbnail Preview
-                Box(
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                    contentAlignment = Alignment.Center
-                ) {
-                    var thumbnail by remember(normalizedUri) { mutableStateOf<Bitmap?>(null) }
-                    var isLoading by remember(normalizedUri) { mutableStateOf(true) }
 
-                    LaunchedEffect(normalizedUri) {
-                        isLoading = true
-                        withContext(Dispatchers.IO) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (attachments.isNotEmpty()) {
+            attachments.forEach { uri ->
+                val normalizedUri = remember(uri) {
+                    org.totschnig.myexpenses.util.AppDirHelper.ensureContentUri(uri, context)
+                }
+                val mimeType = remember(normalizedUri) {
+                    context.contentResolver.getType(normalizedUri)
+                        ?: org.totschnig.myexpenses.util.io.getMimeType(normalizedUri.lastPathSegment ?: "")
+                        ?: "image/*"
+                }
+                val isImage = mimeType.startsWith("image")
+                val fileName = remember(normalizedUri) {
+                    normalizedUri.lastPathSegment?.substringAfterLast('/') ?: "Attachment"
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
                             try {
-                                val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                    val source = ImageDecoder.createSource(context.contentResolver, normalizedUri)
-                                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                                        decoder.setTargetSampleSize(4)
-                                    }
-                                } else {
-                                    context.contentResolver.openInputStream(normalizedUri)?.use {
-                                        BitmapFactory.decodeStream(it)
+                                val viewIntent = SystemViewIntentProvider().getViewIntent(context, normalizedUri, mimeType)
+                                context.startActivity(viewIntent)
+                            } catch (e: Exception) {
+                                Timber.e(e, "Failed to open attachment viewer")
+                            }
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Thumbnail or Document Icon
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isImage) {
+                                var thumbnail by remember(normalizedUri) { mutableStateOf<Bitmap?>(null) }
+                                var isLoading by remember(normalizedUri) { mutableStateOf(true) }
+
+                                LaunchedEffect(normalizedUri) {
+                                    isLoading = true
+                                    withContext(Dispatchers.IO) {
+                                        try {
+                                            val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                                val source = ImageDecoder.createSource(context.contentResolver, normalizedUri)
+                                                ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                                                    decoder.setTargetSampleSize(4)
+                                                }
+                                            } else {
+                                                context.contentResolver.openInputStream(normalizedUri)?.use {
+                                                    BitmapFactory.decodeStream(it)
+                                                }
+                                            }
+                                            thumbnail = decoded
+                                        } catch (_: Exception) {
+                                            try {
+                                                val file = PictureDirHelper.getFileForUri(context, normalizedUri)
+                                                if (file.exists() && file.length() > 0) {
+                                                    thumbnail = BitmapFactory.decodeFile(file.absolutePath)
+                                                }
+                                            } catch (_: Exception) {}
+                                        } finally {
+                                            isLoading = false
+                                        }
                                     }
                                 }
-                                thumbnail = decoded
-                            } catch (_: Exception) {
-                                try {
-                                    val file = PictureDirHelper.getFileForUri(context, normalizedUri)
-                                    if (file.exists() && file.length() > 0) {
-                                        thumbnail = BitmapFactory.decodeFile(file.absolutePath)
-                                    }
-                                } catch (_: Exception) {}
-                            } finally {
-                                isLoading = false
+
+                                when {
+                                    isLoading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    thumbnail != null -> Image(
+                                        bitmap = thumbnail!!.asImageBitmap(),
+                                        contentDescription = "Receipt thumbnail",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    else -> Icon(
+                                        imageVector = Icons.Default.Image,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
                             }
                         }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Text info
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (isImage) Icons.AutoMirrored.Filled.ReceiptLong else Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = if (isImage) "Receipt Image" else fileName,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = if (isImage) "Tap to view full screen" else "Tap to open document",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Remove action
+                        IconButton(onClick = { onRemove(uri) }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Remove attachment",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
-
-                    when {
-                        isLoading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        thumbnail != null -> Image(
-                            bitmap = thumbnail!!.asImageBitmap(),
-                            contentDescription = "Receipt thumbnail",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        else -> Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Text info
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ReceiptLong,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "Receipt Attached",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Tap to view full screen",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Actions: Replace & Remove
-                IconButton(onClick = onAttachGallery) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Change receipt",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                IconButton(onClick = onRemove) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Remove receipt",
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
                 }
             }
-        }
-    } else {
-        // No Attachment: Add Attachment Card
-        OutlinedCard(
-            modifier = modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.outlinedCardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-            ),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_attachment),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Attach Receipt",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(
-                        onClick = onAttachCamera,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
+            // Compact Add Buttons below list
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = onAttachCamera,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp).weight(1f)
+                ) {
+                    Icon(painterResource(id = R.drawable.ic_menu_camera), contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Camera", style = MaterialTheme.typography.labelSmall)
+                }
+                FilledTonalButton(
+                    onClick = onAttachGallery,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp).weight(1f)
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Gallery", style = MaterialTheme.typography.labelSmall)
+                }
+                FilledTonalButton(
+                    onClick = onAttachDocument,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp).weight(1f)
+                ) {
+                    Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Doc", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        } else {
+            // Empty state: Card with 3 buttons
+            OutlinedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            painter = painterResource(id = R.drawable.ic_menu_camera),
+                            painter = painterResource(id = R.drawable.ic_attachment),
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Camera", style = MaterialTheme.typography.labelMedium)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Attach Receipt / Document",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
-                    FilledTonalButton(
-                        onClick = onAttachGallery,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.height(34.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Image,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text("Gallery", style = MaterialTheme.typography.labelMedium)
+                        FilledTonalButton(
+                            onClick = onAttachCamera,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp).weight(1f)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_menu_camera),
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Camera", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        FilledTonalButton(
+                            onClick = onAttachGallery,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp).weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Gallery", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        FilledTonalButton(
+                            onClick = onAttachDocument,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp).weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Doc", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
             }
@@ -1975,15 +2077,25 @@ fun AttachmentSection(
 private fun copyUriToAppStorage(context: Context, sourceUri: Uri): Uri {
     return try {
         val app = context.applicationContext as MyApplication
-        val destUri = PictureDirHelper.getOutputMediaUri(false, app, prefix = "receipt_")
-        context.contentResolver.openInputStream(sourceUri)?.use { input ->
-            context.contentResolver.openOutputStream(destUri)?.use { output ->
+        val contentResolver = context.contentResolver
+        val mimeType = contentResolver.getType(sourceUri)
+        val ext = when {
+            mimeType?.contains("pdf") == true -> "pdf"
+            mimeType?.contains("png") == true -> "png"
+            mimeType?.contains("webp") == true -> "webp"
+            mimeType?.contains("jpeg") == true || mimeType?.contains("jpg") == true -> "jpg"
+            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?: "jpg"
+        }
+        val prefix = if (ext == "pdf") "doc_" else "receipt_"
+        val destUri = PictureDirHelper.getOutputMediaUri(false, app, prefix = prefix, extension = ext)
+        contentResolver.openInputStream(sourceUri)?.use { input ->
+            contentResolver.openOutputStream(destUri)?.use { output ->
                 input.copyTo(output)
             }
         }
         destUri
     } catch (e: Exception) {
-        Timber.e(e, "Failed to copy image to app storage, using source uri")
+        Timber.e(e, "Failed to copy file to app storage, using source uri")
         sourceUri
     }
 }

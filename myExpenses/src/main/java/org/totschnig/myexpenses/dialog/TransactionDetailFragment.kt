@@ -321,14 +321,19 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
                             }
                             else -> {
                                 dismiss()
-                                (requireActivity() as BaseActivity).startEdit(
-                                    Intent(
-                                        requireActivity(),
-                                        ExpenseEdit::class.java
-                                    ).apply {
-                                        putExtra(KEY_ROWID, transaction.transferPeerParent ?: transaction.id)
-                                    }
-                                )
+                                val v2 = requireActivity() as? MyExpensesV2
+                                if (v2 != null) {
+                                    v2.editTransaction(transaction.transferPeerParent ?: transaction.id)
+                                } else {
+                                    (requireActivity() as BaseActivity).startEdit(
+                                        Intent(
+                                            requireActivity(),
+                                            ExpenseEdit::class.java
+                                        ).apply {
+                                            putExtra(KEY_ROWID, transaction.transferPeerParent ?: transaction.id)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }) {

@@ -93,8 +93,13 @@ data class TransactionEditData(
     val splitParts: List<TransactionEditData>? = null,
     val planInstanceId: Long? = null,
     val type: Byte = FLAG_NEUTRAL,
-    val pictureUri: Uri? = null
+    val pictureUri: Uri? = null,
+    val attachments: List<Uri> = emptyList()
 ) : Parcelable {
+    @IgnoredOnParcel
+    val allAttachments: List<Uri>
+        get() = if (attachments.isNotEmpty()) attachments else pictureUri?.let { listOf(it) } ?: emptyList()
+
     @IgnoredOnParcel
     val isSplit = categoryId == SPLIT_CATID
 

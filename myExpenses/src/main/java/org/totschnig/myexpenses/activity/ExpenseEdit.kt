@@ -79,31 +79,33 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                 val defaultAccount = fullAccounts.find { it.id == accountId }
                     ?: fullAccounts.firstOrNull()
 
-                if (isScanningOcr) {
+                val editData = if (rowId != 0L) {
+                    transactionToEdit
+                } else {
+                    transactionToEdit ?: if (!extractOcr && !isScanningOcr) defaultAccount?.let { acc ->
+                        TransactionEditData(
+                            uuid = generateUuid(),
+                            amount = Money(acc.currencyUnit, 0L),
+                            accountId = acc.id,
+                            date = LocalDateTime.now(),
+                            valueDate = LocalDate.now(),
+                            transferEditData = if (operationType == TYPE_TRANSFER) TransferEditData() else null
+                        )
+                    } else null
+                }
+
+                if (editData == null || isScanningOcr) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
                     }
-                }
-
-                val editData = transactionToEdit ?: if (!extractOcr && !isScanningOcr) defaultAccount?.let { acc ->
-                    TransactionEditData(
-                        uuid = generateUuid(),
-                        amount = Money(acc.currencyUnit, 0L),
-                        accountId = acc.id,
-                        date = LocalDateTime.now(),
-                        valueDate = LocalDate.now(),
-                        transferEditData = if (operationType == TYPE_TRANSFER) TransferEditData() else null
-                    )
-                } else null
-
-                editData?.let { data ->
+                } else {
                     ExpenseEditScreen(
-                        initialData = data,
+                        initialData = editData,
                         accounts = targetAccounts,
-                        quickCategories = viewModel.getQuickCategories(if (isIncome || data.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
+                        quickCategories = viewModel.getQuickCategories(if (isIncome || editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
                         allCategories = viewModel.getAllCategories(),
                         allTags = viewModel.getAllTags(),
                         onSave = { savedData ->

@@ -789,7 +789,10 @@ open class MyExpensesV2ViewModel(
                 val editData = TransactionMapper.map(repoTx, currencyContext)
                 val attachments = repository.loadAttachments(transactionId)
                 val picUri = attachments.firstOrNull()
-                _transactionToEdit.value = editData.copy(pictureUri = picUri)
+                _transactionToEdit.value = editData.copy(
+                    pictureUri = picUri,
+                    attachments = attachments
+                )
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load transaction $transactionId for edit")
             }
@@ -816,7 +819,8 @@ open class MyExpensesV2ViewModel(
                     uuid = generateUuid(),
                     date = date,
                     valueDate = valueDate,
-                    pictureUri = picUri
+                    pictureUri = picUri,
+                    attachments = attachments
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Failed to clone transaction $transactionId")
@@ -867,19 +871,18 @@ open class MyExpensesV2ViewModel(
     fun saveTransaction(data: TransactionEditData) {
         viewModelScope.launch(coroutineDispatcher) {
             val repoTx = mapTransaction(data)
+            val effectiveAttachments = data.allAttachments
             val txId = if (data.id != 0L) {
                 repository.updateTransaction(repoTx)
                 try {
                     val existing = repository.loadAttachments(data.id)
-                    if (data.pictureUri == null) {
-                        if (existing.isNotEmpty()) {
-                            repository.deleteAttachments(data.id, existing)
-                        }
-                    } else if (!existing.contains(data.pictureUri)) {
-                        if (existing.isNotEmpty()) {
-                            repository.deleteAttachments(data.id, existing)
-                        }
-                        repository.addAttachments(data.id, listOf(data.pictureUri))
+                    val toDelete = existing - effectiveAttachments.toSet()
+                    val toAdd = effectiveAttachments - existing.toSet()
+                    if (toDelete.isNotEmpty()) {
+                        repository.deleteAttachments(data.id, toDelete)
+                    }
+                    if (toAdd.isNotEmpty()) {
+                        repository.addAttachments(data.id, toAdd)
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to sync attachments for transaction ${data.id}")
@@ -887,11 +890,11 @@ open class MyExpensesV2ViewModel(
                 data.id
             } else {
                 val createdTx = repository.createTransaction(repoTx)
-                data.pictureUri?.let { picUri ->
+                if (effectiveAttachments.isNotEmpty()) {
                     try {
-                        repository.addAttachments(createdTx.id, listOf(picUri))
+                        repository.addAttachments(createdTx.id, effectiveAttachments)
                     } catch (e: Exception) {
-                        Timber.e(e, "Failed to attach receipt picture $picUri to transaction ${createdTx.id}")
+                        Timber.e(e, "Failed to attach files to transaction ${createdTx.id}")
                     }
                 }
                 createdTx.id
