@@ -358,10 +358,10 @@ fun ExpenseEditScreen(
     var referenceNumber by rememberSaveable {
         mutableStateOf(initialData?.referenceNumber ?: "")
     }
-    var attachments by remember {
+    var attachments by remember(initialData?.id, initialData?.uuid) {
         mutableStateOf(initialData?.allAttachments ?: emptyList())
     }
-    var pictureUri by remember {
+    var pictureUri by remember(initialData?.id, initialData?.uuid) {
         mutableStateOf(initialData?.pictureUri ?: initialData?.allAttachments?.firstOrNull())
     }
 
@@ -1818,12 +1818,20 @@ fun AttachmentSection(
         if (attachments.isNotEmpty()) {
             attachments.forEach { uri ->
                 val normalizedUri = remember(uri) {
-                    org.totschnig.myexpenses.util.AppDirHelper.ensureContentUri(uri, context)
+                    try {
+                        org.totschnig.myexpenses.util.AppDirHelper.ensureContentUri(uri, context)
+                    } catch (_: Exception) {
+                        uri
+                    }
                 }
                 val mimeType = remember(normalizedUri) {
-                    context.contentResolver.getType(normalizedUri)
-                        ?: org.totschnig.myexpenses.util.io.getMimeType(normalizedUri.lastPathSegment ?: "")
-                        ?: "image/*"
+                    try {
+                        context.contentResolver.getType(normalizedUri)
+                            ?: org.totschnig.myexpenses.util.io.getMimeType(normalizedUri.lastPathSegment ?: "")
+                            ?: "image/*"
+                    } catch (_: Exception) {
+                        "image/*"
+                    }
                 }
                 val isImage = mimeType.startsWith("image")
                 val fileName = remember(normalizedUri) {

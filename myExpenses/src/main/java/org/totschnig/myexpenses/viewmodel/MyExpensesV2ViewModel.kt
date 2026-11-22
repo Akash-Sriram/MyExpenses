@@ -787,7 +787,9 @@ open class MyExpensesV2ViewModel(
                     extended = true
                 )
                 val editData = TransactionMapper.map(repoTx, currencyContext)
-                val attachments = repository.loadAttachments(transactionId)
+                val attachments = repository.loadAttachments(transactionId).ifEmpty {
+                    repoTx.transferPeer?.id?.let { repository.loadAttachments(it) } ?: emptyList()
+                }
                 val picUri = attachments.firstOrNull()
                 _transactionToEdit.value = editData.copy(
                     pictureUri = picUri,
@@ -809,7 +811,9 @@ open class MyExpensesV2ViewModel(
                     extended = true
                 )
                 val editData = TransactionMapper.map(repoTx, currencyContext)
-                val attachments = repository.loadAttachments(transactionId)
+                val attachments = repository.loadAttachments(transactionId).ifEmpty {
+                    repoTx.transferPeer?.id?.let { repository.loadAttachments(it) } ?: emptyList()
+                }
                 val picUri = attachments.firstOrNull()
                 val isCurrentDate = prefHandler.getBoolean(PrefKey.CLONE_WITH_CURRENT_DATE, true)
                 val date = if (isCurrentDate) LocalDateTime.now() else editData.date
