@@ -47,6 +47,21 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import android.content.Context
+import android.net.Uri
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.os.Build
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import org.totschnig.myexpenses.MyApplication
+import org.totschnig.myexpenses.activity.SystemViewIntentProvider
+import org.totschnig.myexpenses.util.PictureDirHelper
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.filled.Notes
@@ -57,6 +72,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.res.painterResource
+import timber.log.Timber
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -340,6 +358,44 @@ fun ExpenseEditScreen(
     }
     var pictureUri by remember {
         mutableStateOf(initialData?.pictureUri)
+    }
+
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val copiedUri = copyUriToAppStorage(context, uri)
+            pictureUri = copiedUri
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success: Boolean ->
+        if (success && tempCameraUri != null) {
+            pictureUri = tempCameraUri
+        }
+    }
+
+    val launchCamera = {
+        try {
+            val app = context.applicationContext as MyApplication
+            val uri = PictureDirHelper.getOutputMediaUri(false, app, prefix = "receipt_")
+            tempCameraUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to launch camera")
+        }
+    }
+
+    val launchGallery = {
+        try {
+            galleryLauncher.launch("image/*")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to launch gallery picker")
+        }
     }
 
     // Update state when initialData changes (e.g. OCR completes asynchronously)
@@ -1022,46 +1078,13 @@ fun ExpenseEditScreen(
                         }
                     }
 
-                    // Receipt Attachment Badge (if pictureUri != null)
-                    pictureUri?.let { uri ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ReceiptLong,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = "Receipt Attached",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                )
-                            }
-                            IconButton(
-                                onClick = { pictureUri = null },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Remove receipt",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
+                    // Receipt / Picture Attachment Section
+                    AttachmentSection(
+                        pictureUri = pictureUri,
+                        onAttachCamera = launchCamera,
+                        onAttachGallery = launchGallery,
+                        onRemove = { pictureUri = null }
+                    )
 
                     // Reference Number / UTR Field
                     if (selectedType != TransactionTypeOption.TRANSFER) {
@@ -1745,4 +1768,221 @@ private fun CategoryTreeNodeRow(
         }
     }
 }
+
+@Composable
+fun AttachmentSection(
+    pictureUri: Uri?,
+    onAttachCamera: () -> Unit,
+    onAttachGallery: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    if (pictureUri != null) {
+        // Thumbnail & Info Card
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .clickable {
+                    try {
+                        val viewIntent = SystemViewIntentProvider().getViewIntent(context, pictureUri, "image/*")
+                        context.startActivity(viewIntent)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to open image viewer")
+                    }
+                },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Async Thumbnail Preview
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center
+                ) {
+                    var thumbnail by remember(pictureUri) { mutableStateOf<Bitmap?>(null) }
+                    var isLoading by remember(pictureUri) { mutableStateOf(true) }
+
+                    LaunchedEffect(pictureUri) {
+                        isLoading = true
+                        withContext(Dispatchers.IO) {
+                            try {
+                                val decoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                    val source = ImageDecoder.createSource(context.contentResolver, pictureUri)
+                                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                                        decoder.setTargetSampleSize(4)
+                                    }
+                                } else {
+                                    context.contentResolver.openInputStream(pictureUri)?.use {
+                                        BitmapFactory.decodeStream(it)
+                                    }
+                                }
+                                thumbnail = decoded
+                            } catch (_: Exception) {
+                                try {
+                                    val file = PictureDirHelper.getFileForUri(context, pictureUri)
+                                    if (file.exists() && file.length() > 0) {
+                                        thumbnail = BitmapFactory.decodeFile(file.absolutePath)
+                                    }
+                                } catch (_: Exception) {}
+                            } finally {
+                                isLoading = false
+                            }
+                        }
+                    }
+
+                    when {
+                        isLoading -> CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        thumbnail != null -> Image(
+                            bitmap = thumbnail!!.asImageBitmap(),
+                            contentDescription = "Receipt thumbnail",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        else -> Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Text info
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ReceiptLong,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "Receipt Attached",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Tap to view full screen",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Actions: Replace & Remove
+                IconButton(onClick = onAttachGallery) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Change receipt",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onRemove) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Remove receipt",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    } else {
+        // No Attachment: Add Attachment Card
+        OutlinedCard(
+            modifier = modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.outlinedCardColors(
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+            ),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_attachment),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Attach Receipt",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(
+                        onClick = onAttachCamera,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_menu_camera),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Camera", style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    FilledTonalButton(
+                        onClick = onAttachGallery,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Gallery", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun copyUriToAppStorage(context: Context, sourceUri: Uri): Uri {
+    return try {
+        val app = context.applicationContext as MyApplication
+        val destUri = PictureDirHelper.getOutputMediaUri(false, app, prefix = "receipt_")
+        context.contentResolver.openInputStream(sourceUri)?.use { input ->
+            context.contentResolver.openOutputStream(destUri)?.use { output ->
+                input.copyTo(output)
+            }
+        }
+        destUri
+    } catch (e: Exception) {
+        Timber.e(e, "Failed to copy image to app storage, using source uri")
+        sourceUri
+    }
+}
+
 

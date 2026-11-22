@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.Uri
 import java.math.RoundingMode
 import org.totschnig.myexpenses.db2.addAttachments
+import org.totschnig.myexpenses.db2.deleteAttachments
+import org.totschnig.myexpenses.db2.loadAttachments
 import org.totschnig.myexpenses.db2.getCategoryPath
 import org.totschnig.myexpenses.db2.requireRootParty
 import org.totschnig.myexpenses.provider.BaseTransactionProvider
@@ -784,7 +786,10 @@ open class MyExpensesV2ViewModel(
                     withTags = true,
                     extended = true
                 )
-                _transactionToEdit.value = TransactionMapper.map(repoTx, currencyContext)
+                val editData = TransactionMapper.map(repoTx, currencyContext)
+                val attachments = repository.loadAttachments(transactionId)
+                val picUri = attachments.firstOrNull()
+                _transactionToEdit.value = editData.copy(pictureUri = picUri)
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load transaction $transactionId for edit")
             }
@@ -801,6 +806,8 @@ open class MyExpensesV2ViewModel(
                     extended = true
                 )
                 val editData = TransactionMapper.map(repoTx, currencyContext)
+                val attachments = repository.loadAttachments(transactionId)
+                val picUri = attachments.firstOrNull()
                 val isCurrentDate = prefHandler.getBoolean(PrefKey.CLONE_WITH_CURRENT_DATE, true)
                 val date = if (isCurrentDate) LocalDateTime.now() else editData.date
                 val valueDate = if (isCurrentDate) LocalDate.now() else editData.valueDate
@@ -808,7 +815,8 @@ open class MyExpensesV2ViewModel(
                     id = 0L,
                     uuid = generateUuid(),
                     date = date,
-                    valueDate = valueDate
+                    valueDate = valueDate,
+                    pictureUri = picUri
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Failed to clone transaction $transactionId")
@@ -861,16 +869,32 @@ open class MyExpensesV2ViewModel(
             val repoTx = mapTransaction(data)
             val txId = if (data.id != 0L) {
                 repository.updateTransaction(repoTx)
+                try {
+                    val existing = repository.loadAttachments(data.id)
+                    if (data.pictureUri == null) {
+                        if (existing.isNotEmpty()) {
+                            repository.deleteAttachments(data.id, existing)
+                        }
+                    } else if (!existing.contains(data.pictureUri)) {
+                        if (existing.isNotEmpty()) {
+                            repository.deleteAttachments(data.id, existing)
+                        }
+                        repository.addAttachments(data.id, listOf(data.pictureUri))
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to sync attachments for transaction ${data.id}")
+                }
                 data.id
             } else {
-                repository.createTransaction(repoTx).id
-            }
-            data.pictureUri?.let { picUri ->
-                try {
-                    repository.addAttachments(txId, listOf(picUri))
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to attach receipt picture $picUri to transaction $txId")
+                val createdTx = repository.createTransaction(repoTx)
+                data.pictureUri?.let { picUri ->
+                    try {
+                        repository.addAttachments(createdTx.id, listOf(picUri))
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to attach receipt picture $picUri to transaction ${createdTx.id}")
+                    }
                 }
+                createdTx.id
             }
             contentResolver.notifyChange(TransactionProvider.TRANSACTIONS_URI, null, 0)
             contentResolver.notifyChange(TransactionProvider.ACCOUNTS_URI, null, 0)
