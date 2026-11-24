@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="versions">
+        <item>896;1.0.10;Multi-attachment selection for Gallery and Documents, and unique collision-proof storage naming</item>
         <item>895;1.0.9;Multi-attachment support for images and documents (PDF/doc), 1-tap Camera/Gallery/Doc pickers, live thumbnail previews, and full edit transaction attachment sync</item>
         <item>894;1.0.8;Multi-level category tree selection, India-specific vector icon pack (Auto, LPG, 20L Water Can, Milk, Temple, UPI, Chai, etc.), and uniform category badges</item>
         <item>893;1.0.7;100% Jetpack Compose transaction editor, dropped split transactions, and legacy debt elimination</item>
