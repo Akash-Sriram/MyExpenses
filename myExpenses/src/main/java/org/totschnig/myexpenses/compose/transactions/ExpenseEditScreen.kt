@@ -368,11 +368,11 @@ fun ExpenseEditScreen(
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val copiedUri = copyUriToAppStorage(context, uri)
-            attachments = attachments + copiedUri
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val copiedUris = uris.map { copyUriToAppStorage(context, it) }
+            attachments = attachments + copiedUris
             pictureUri = attachments.firstOrNull()
         }
     }
@@ -387,11 +387,11 @@ fun ExpenseEditScreen(
     }
 
     val documentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val copiedUri = copyUriToAppStorage(context, uri)
-            attachments = attachments + copiedUri
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            val copiedUris = uris.map { copyUriToAppStorage(context, it) }
+            attachments = attachments + copiedUris
             pictureUri = attachments.firstOrNull()
         }
     }
@@ -399,7 +399,8 @@ fun ExpenseEditScreen(
     val launchCamera = {
         try {
             val app = context.applicationContext as MyApplication
-            val uri = PictureDirHelper.getOutputMediaUri(false, app, prefix = "receipt_")
+            val uniqueName = "receipt_${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(8)}"
+            val uri = PictureDirHelper.getOutputMediaUri(false, app, fileName = uniqueName)
             tempCameraUri = uri
             cameraLauncher.launch(uri)
         } catch (e: Exception) {
@@ -2095,7 +2096,8 @@ private fun copyUriToAppStorage(context: Context, sourceUri: Uri): Uri {
             else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType) ?: "jpg"
         }
         val prefix = if (ext == "pdf") "doc_" else "receipt_"
-        val destUri = PictureDirHelper.getOutputMediaUri(false, app, prefix = prefix, extension = ext)
+        val uniqueName = "${prefix}${System.currentTimeMillis()}_${java.util.UUID.randomUUID().toString().take(8)}"
+        val destUri = PictureDirHelper.getOutputMediaUri(false, app, fileName = uniqueName, extension = ext)
         contentResolver.openInputStream(sourceUri)?.use { input ->
             contentResolver.openOutputStream(destUri)?.use { output ->
                 input.copyTo(output)
