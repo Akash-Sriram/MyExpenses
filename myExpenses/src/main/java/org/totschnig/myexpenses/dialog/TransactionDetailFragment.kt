@@ -14,14 +14,28 @@
  */
 package org.totschnig.myexpenses.dialog
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import org.totschnig.myexpenses.compose.transactions.CategoryIconBadge
 import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +50,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Icon as M3Icon
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -173,6 +188,7 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
             Text(
                 modifier = modifier,
                 text = content,
+                style = MaterialTheme.typography.bodyMedium,
                 color = color
             )
         }
@@ -183,14 +199,25 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
         label: String,
         content: @Composable () -> Unit
     ) {
-        Row(modifier = Modifier.padding(horizontal = super.horizontalPadding)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = super.horizontalPadding, vertical = 3.dp),
+            verticalAlignment = Alignment.Top
+        ) {
             Text(
                 modifier = Modifier
-                    .weight(1f)
-                    .align(Alignment.CenterVertically),
-                text = label
+                    .weight(1.15f)
+                    .padding(top = 2.dp),
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Box(modifier = Modifier.weight(2f)) {
+            Box(
+                modifier = Modifier
+                    .weight(2f)
+                    .padding(start = 8.dp)
+            ) {
                 content()
             }
         }
@@ -361,10 +388,23 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
             )
         }
         if (transaction.catId != null && transaction.catId > 0) {
-            TableRow(
-                label = R.string.category,
-                content = transaction.categoryPath!!
-            )
+            TableRow(stringResource(R.string.category)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CategoryIconBadge(
+                        icon = transaction.icon,
+                        color = null,
+                        type = transaction.type,
+                        size = 28.dp
+                    )
+                    Text(
+                        text = transaction.categoryPath ?: "",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
         }
         if (!transaction.isArchive) {
             val dateMode = getDateMode(transaction.accountType, prefHandler)
@@ -449,12 +489,48 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
                     transaction.debtLabel?.let {
                         append(" ($it)")
                     }
-                    val isUpi = !transaction.isTransfer && transaction.methodLabel?.contains("UPI", ignoreCase = true) == true
-                    if (isUpi && transaction.iban != null) {
-                        append(" (${transaction.iban})")
-                    }
                 }
             )
+        }
+        val upiId = transaction.party?.iban ?: transaction.iban
+        if (!upiId.isNullOrBlank()) {
+            val context = LocalContext.current
+            TableRow(label = "UPI ID") {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.clickable {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("UPI ID", upiId))
+                        Toast.makeText(context, "Copied UPI ID: $upiId", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        M3Icon(
+                            painter = painterResource(R.drawable.ic_upi_rupee),
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = upiId,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        M3Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy UPI ID",
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
         }
         if (!transaction.methodLabel.isNullOrBlank()) {
             TableRow(
@@ -470,12 +546,20 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
         }
         if (!transaction.isArchive && transaction.accountType?.supportsReconciliation == true) {
             val roles = transaction.crStatus.toColorRoles(requireContext())
-            TableRow(
-                modifier = Modifier.background(color = Color(roles.accent)),
-                label = R.string.status,
-                content = stringResource(id = transaction.crStatus.toStringRes()),
-                color = Color(roles.onAccent)
-            )
+            TableRow(label = stringResource(R.string.status)) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(roles.accent).copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, Color(roles.accent).copy(alpha = 0.4f))
+                ) {
+                    Text(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        text = stringResource(id = transaction.crStatus.toStringRes()),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(roles.accent)
+                    )
+                }
+            }
         }
         if (transaction.originTemplate != null) {
             TableRow(
@@ -517,8 +601,8 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
             if (it.isNotEmpty()) {
                 TableRow(stringResource(R.string.attachments)) {
                     FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
 
                         it.forEach { (uri, info) ->
@@ -529,37 +613,43 @@ class TransactionDetailFragment : ComposeBaseDialogFragment3() {
                                     info.type
                                 )
                             }
-                            when {
-                                info.thumbnail != null -> Image(
-                                    modifier = Modifier
-                                        .clickable(onClick = onClick)
-                                        .size(48.dp)
-                                        .padding(5.dp),
-                                    bitmap = info.thumbnail.asImageBitmap(),
-                                    contentScale = ContentScale.Crop,
-                                    contentDescription = null
-                                )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(onClick = onClick)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    when {
+                                        info.thumbnail != null -> Image(
+                                            bitmap = info.thumbnail.asImageBitmap(),
+                                            contentScale = ContentScale.Crop,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
 
-                                info.typeIcon != null ->
-                                    Image(
-                                        modifier = Modifier
-                                            .clickable(onClick = onClick)
-                                            .size(48.dp),
-                                        painter = rememberDrawablePainter(
-                                            drawable = info.typeIcon.loadDrawable(
-                                                requireContext()
+                                        info.typeIcon != null ->
+                                            Image(
+                                                modifier = Modifier.size(28.dp),
+                                                painter = rememberDrawablePainter(
+                                                    drawable = info.typeIcon.loadDrawable(
+                                                        requireContext()
+                                                    )
+                                                ),
+                                                contentDescription = null
                                             )
-                                        ),
-                                        contentDescription = null
-                                    )
 
-                                else -> Image(
-                                    modifier = Modifier
-                                        .clickable(onClick = onClick),
-                                    painter = painterResource(
-                                        id = info.fallbackResource ?: 0
-                                    ), contentDescription = null
-                                )
+                                        else -> Image(
+                                            modifier = Modifier.size(28.dp),
+                                            painter = painterResource(
+                                                id = info.fallbackResource ?: R.drawable.ic_attachment
+                                            ), contentDescription = null
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

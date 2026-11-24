@@ -83,10 +83,13 @@ import org.totschnig.myexpenses.db2.createTransaction
 import org.totschnig.myexpenses.db2.entities.Transaction
 import org.totschnig.myexpenses.db2.findAccountType
 import org.totschnig.myexpenses.db2.findSiblingParentId
+import org.totschnig.myexpenses.db2.getRootPartyId
 import org.totschnig.myexpenses.db2.loadAccount
 import org.totschnig.myexpenses.db2.loadSubAccounts
 import org.totschnig.myexpenses.db2.loadTrade
 import org.totschnig.myexpenses.db2.loadTransaction
+import org.totschnig.myexpenses.db2.requireBranchParty
+import org.totschnig.myexpenses.db2.requireRootParty
 import org.totschnig.myexpenses.db2.savePrice
 import org.totschnig.myexpenses.db2.setBalanceType
 import org.totschnig.myexpenses.db2.storeExchangeRate
@@ -874,8 +877,26 @@ open class MyExpensesV2ViewModel(
 
     fun saveTransaction(data: TransactionEditData) {
         viewModelScope.launch(coroutineDispatcher) {
-            val repoTx = mapTransaction(data)
-            val effectiveAttachments = data.allAttachments
+            val resolvedParty = data.party?.let { party ->
+                val rootId = party.id?.takeIf { it != 0L }?.let { id ->
+                    repository.getRootPartyId(id) ?: id
+                } ?: repository.requireRootParty(party.name)
+
+                if (rootId != null) {
+                    val finalPartyId = if (!party.iban.isNullOrBlank()) {
+                        repository.requireBranchParty(rootId, party.name, party.iban)
+                    } else {
+                        rootId
+                    }
+                    val finalName = getPayeeName(finalPartyId) ?: party.name
+                    DisplayParty(finalPartyId, finalName, party.shortName, party.iban)
+                } else {
+                    party
+                }
+            }
+            val effectiveData = data.copy(party = resolvedParty)
+            val repoTx = mapTransaction(effectiveData)
+            val effectiveAttachments = effectiveData.allAttachments
             val txId = if (data.id != 0L) {
                 repository.updateTransaction(repoTx)
                 try {
@@ -937,8 +958,8 @@ open class MyExpensesV2ViewModel(
                     val payeeId = payeeName?.let { resolvePayeeId(it, receipt.upiId) }
                     val party = payeeId?.let { id ->
                         val name = getPayeeName(id) ?: payeeName
-                        DisplayParty(id = id, name = name)
-                    } ?: payeeName?.let { DisplayParty(id = 0L, name = it) }
+                        DisplayParty(id = id, name = name, iban = receipt.upiId)
+                    } ?: payeeName?.let { DisplayParty(id = 0L, name = it, iban = receipt.upiId) }
 
                     val methodId = findMethodIdForLabel("UPI") ?: findMethodIdForLabel("Electronic payment")
                     val methodLabel = if (methodId != null) "UPI" else null

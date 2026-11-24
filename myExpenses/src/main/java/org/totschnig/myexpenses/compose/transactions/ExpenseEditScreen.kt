@@ -327,10 +327,14 @@ fun ExpenseEditScreen(
         showCategoryPicker = true
     }
 
-    // Payee
+    // Payee & UPI ID
     var payeeText by rememberSaveable {
         mutableStateOf(initialData?.party?.name ?: "")
     }
+    var upiId by rememberSaveable {
+        mutableStateOf(initialData?.party?.iban ?: "")
+    }
+    var showUpiFieldManual by rememberSaveable { mutableStateOf(false) }
 
     // Date & Time
     var date by remember {
@@ -434,6 +438,7 @@ fun ExpenseEditScreen(
             selectedCategoryPath = initialData.categoryPath
             selectedCategoryIcon = initialData.categoryIcon
             payeeText = initialData.party?.name ?: ""
+            upiId = initialData.party?.iban ?: ""
             date = initialData.date.toLocalDate()
             time = initialData.date.toLocalTime()
             selectedTags = initialData.tags
@@ -482,7 +487,13 @@ fun ExpenseEditScreen(
             accountId = selectedAccountId,
             date = fullDateTime,
             valueDate = date,
-            party = if (payeeText.isNotBlank()) DisplayParty(id = initialData?.party?.id, name = payeeText.trim()) else null,
+            party = if (payeeText.isNotBlank()) {
+                DisplayParty(
+                    id = initialData?.party?.id,
+                    name = payeeText.trim(),
+                    iban = upiId.trim().takeIf { it.isNotEmpty() }
+                )
+            } else null,
             categoryId = if (!isTransfer) selectedCategoryId else null,
             categoryPath = if (!isTransfer) selectedCategoryPath else null,
             categoryIcon = if (!isTransfer) selectedCategoryIcon else null,
@@ -835,6 +846,54 @@ fun ExpenseEditScreen(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
+
+                        // UPI ID / VPA Field
+                        val isUpiMethod = availableMethods.find { it.id == selectedMethodId }?.label?.contains("UPI", ignoreCase = true) == true
+                        if (isUpiMethod || upiId.isNotBlank() || showUpiFieldManual) {
+                            OutlinedTextField(
+                                value = upiId,
+                                onValueChange = { upiId = it },
+                                label = { Text("UPI ID / VPA") },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_upi_rupee),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                trailingIcon = {
+                                    if (upiId.isNotBlank()) {
+                                        IconButton(onClick = { upiId = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear UPI ID", modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                },
+                                placeholder = { Text("e.g. merchant@upi or number@bank") },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        } else if (payeeText.isNotBlank()) {
+                            TextButton(
+                                onClick = { showUpiFieldManual = true },
+                                modifier = Modifier.align(Alignment.End),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_upi_rupee),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "+ Add UPI ID",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
 
                         // Category Selection & Carousel
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
