@@ -29,8 +29,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.window.DialogProperties
@@ -245,12 +249,15 @@ fun ExpenseEditScreen(
     val transferAccount = accounts.find { it.id == transferAccountId } ?: accounts.getOrNull(1)
 
     // Amount & Calculator
+    val initialAmountMajor = initialData?.amount?.amountMajor?.abs() ?: BigDecimal.ZERO
     var amount by remember {
-        mutableStateOf(initialData?.amount?.amountMajor?.abs() ?: BigDecimal.ZERO)
+        mutableStateOf(initialAmountMajor)
     }
-    val isInitialAmountZero = (initialData?.amount?.amountMajor?.compareTo(BigDecimal.ZERO) ?: 0) == 0
+    var amountText by rememberSaveable {
+        mutableStateOf(if (initialAmountMajor > BigDecimal.ZERO) initialAmountMajor.stripTrailingZeros().toPlainString() else "")
+    }
     var showCalculator by rememberSaveable {
-        mutableStateOf(isInitialAmountZero)
+        mutableStateOf(false)
     }
 
     // Category
@@ -432,7 +439,11 @@ fun ExpenseEditScreen(
     // Update state when initialData changes (e.g. OCR completes asynchronously)
     LaunchedEffect(initialData) {
         if (initialData != null) {
-            amount = initialData.amount.amountMajor.abs()
+            val newAmt = initialData.amount.amountMajor.abs()
+            amount = newAmt
+            if (newAmt > BigDecimal.ZERO) {
+                amountText = newAmt.stripTrailingZeros().toPlainString()
+            }
             selectedAccountId = initialData.accountId
             transferAccountId = initialData.transferEditData?.transferAccountId ?: accounts.getOrNull(1)?.id ?: 0L
             selectedCategoryId = initialData.categoryId
@@ -632,70 +643,94 @@ fun ExpenseEditScreen(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Amount Row - Clickable to open/toggle calculator
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (showCalculator) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                                else MaterialTheme.colorScheme.surface
-                            )
-                            .border(
-                                width = if (showCalculator) 1.5.dp else 1.dp,
-                                color = if (showCalculator) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { showCalculator = !showCalculator }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = stringResource(R.string.amount),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = selectedAccount?.currency?.symbol ?: "₹",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        color = when (selectedType) {
-                                            TransactionTypeOption.EXPENSE -> colors.expense
-                                            TransactionTypeOption.INCOME -> colors.income
-                                            TransactionTypeOption.TRANSFER -> colors.transfer
-                                        },
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(end = 6.dp)
-                                )
-                                Text(
-                                    text = if (amount == BigDecimal.ZERO) "0.00" else amount.stripTrailingZeros().toPlainString(),
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                    // Amount Field - Default System Number Pad Keyboard with Calculator Tool
+                    OutlinedTextField(
+                        value = amountText,
+                        onValueChange = { input ->
+                            val normalized = input.replace(',', '.')
+                            if (normalized.any { it in "+-×÷/*" }) {
+                                amountText = input
+                                val calculated = CalculatorEngine.calculate(normalized)
+                                if (calculated != null && calculated >= BigDecimal.ZERO) {
+                                    amount = calculated
+                                }
+                            } else {
+                                val isValidNumberOrPrefix = normalized.isEmpty() ||
+                                        normalized.matches(Regex("""^\d*\.?\d*$"""))
+                                if (isValidNumberOrPrefix) {
+                                    amountText = input
+                                    amount = normalized.toBigDecimalOrNull() ?: BigDecimal.ZERO
+                                }
                             }
-                        }
-
-                        IconButton(
-                            onClick = { showCalculator = !showCalculator },
-                            modifier = Modifier
-                                .background(
-                                    if (showCalculator) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = CircleShape
-                                )
-                        ) {
-                            Icon(
-                                Icons.Default.Calculate,
-                                contentDescription = "Toggle Calculator",
-                                tint = if (showCalculator) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
+                        },
+                        label = { Text(stringResource(R.string.amount)) },
+                        placeholder = { Text("0.00") },
+                        leadingIcon = {
+                            Text(
+                                text = selectedAccount?.currency?.symbol ?: "₹",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    color = when (selectedType) {
+                                        TransactionTypeOption.EXPENSE -> colors.expense
+                                        TransactionTypeOption.INCOME -> colors.income
+                                        TransactionTypeOption.TRANSFER -> colors.transfer
+                                    },
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                modifier = Modifier.padding(start = 12.dp, end = 4.dp)
                             )
-                        }
-                    }
+                        },
+                        trailingIcon = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(end = 4.dp)
+                            ) {
+                                if (amountText.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = {
+                                            amountText = ""
+                                            amount = BigDecimal.ZERO
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Clear,
+                                            contentDescription = "Clear amount",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { showCalculator = !showCalculator },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(
+                                            if (showCalculator) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = CircleShape
+                                        )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Calculate,
+                                        contentDescription = "Calculator / Sum Numbers",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (showCalculator) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        },
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal,
+                            imeAction = ImeAction.Next
+                        ),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     AnimatedVisibility(
                         visible = showCalculator,
@@ -708,9 +743,11 @@ fun ExpenseEditScreen(
                                 initialAmount = amount,
                                 onAmountChanged = { liveAmount ->
                                     amount = liveAmount
+                                    amountText = if (liveAmount > BigDecimal.ZERO) liveAmount.stripTrailingZeros().toPlainString() else ""
                                 },
                                 onAmountCommitted = { newAmount ->
                                     amount = newAmount
+                                    amountText = if (newAmount > BigDecimal.ZERO) newAmount.stripTrailingZeros().toPlainString() else ""
                                     showCalculator = false
                                 },
                                 onClose = {
