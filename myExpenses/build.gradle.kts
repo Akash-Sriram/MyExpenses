@@ -67,6 +67,16 @@ android {
     }
 
     signingConfigs {
+        getByName("debug") {
+            val customDebugKeystore = rootProject.file("config/debug.keystore")
+            if (customDebugKeystore.exists()) {
+                storeFile = customDebugKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+
         val releaseStoreFile = getSecretProperty("RELEASE_STORE_FILE")
         val releaseStorePassword = getSecretProperty("RELEASE_STORE_PASSWORD")
         val releaseKeyAlias = getSecretProperty("RELEASE_KEY_ALIAS")
