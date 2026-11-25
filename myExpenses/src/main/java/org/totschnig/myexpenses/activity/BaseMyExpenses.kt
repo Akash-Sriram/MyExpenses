@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.compose.conditional
 import org.totschnig.myexpenses.dialog.AppUpdateDialogFragment
+import org.totschnig.myexpenses.service.AutoBackupWorker
 import org.totschnig.myexpenses.util.updater.AppUpdateManager
 
 import org.totschnig.myexpenses.compose.filter.FilterCard
@@ -279,6 +280,8 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                 }
             }
         }
+
+        AutoBackupWorker.checkAndCatchUpOnLaunch(this, prefHandler)
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {

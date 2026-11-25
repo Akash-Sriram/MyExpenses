@@ -33,49 +33,82 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
         const val ACTION_BACKUP_PURGE_CANCEL = "BACKUP_PURGE_CANCEL"
         const val ACTION_BACKUP_PURGE = "BACKUP_PURGE"
 
-        private fun WorkManager.cancelWork() = cancelUniqueWork(WORK_NAME)
-        private fun WorkManager.enqueue(initialDelayMillis: Long?): Operation {
-            Timber.w("enqueuing $WORK_NAME with initialDelayMillis $initialDelayMillis")
-            return enqueueUniqueWork(
-                WORK_NAME,
-                ExistingWorkPolicy.REPLACE,
-                OneTimeWorkRequestBuilder<AutoBackupWorker>()
-                    .apply {
-                        initialDelayMillis?.let {
-                            setInitialDelay(it, TimeUnit.MILLISECONDS)
-                        }
-                    }.build()
-            )
-        }
-
         private const val WORK_NAME = "AutoBackupService"
+        private const val IMMEDIATE_WORK_NAME = "AutoBackupService_Immediate"
 
         fun enqueueOrCancel(context: Context, prefHandler: PrefHandler) {
             val workManager = WorkManager.getInstance(context)
-            if (prefHandler.getBoolean(PrefKey.AUTO_BACKUP, false) &&
-                prefHandler.getBoolean(PrefKey.AUTO_BACKUP_DIRTY, true)
-            ) {
-                workManager.enqueue(
-                    TimePreference.getScheduledTime(
-                        prefHandler, PrefKey.AUTO_BACKUP_TIME
-                    )
+            if (prefHandler.getBoolean(PrefKey.AUTO_BACKUP, false)) {
+                val delay = TimePreference.getScheduledTime(
+                    prefHandler, PrefKey.AUTO_BACKUP_TIME
                 )
+                val periodicWork = PeriodicWorkRequestBuilder<AutoBackupWorker>(24, TimeUnit.HOURS)
+                    .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                    .setConstraints(
+                        Constraints.Builder()
+                            .setRequiresStorageNotLow(true)
+                            .build()
+                    )
+                    .build()
+                workManager.enqueueUniquePeriodicWork(
+                    WORK_NAME,
+                    ExistingPeriodicWorkPolicy.UPDATE,
+                    periodicWork
+                )
+                Timber.i("AutoBackup: scheduled daily recurring backup with initial delay of ${delay}ms")
             } else {
-                workManager.cancelWork()
+                workManager.cancelUniqueWork(WORK_NAME)
+                workManager.cancelUniqueWork(IMMEDIATE_WORK_NAME)
+                Timber.i("AutoBackup: cancelled auto backup workers")
+            }
+        }
+
+        fun enqueueImmediate(context: Context) {
+            val workManager = WorkManager.getInstance(context)
+            val immediateWork = OneTimeWorkRequestBuilder<AutoBackupWorker>()
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiresStorageNotLow(true)
+                        .build()
+                )
+                .build()
+            workManager.enqueueUniqueWork(
+                IMMEDIATE_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                immediateWork
+            )
+            Timber.i("AutoBackup: enqueued immediate catch-up backup")
+        }
+
+        fun checkAndCatchUpOnLaunch(context: Context, prefHandler: PrefHandler) {
+            if (!prefHandler.getBoolean(PrefKey.AUTO_BACKUP, false)) return
+
+            val lastRun = prefHandler.getLong(PrefKey.AUTO_BACKUP_LAST_RUN, 0L)
+            val now = System.currentTimeMillis()
+            if (now - lastRun >= TimeUnit.HOURS.toMillis(24)) {
+                Timber.i("AutoBackup: Catching up on missed daily backup (last run was ${now - lastRun}ms ago)")
+                enqueueImmediate(context)
             }
         }
 
         fun cancel(context: Context) {
-            WorkManager.getInstance(context).cancelWork()
+            val workManager = WorkManager.getInstance(context)
+            workManager.cancelUniqueWork(WORK_NAME)
+            workManager.cancelUniqueWork(IMMEDIATE_WORK_NAME)
         }
 
         fun enqueue(context: Context) {
-            WorkManager.getInstance(context).enqueue(null)
+            enqueueImmediate(context)
         }
     }
 
     override suspend fun doWork(): Result {
         Timber.w("now doWork $WORK_NAME")
+
+        if (!prefHandler.getBoolean(PrefKey.AUTO_BACKUP, false)) {
+            Timber.i("Auto-backup is disabled in preferences, skipping doWork")
+            return Result.success()
+        }
 
         // 1. Run daily incremental backup (media sync + DB snapshot)
         val incrementalResult = doBackup(
@@ -136,33 +169,17 @@ class AutoBackupWorker(context: Context, workerParameters: WorkerParameters) :
                     Timber.d("Auto-backup: silently pruned ${oldBackups.size} old backup(s) to retain single verified copy")
                 }
             }
-        }.onFailure {
-            prefHandler.putBoolean(PrefKey.AUTO_BACKUP, false)
-            val content =
-                "${it.message} ${wrappedContext.getString(R.string.warning_auto_backup_deactivated)}"
-            val preferenceIntent = PreferenceActivity.getIntent(
-                applicationContext, prefHandler.getKey(PrefKey.CATEGORY_BACKUP_RESTORE)
-            )
-            val builder = buildMessage(content)
-                .setContentIntent(
-                    PendingIntent.getActivity(
-                        applicationContext,
-                        0,
-                        preferenceIntent,
-                        PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                )
-            val notification = builder.build()
-            notification.flags = Notification.FLAG_AUTO_CANCEL
-            notify(notification)
-            return Result.failure()
+        }.onFailure { e ->
+            Timber.e(e, "Auto-backup: daily full solid backup failed")
         }
 
-        if (incrementalResult.isFailure && fullResult.isFailure) {
-            return Result.failure()
+        if (incrementalResult.isSuccess || fullResult.isSuccess) {
+            prefHandler.putLong(PrefKey.AUTO_BACKUP_LAST_RUN, System.currentTimeMillis())
+            prefHandler.putBoolean(PrefKey.AUTO_BACKUP_DIRTY, false)
+            return Result.success()
         }
 
-        return Result.success()
+        return Result.retry()
     }
 }
 
