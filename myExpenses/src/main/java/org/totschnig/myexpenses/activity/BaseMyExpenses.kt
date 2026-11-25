@@ -265,8 +265,10 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
 
         if (AppUpdateManager.shouldCheckAutomatically(this)) {
             lifecycleScope.launch(Dispatchers.IO) {
-                AppUpdateManager.recordCheckTime(this@BaseMyExpenses)
                 val result = AppUpdateManager.checkUpdate(this@BaseMyExpenses)
+                if (result.isSuccess) {
+                    AppUpdateManager.recordCheckTime(this@BaseMyExpenses)
+                }
                 result.getOrNull()?.let { releaseInfo ->
                     withContext(Dispatchers.Main) {
                         if (!isFinishing && !isDestroyed) {
@@ -1322,8 +1324,6 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                 return
             }
             upgradeHandlerViewModel.upgrade(this, prevVersion, currentVersion)
-
-            showVersionDialog(prevVersion)
         }
         checkCalendarPermission()
     }

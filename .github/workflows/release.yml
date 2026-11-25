@@ -91,15 +91,45 @@ jobs:
           path: ${{ steps.prepare_artifacts.outputs.apk_path }}
           retention-days: 30
 
+      - name: Extract Release Notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.prepare_artifacts.outputs.version }}"
+          CLEAN_VERSION="${VERSION#v}"
+          CLEAN_VERSION="${CLEAN_VERSION#r}"
+
+          RAW_NOTES=$(grep -oP "<item>[0-9]+;${CLEAN_VERSION};\K[^<]+" myExpenses/src/main/res/values/version_info.xml || echo "")
+
+          if [ -n "$RAW_NOTES" ]; then
+            {
+              echo "body<<EOF"
+              echo "### What's New in v${CLEAN_VERSION}"
+              echo ""
+              echo "$RAW_NOTES" | sed 's/, /\n- /g' | sed 's/^/- /'
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "body<<EOF"
+              echo "### What's New in v${CLEAN_VERSION}"
+              echo ""
+              echo "- Various performance improvements and bug fixes."
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.prepare_artifacts.outputs.version }}
           name: MyExpenses ${{ steps.prepare_artifacts.outputs.version }}
+          body: ${{ steps.release_notes.outputs.body }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
           files: ${{ steps.prepare_artifacts.outputs.apk_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

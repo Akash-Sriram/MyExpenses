@@ -54,31 +54,61 @@ class AppUpdateDialogFragment : BaseDialogFragment() {
             "Version $tagName"
         }
 
-        binding.updateChangelogText.text = if (body.isNotBlank()) body else "No release notes provided."
+        binding.updateChangelogText.text = formatChangelog(body)
 
-        val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.in_app_update_available_title)
-            .setView(binding.root)
-            .setPositiveButton(R.string.in_app_update_download_install, null)
-            .setNeutralButton(R.string.in_app_update_view_on_github) { _, _ ->
-                if (htmlUrl.isNotBlank()) {
-                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl)).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(browserIntent)
+        if (htmlUrl.isNotBlank()) {
+            binding.updateViewOnGithub.visibility = View.VISIBLE
+            binding.updateViewOnGithub.setOnClickListener {
+                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(htmlUrl)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
+                startActivity(browserIntent)
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-
-        dialog.setOnShowListener {
-            val positiveBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            positiveBtn.setOnClickListener {
-                handlePositiveAction(positiveBtn, releaseInfo)
-            }
+        } else {
+            binding.updateViewOnGithub.visibility = View.GONE
         }
 
-        return dialog
+        binding.btnCancel.setOnClickListener {
+            dismissAllowingStateLoss()
+        }
+
+        binding.btnDownloadInstall.setOnClickListener {
+            handlePositiveAction(binding.btnDownloadInstall, releaseInfo)
+        }
+
+        return MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.in_app_update_available_title)
+            .setView(binding.root)
+            .create()
+    }
+
+    private fun formatChangelog(rawBody: String): String {
+        if (rawBody.isBlank()) return "• Various improvements and bug fixes."
+
+        // If body only contains GitHub automatic compare link without actual notes
+        val trimmed = rawBody.trim()
+        if (trimmed.startsWith("**Full Changelog**") || trimmed.startsWith("Full Changelog")) {
+            return "• Various performance improvements and bug fixes.\n• See complete git commit history via the link below."
+        }
+
+        // Clean up markdown headers and bolding
+        val lines = trimmed.lines()
+            .map { it.trim() }
+            .filter { line ->
+                line.isNotEmpty() && !line.startsWith("### What's New") && !line.startsWith("## ")
+            }
+            .map { line ->
+                val unbolded = line.replace("**", "").replace("__", "")
+                if (unbolded.startsWith("- ") || unbolded.startsWith("* ")) {
+                    "• " + unbolded.substring(2).trim()
+                } else if (unbolded.startsWith("• ")) {
+                    unbolded
+                } else {
+                    "• $unbolded"
+                }
+            }
+
+        return if (lines.isNotEmpty()) lines.joinToString("\n") else "• Various improvements and bug fixes."
     }
 
     private fun handlePositiveAction(button: Button, releaseInfo: ReleaseInfo) {
@@ -90,7 +120,7 @@ class AppUpdateDialogFragment : BaseDialogFragment() {
                     Toast.makeText(ctx, R.string.in_app_update_permission_prompt, Toast.LENGTH_LONG).show()
                     startActivity(AppUpdateManager.createManageUnknownAppSourcesIntent(ctx))
                 } else {
-                    AppUpdateManager.installApk(ctx, apkFile)
+                    AppUpdateManager.installApkSilently(ctx, apkFile)
                     dismissAllowingStateLoss()
                 }
                 return
@@ -101,6 +131,7 @@ class AppUpdateDialogFragment : BaseDialogFragment() {
 
         isDownloading = true
         button.isEnabled = false
+        binding.btnCancel.isEnabled = false
         binding.updateProgressContainer.visibility = View.VISIBLE
         binding.updateProgressBar.progress = 0
         binding.updateStatusText.text = getString(R.string.in_app_update_downloading, "0%")
@@ -113,6 +144,7 @@ class AppUpdateDialogFragment : BaseDialogFragment() {
 
             isDownloading = false
             button.isEnabled = true
+            binding.btnCancel.isEnabled = true
 
             result.fold(
                 onSuccess = { file ->
@@ -124,7 +156,7 @@ class AppUpdateDialogFragment : BaseDialogFragment() {
                         Toast.makeText(ctx, R.string.in_app_update_permission_prompt, Toast.LENGTH_LONG).show()
                         startActivity(AppUpdateManager.createManageUnknownAppSourcesIntent(ctx))
                     } else {
-                        AppUpdateManager.installApk(ctx, file)
+                        AppUpdateManager.installApkSilently(ctx, file)
                         dismissAllowingStateLoss()
                     }
                 },

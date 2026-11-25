@@ -1,0 +1,96 @@
+name: Debug Testing & Build Pipeline
+
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - 'v*'
+      - 'r*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      build_apk:
+        description: 'Build and package Debug APK'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build-debug:
+    name: Run Tests & Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x ./gradlew
+
+      - name: Run Debug Unit Tests
+        run: ./gradlew testInternDebugUnitTest --stacktrace
+
+      - name: Build Intern Debug APK
+        if: github.event_name != 'workflow_dispatch' || inputs.build_apk
+        run: ./gradlew assembleInternDebug --stacktrace
+
+      - name: Prepare Debug Artifact
+        if: github.event_name != 'workflow_dispatch' || inputs.build_apk
+        id: prepare_artifact
+        run: |
+          APK_SRC="myExpenses/build/outputs/apk/intern/debug/myExpenses-intern-debug.apk"
+          if [ ! -f "$APK_SRC" ]; then
+            echo "Error: Debug APK not found at $APK_SRC"
+            exit 1
+          fi
+
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          NAMED_APK="MyExpenses-debug-${SHORT_SHA}.apk"
+          cp "$APK_SRC" "$NAMED_APK"
+          echo "apk_path=$NAMED_APK" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Upload Debug APK Artifact
+        if: github.event_name != 'workflow_dispatch' || inputs.build_apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: MyExpenses-debug
+          path: ${{ steps.prepare_artifact.outputs.apk_path }}
+          retention-days: 14
+
+      - name: Post Job Summary
+        if: always()
+        run: |
+          {
+            echo "### 🚀 Debug Testing & Build Summary"
+            echo ""
+            echo "- **Commit**: \`${{ github.sha }}\`"
+            echo "- **Branch / Ref**: \`${{ github.ref_name }}\`"
+            echo "- **Triggered by**: \`${{ github.actor }}\` via \`${{ github.event_name }}\`"
+            if [ -n "${{ steps.prepare_artifact.outputs.apk_path }}" ]; then
+              echo "- **Debug APK**: \`${{ steps.prepare_artifact.outputs.apk_path }}\`"
+              echo ""
+              echo "#### 📲 Install on Device via GH CLI:"
+              echo "\`\`\`bash"
+              echo "gh run download ${{ github.run_id }} -n MyExpenses-debug -D /tmp/debug-apk"
+              echo "adb install -r /tmp/debug-apk/${{ steps.prepare_artifact.outputs.apk_path }}"
+              echo "\`\`\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

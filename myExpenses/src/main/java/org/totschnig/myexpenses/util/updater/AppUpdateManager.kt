@@ -1,7 +1,9 @@
 package org.totschnig.myexpenses.util.updater
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -14,6 +16,7 @@ import org.json.JSONObject
 import org.totschnig.myexpenses.BuildConfig
 import timber.log.Timber
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
@@ -30,7 +33,7 @@ data class ReleaseInfo(
 object AppUpdateManager {
 
     private const val PREF_KEY_LAST_UPDATE_CHECK = "last_github_update_check_millis"
-    private const val UPDATE_CHECK_INTERVAL_MILLIS = 24 * 60 * 60 * 1000L // 24 hours
+    private const val UPDATE_CHECK_INTERVAL_MILLIS = 2 * 60 * 60 * 1000L // 2 hours
 
     private val defaultHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -279,5 +282,44 @@ object AppUpdateManager {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(installIntent)
+    }
+
+    /**
+     * Installs the downloaded update APK silently on Android 12+ without prompting the user.
+     * Falls back to standard system installer if on Android < 12 or if an exception occurs.
+     */
+    fun installApkSilently(context: Context, apkFile: File) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val packageInstaller = context.packageManager.packageInstaller
+                val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+                    setAppPackageName(context.packageName)
+                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                }
+                val sessionId = packageInstaller.createSession(params)
+                val session = packageInstaller.openSession(sessionId)
+                session.openWrite("app_update", 0, apkFile.length()).use { out ->
+                    FileInputStream(apkFile).use { input ->
+                        input.copyTo(out)
+                    }
+                }
+                val callbackIntent = Intent(context, AppUpdateInstallReceiver::class.java).apply {
+                    action = AppUpdateInstallReceiver.ACTION_INSTALL_STATUS
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    sessionId,
+                    callbackIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                )
+                session.commit(pendingIntent.intentSender)
+                session.close()
+                Timber.i("Silent update session committed successfully (sessionId=$sessionId)")
+                return
+            } catch (e: Exception) {
+                Timber.e(e, "Silent package install failed, falling back to legacy installer")
+            }
+        }
+        installApk(context, apkFile)
     }
 }
