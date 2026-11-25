@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -183,11 +185,16 @@ object CalculatorEngine {
 fun CalculatorKeypad(
     modifier: Modifier = Modifier,
     initialAmount: BigDecimal? = null,
+    onAmountChanged: (BigDecimal) -> Unit = {},
     onAmountCommitted: (BigDecimal) -> Unit,
     onClose: () -> Unit = {}
 ) {
     var expression by remember {
-        mutableStateOf(initialAmount?.stripTrailingZeros()?.toPlainString() ?: "")
+        mutableStateOf(
+            if (initialAmount != null && initialAmount > BigDecimal.ZERO) {
+                initialAmount.stripTrailingZeros().toPlainString()
+            } else ""
+        )
     }
 
     val liveResult = remember(expression) {
@@ -198,26 +205,75 @@ fun CalculatorKeypad(
         }
     }
 
+    // Live update callback whenever expression or liveResult changes
+    LaunchedEffect(expression, liveResult) {
+        if (expression.isBlank()) {
+            onAmountChanged(BigDecimal.ZERO)
+        } else {
+            val result = liveResult ?: expression.toBigDecimalOrNull()
+            if (result != null && result >= BigDecimal.ZERO) {
+                onAmountChanged(result)
+            }
+        }
+    }
+
     fun appendToken(token: String) {
         val sanitized = when (token) {
             "." -> {
                 val lastOperatorIndex = expression.indexOfLast { it in "+-×÷/*" }
                 val currentOperand = if (lastOperatorIndex >= 0) {
-                    expression.substring(lastOperatorIndex + 1)
-                } else expression
-                if (currentOperand.contains(".")) "" else "."
+                    expression.substring(lastOperatorIndex + 1).trim()
+                } else expression.trim()
+                if (currentOperand.isEmpty()) {
+                    "0."
+                } else if (currentOperand.contains(".")) {
+                    ""
+                } else {
+                    "."
+                }
             }
             "+", "-", "×", "÷" -> {
                 if (expression.isEmpty()) {
                     if (token == "-") "-" else ""
-                } else if (expression.last() in "+-×÷/*") {
-                    expression = expression.dropLast(1)
-                    token
                 } else {
-                    " $token "
+                    val trimmed = expression.trimEnd()
+                    if (trimmed.lastOrNull() in listOf('+', '-', '×', '÷', '/', '*')) {
+                        expression = trimmed.dropLast(1).trimEnd() + " $token "
+                        return
+                    } else {
+                        " $token "
+                    }
                 }
             }
-            else -> token
+            "0", "00" -> {
+                val lastOperatorIndex = expression.indexOfLast { it in "+-×÷/*" }
+                val currentOperand = if (lastOperatorIndex >= 0) {
+                    expression.substring(lastOperatorIndex + 1).trim()
+                } else expression.trim()
+                if (currentOperand == "0") {
+                    ""
+                } else {
+                    token
+                }
+            }
+            else -> {
+                // Digits 1-9
+                val lastOperatorIndex = expression.indexOfLast { it in "+-×÷/*" }
+                val currentOperand = if (lastOperatorIndex >= 0) {
+                    expression.substring(lastOperatorIndex + 1).trim()
+                } else expression.trim()
+                if (currentOperand == "0") {
+                    // Replace leading zero with the new digit
+                    if (lastOperatorIndex >= 0) {
+                        expression = expression.substring(0, lastOperatorIndex + 1) + " " + token
+                    } else {
+                        expression = token
+                    }
+                    return
+                } else {
+                    token
+                }
+            }
         }
         expression += sanitized
     }
@@ -233,11 +289,9 @@ fun CalculatorKeypad(
     }
 
     fun commitResult() {
-        val result = liveResult ?: expression.toBigDecimalOrNull()
-        if (result != null) {
-            onAmountCommitted(result)
-            onClose()
-        }
+        val result = liveResult ?: expression.toBigDecimalOrNull() ?: BigDecimal.ZERO
+        onAmountCommitted(result)
+        onClose()
     }
 
     Surface(
@@ -286,22 +340,44 @@ fun CalculatorKeypad(
                     }
                 }
 
-                IconButton(onClick = ::backspace) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.Backspace,
-                        contentDescription = "Backspace",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = ::backspace) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Backspace,
+                            contentDescription = "Backspace",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(
+                        onClick = ::commitResult,
+                        modifier = Modifier
+                            .padding(start = 4.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Done",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                 }
             }
 
             // Keypad Grid Rows
+            val hasPendingOp = liveResult != null || expression.trim().let {
+                it.endsWith("+") || it.endsWith("-") || it.endsWith("×") || it.endsWith("÷")
+            }
+            val confirmLabel = if (hasPendingOp) "=" else "✓"
+
             val rows = listOf(
                 listOf("C", "(", ")", "÷"),
                 listOf("7", "8", "9", "×"),
                 listOf("4", "5", "6", "-"),
                 listOf("1", "2", "3", "+"),
-                listOf("0", "00", ".", "=")
+                listOf("0", "00", ".", confirmLabel)
             )
 
             for (row in rows) {
@@ -310,11 +386,12 @@ fun CalculatorKeypad(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     for (btn in row) {
-                        val isOp = btn in listOf("÷", "×", "-", "+", "=")
+                        val isConfirm = btn == confirmLabel
+                        val isOp = btn in listOf("÷", "×", "-", "+")
                         val isAction = btn in listOf("C", "(", ")")
 
                         val colors = when {
-                            btn == "=" -> ButtonDefaults.buttonColors(
+                            isConfirm -> ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             )
@@ -335,8 +412,11 @@ fun CalculatorKeypad(
                         ElevatedButton(
                             onClick = {
                                 when (btn) {
-                                    "C" -> expression = ""
-                                    "=" -> commitResult()
+                                    "C" -> {
+                                        expression = ""
+                                        onAmountChanged(BigDecimal.ZERO)
+                                    }
+                                    confirmLabel -> commitResult()
                                     else -> appendToken(btn)
                                 }
                             },
@@ -347,13 +427,21 @@ fun CalculatorKeypad(
                             colors = colors,
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                         ) {
-                            Text(
-                                text = btn,
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = if (isOp || isAction) FontWeight.Bold else FontWeight.Medium
-                                ),
-                                textAlign = TextAlign.Center
-                            )
+                            if (btn == "✓") {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Done",
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Text(
+                                    text = btn,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = if (isOp || isAction || isConfirm) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }

@@ -248,8 +248,9 @@ fun ExpenseEditScreen(
     var amount by remember {
         mutableStateOf(initialData?.amount?.amountMajor?.abs() ?: BigDecimal.ZERO)
     }
+    val isInitialAmountZero = (initialData?.amount?.amountMajor?.compareTo(BigDecimal.ZERO) ?: 0) == 0
     var showCalculator by rememberSaveable {
-        mutableStateOf(false)
+        mutableStateOf(isInitialAmountZero)
     }
 
     // Category
@@ -631,9 +632,22 @@ fun ExpenseEditScreen(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Amount Row
+                    // Amount Row - Clickable to open/toggle calculator
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (showCalculator) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                                else MaterialTheme.colorScheme.surface
+                            )
+                            .border(
+                                width = if (showCalculator) 1.5.dp else 1.dp,
+                                color = if (showCalculator) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { showCalculator = !showCalculator }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -671,7 +685,7 @@ fun ExpenseEditScreen(
                             onClick = { showCalculator = !showCalculator },
                             modifier = Modifier
                                 .background(
-                                    if (showCalculator) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                    if (showCalculator) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                                     shape = CircleShape
                                 )
                         ) {
@@ -692,8 +706,14 @@ fun ExpenseEditScreen(
                             HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
                             CalculatorKeypad(
                                 initialAmount = amount,
+                                onAmountChanged = { liveAmount ->
+                                    amount = liveAmount
+                                },
                                 onAmountCommitted = { newAmount ->
                                     amount = newAmount
+                                    showCalculator = false
+                                },
+                                onClose = {
                                     showCalculator = false
                                 }
                             )
