@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,8 +66,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.totschnig.myexpenses.R
@@ -111,8 +115,11 @@ fun TagsScreen(
         focusRequester.requestFocus()
     }
 
-    var searchQuery by remember { mutableStateOf("") }
-    val trimmedQuery = searchQuery.trim()
+    var searchQuery by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(""))
+    }
+    val queryText = searchQuery.text
+    val trimmedQuery = queryText.trim()
     val exactMatch = tags.any { it.label.equals(trimmedQuery, ignoreCase = true) }
     val canAddTag = allowModifications && trimmedQuery.isNotBlank() && !exactMatch
 
@@ -120,14 +127,16 @@ fun TagsScreen(
     var tagToDelete by remember { mutableStateOf<Tag?>(null) }
 
     // Filter tags
-    val filteredTags = remember(tags, searchQuery) {
+    val filteredTags = remember(tags, queryText) {
         if (trimmedQuery.isEmpty()) tags
         else tags.filter { it.label.contains(trimmedQuery, ignoreCase = true) }
     }
 
     // Edit Tag Dialog
     tagToEdit?.let { tag ->
-        var editLabel by remember { mutableStateOf(tag.label) }
+        var editLabel by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+            mutableStateOf(TextFieldValue(tag.label, TextRange(tag.label.length)))
+        }
         var chosenColorInt by remember { mutableStateOf(tag.color) }
         var hasError by remember { mutableStateOf(false) }
 
@@ -140,7 +149,7 @@ fun TagsScreen(
                         value = editLabel,
                         onValueChange = {
                             editLabel = it
-                            if (it.isNotBlank()) hasError = false
+                            if (it.text.isNotBlank()) hasError = false
                         },
                         label = { Text("Tag Name *") },
                         isError = hasError,
@@ -148,6 +157,11 @@ fun TagsScreen(
                             { Text(stringResource(R.string.required), color = MaterialTheme.colorScheme.error) }
                         } else null,
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Words,
+                            autoCorrectEnabled = false,
+                            imeAction = ImeAction.Done
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -201,7 +215,7 @@ fun TagsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val trimmed = editLabel.trim()
+                    val trimmed = editLabel.text.trim()
                     if (trimmed.isEmpty()) {
                         hasError = true
                     } else {
@@ -328,8 +342,8 @@ fun TagsScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(end = 4.dp)
                     ) {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                        if (queryText.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = TextFieldValue("") }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
                         }
@@ -337,7 +351,7 @@ fun TagsScreen(
                             IconButton(
                                 onClick = {
                                     onAddTag(trimmedQuery)
-                                    searchQuery = ""
+                                    searchQuery = TextFieldValue("")
                                 }
                             ) {
                                 Icon(
@@ -350,12 +364,22 @@ fun TagsScreen(
                     }
                 },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = if (canAddTag) ImeAction.Done else ImeAction.Search),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Words,
+                    autoCorrectEnabled = false,
+                    imeAction = ImeAction.Search
+                ),
                 keyboardActions = KeyboardActions(
+                    onSearch = {
+                        if (canAddTag) {
+                            onAddTag(trimmedQuery)
+                            searchQuery = TextFieldValue("")
+                        }
+                    },
                     onDone = {
                         if (canAddTag) {
                             onAddTag(trimmedQuery)
-                            searchQuery = ""
+                            searchQuery = TextFieldValue("")
                         }
                     }
                 ),
@@ -372,7 +396,7 @@ fun TagsScreen(
                         .fillMaxWidth()
                         .clickable {
                             onAddTag(trimmedQuery)
-                            searchQuery = ""
+                            searchQuery = TextFieldValue("")
                         },
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
@@ -440,7 +464,7 @@ fun TagsScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         )
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "No tags matching \"$searchQuery\"" else "No tags yet",
+                            text = if (queryText.isNotEmpty()) "No tags matching \"$trimmedQuery\"" else "No tags yet",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
