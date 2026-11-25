@@ -12,3 +12,4 @@ extracted_backup/
 *.zip
 *.jks
 *.keystore
+!config/debug.keystore
