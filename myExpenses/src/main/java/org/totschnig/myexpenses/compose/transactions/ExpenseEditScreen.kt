@@ -227,11 +227,11 @@ fun ExpenseEditScreen(
     val context = LocalContext.current
 
     // Transaction Type
-    var selectedType by rememberSaveable {
+    var selectedType by rememberSaveable(initialData?.uuid) {
         mutableStateOf(
             when {
                 initialData?.isTransfer == true -> TransactionTypeOption.TRANSFER
-                initialData?.amount?.amountMajor?.signum() == 1 -> TransactionTypeOption.INCOME
+                initialData?.type == FLAG_INCOME || initialData?.amount?.amountMajor?.signum() == 1 -> TransactionTypeOption.INCOME
                 else -> TransactionTypeOption.EXPENSE
             }
         )
@@ -461,7 +461,7 @@ fun ExpenseEditScreen(
             pictureUri = initialData.pictureUri ?: initialData.allAttachments.firstOrNull()
             selectedType = when {
                 initialData.isTransfer -> TransactionTypeOption.TRANSFER
-                initialData.amount.amountMajor.signum() == 1 -> TransactionTypeOption.INCOME
+                initialData.type == FLAG_INCOME || initialData.amount.amountMajor.signum() == 1 -> TransactionTypeOption.INCOME
                 else -> TransactionTypeOption.EXPENSE
             }
         }
@@ -499,6 +499,7 @@ fun ExpenseEditScreen(
             accountId = selectedAccountId,
             date = fullDateTime,
             valueDate = date,
+            type = if (selectedType == TransactionTypeOption.INCOME) FLAG_INCOME else if (isTransfer) FLAG_NEUTRAL else FLAG_EXPENSE,
             party = if (payeeText.isNotBlank()) {
                 DisplayParty(
                     id = initialData?.party?.id,
@@ -704,16 +705,18 @@ fun ExpenseEditScreen(
                                     onClick = { showCalculator = !showCalculator },
                                     modifier = Modifier
                                         .size(36.dp)
-                                        .background(
-                                            if (showCalculator) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                            shape = CircleShape
+                                        .then(
+                                            if (showCalculator) Modifier.background(
+                                                MaterialTheme.colorScheme.primaryContainer,
+                                                shape = CircleShape
+                                            ) else Modifier
                                         )
                                 ) {
                                     Icon(
                                         Icons.Default.Calculate,
                                         contentDescription = "Calculator / Sum Numbers",
                                         modifier = Modifier.size(20.dp),
-                                        tint = if (showCalculator) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary
+                                        tint = if (showCalculator) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }

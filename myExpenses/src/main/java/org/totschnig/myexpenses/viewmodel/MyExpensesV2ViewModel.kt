@@ -774,6 +774,7 @@ open class MyExpensesV2ViewModel(
             accountId = defaultAccount.id,
             date = LocalDateTime.now(),
             valueDate = LocalDate.now(),
+            type = if (isIncome) FLAG_INCOME else if (isTransfer) FLAG_NEUTRAL else FLAG_EXPENSE,
             transferEditData = if (isTransfer) TransferEditData(
                 transferAccountId = targetAccount?.id ?: 0L
             ) else null

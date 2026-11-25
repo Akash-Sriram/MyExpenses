@@ -89,6 +89,7 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                             accountId = acc.id,
                             date = LocalDateTime.now(),
                             valueDate = LocalDate.now(),
+                            type = if (isIncome) FLAG_INCOME else if (operationType == TYPE_TRANSFER) org.totschnig.myexpenses.db2.FLAG_NEUTRAL else FLAG_EXPENSE,
                             transferEditData = if (operationType == TYPE_TRANSFER) TransferEditData() else null
                         )
                     } else null
@@ -105,7 +106,7 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                     ExpenseEditScreen(
                         initialData = editData,
                         accounts = targetAccounts,
-                        quickCategories = viewModel.getQuickCategories(if (isIncome || editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
+                        quickCategories = viewModel.getQuickCategories(if (isIncome || editData.type == FLAG_INCOME || editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
                         allCategories = viewModel.getAllCategories(),
                         allTags = viewModel.getAllTags(),
                         onSave = { savedData ->

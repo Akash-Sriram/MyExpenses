@@ -286,7 +286,7 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                             ExpenseEditScreen(
                                 initialData = editData,
                                 accounts = accounts.filter { !it.isPortfolio && !it.sealed }.map { it.toAccount() },
-                                quickCategories = viewModel.getQuickCategories(if (editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
+                                quickCategories = viewModel.getQuickCategories(if (editData.type == FLAG_INCOME || editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
                                 allCategories = viewModel.getAllCategories(),
                                 allTags = viewModel.getAllTags(),
                                 onSave = { savedData ->
