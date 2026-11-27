@@ -1989,10 +1989,11 @@ open class MyExpensesV2ViewModel(
         accountId: Long,
         totalDue: Long,
         minDue: Long,
-        statementDay: Int,
-        dueDay: Int
+        unbilled: Long = 0L,
+        statementDate: Long? = null,
+        dueDate: Long? = null
     ) = withContext(coroutineDispatcher) {
-        repositoryCreditCard.updateCreditCardStatement(accountId, totalDue, minDue, statementDay, dueDay)
+        repositoryCreditCard.updateCreditCardStatement(accountId, totalDue, minDue, unbilled, statementDate, dueDate)
     }
 
     suspend fun saveCreditCardDetail(detail: CreditCardDetail) = withContext(coroutineDispatcher) {
@@ -2000,13 +2001,19 @@ open class MyExpensesV2ViewModel(
     }
 
     suspend fun loadTransactionsForReconcile(accountId: Long): List<Transaction2> = withContext(coroutineDispatcher) {
-        val proj = Transaction2.projection(grouping = Grouping.NONE, extended = true, prefHandler = prefHandler)
+        val proj = Transaction2.projection(
+            isAggregate = (accountId <= 0),
+            grouping = Grouping.NONE,
+            prefHandler = prefHandler,
+            extended = true
+        )
         val selection = if (accountId > 0) "$KEY_ACCOUNTID = ?" else null
         val selectionArgs = if (accountId > 0) arrayOf(accountId.toString()) else null
         val sortOrder = "$KEY_DATE DESC"
 
         contentResolver.query(
-            TransactionProvider.TRANSACTIONS_URI,
+            TransactionProvider.EXTENDED_URI.buildUpon()
+                .appendQueryParameter(QUERY_PARAMETER_SEARCH, "1").build(),
             proj,
             selection,
             selectionArgs,
@@ -2034,15 +2041,17 @@ open class MyExpensesV2ViewModel(
             val amountMinor = Money.convertBigDecimal(amountMajor, account.currencyUnit.fractionDigits)
             val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
 
-            val dateEpoch = statementTx.date.atStartOfDay(ZoneId.systemDefault()).toEpochSecond()
+            val dateLocalDateTime = statementTx.date.atStartOfDay()
 
             val resolvedPartyId = repository.requireRootParty(statementTx.payeeOrRemarks)
             val party = DisplayParty(resolvedPartyId, statementTx.payeeOrRemarks)
 
             val txData = TransactionEditData(
+                uuid = org.totschnig.myexpenses.model.generateUuid(),
                 accountId = account.id,
                 amount = Money(account.currencyUnit, signedAmountMinor),
-                date = dateEpoch,
+                date = dateLocalDateTime,
+                valueDate = statementTx.date,
                 party = party,
                 comment = statementTx.payeeOrRemarks,
                 referenceNumber = statementTx.utr ?: statementTx.ref
