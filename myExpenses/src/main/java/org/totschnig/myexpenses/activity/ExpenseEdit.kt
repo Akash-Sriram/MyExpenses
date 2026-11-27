@@ -109,6 +109,7 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                         quickCategories = viewModel.getQuickCategories(if (isIncome || editData.type == FLAG_INCOME || editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
                         allCategories = viewModel.getAllCategories(),
                         allTags = viewModel.getAllTags(),
+                        allPayees = viewModel.getAllPayees(),
                         onSave = { savedData ->
                             viewModel.saveTransaction(savedData)
                             finish()
@@ -118,6 +119,9 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                         },
                         onAddTag = { label ->
                             viewModel.createTag(label)
+                        },
+                        onPayeeSelected = { payeeId ->
+                            viewModel.getAutofillForPayee(payeeId)
                         }
                     )
                 }

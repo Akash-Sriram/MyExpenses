@@ -876,6 +876,51 @@ open class MyExpensesV2ViewModel(
         return Tag(id, trimmed)
     }
 
+    fun getAllPayees(): List<DisplayParty> {
+        return try {
+            contentResolver.query(
+                TransactionProvider.PAYEES_URI,
+                arrayOf(KEY_ROWID, KEY_PAYEE_NAME, KEY_IBAN),
+                null,
+                null,
+                "$KEY_PAYEE_NAME COLLATE LOCALIZED ASC"
+            )?.use { cursor ->
+                val list = mutableListOf<DisplayParty>()
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(0)
+                    val name = cursor.getString(1)
+                    val iban = if (!cursor.isNull(2)) cursor.getString(2) else null
+                    if (!name.isNullOrBlank()) {
+                        list.add(DisplayParty(id, name, iban = iban))
+                    }
+                }
+                list
+            } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getAutofillForPayee(payeeId: Long): Long? {
+        return try {
+            contentResolver.query(
+                android.content.ContentUris.withAppendedId(TransactionProvider.AUTOFILL_URI, payeeId),
+                arrayOf(KEY_CATID),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                    val catId = cursor.getLong(0)
+                    if (catId != 0L) catId else null
+                } else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+
     fun saveTransaction(data: TransactionEditData) {
         viewModelScope.launch(coroutineDispatcher) {
             val resolvedParty = data.party?.let { party ->

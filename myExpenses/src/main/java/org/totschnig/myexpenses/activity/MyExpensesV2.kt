@@ -289,6 +289,7 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                 quickCategories = viewModel.getQuickCategories(if (editData.type == FLAG_INCOME || editData.amount.amountMajor.signum() == 1) FLAG_INCOME else FLAG_EXPENSE),
                                 allCategories = viewModel.getAllCategories(),
                                 allTags = viewModel.getAllTags(),
+                                allPayees = viewModel.getAllPayees(),
                                 onSave = { savedData ->
                                     viewModel.saveTransaction(savedData)
                                     viewModel.clearTransactionToEdit()
@@ -298,6 +299,9 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                 },
                                 onAddTag = { label ->
                                     viewModel.createTag(label)
+                                },
+                                onPayeeSelected = { payeeId ->
+                                    viewModel.getAutofillForPayee(payeeId)
                                 }
                             )
                         }

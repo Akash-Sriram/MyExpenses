@@ -105,6 +105,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
@@ -216,10 +221,12 @@ fun ExpenseEditScreen(
     quickCategories: List<QuickCategory> = emptyList(),
     allCategories: List<Category> = emptyList(),
     allTags: List<Tag> = emptyList(),
+    allPayees: List<DisplayParty> = emptyList(),
     onSave: (TransactionEditData) -> Unit,
     onClose: () -> Unit,
     onOpenCategoryPicker: () -> Unit = {},
-    onAddTag: (String) -> Unit = {},
+    onAddTag: (String) -> Tag? = { null },
+    onPayeeSelected: ((Long) -> Long?)? = null,
     modifier: Modifier = Modifier
 ) {
     val currencyFormatter = LocalCurrencyFormatter.current
@@ -343,6 +350,19 @@ fun ExpenseEditScreen(
         mutableStateOf(initialData?.party?.iban ?: "")
     }
     var showUpiFieldManual by rememberSaveable { mutableStateOf(false) }
+    var payeeMenuExpanded by remember { mutableStateOf(false) }
+
+    val filteredPayees = remember(payeeText, allPayees) {
+        val query = payeeText.trim().lowercase()
+        if (query.isEmpty()) {
+            allPayees.take(6)
+        } else {
+            allPayees.filter { party ->
+                party.name.lowercase().contains(query) ||
+                        (party.iban?.lowercase()?.contains(query) == true)
+            }.take(8)
+        }
+    }
 
     // Date & Time
     var date by remember {
@@ -353,6 +373,9 @@ fun ExpenseEditScreen(
     }
 
     // Tags
+    var currentAllTags by remember(allTags) {
+        mutableStateOf(allTags)
+    }
     var selectedTags by remember {
         mutableStateOf(initialData?.tags ?: emptyList())
     }
@@ -592,8 +615,8 @@ fun ExpenseEditScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
             // 1. Transaction Type Toggle
@@ -641,8 +664,8 @@ fun ExpenseEditScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Amount Field - Default System Number Pad Keyboard with Calculator Tool
                     OutlinedTextField(
@@ -767,10 +790,11 @@ fun ExpenseEditScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                                 .clickable { showAccountMenu = true }
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -830,10 +854,11 @@ fun ExpenseEditScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                                     .clickable { showTransferAccountMenu = true }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -888,24 +913,99 @@ fun ExpenseEditScreen(
                         }
                     }
 
-                    // Payee / Payer Field
+                    // Payee / Payer Field with Autocomplete
                     if (selectedType != TransactionTypeOption.TRANSFER) {
-                        OutlinedTextField(
-                            value = payeeText,
-                            onValueChange = { payeeText = it },
-                            label = {
-                                Text(
-                                    if (selectedType == TransactionTypeOption.INCOME) stringResource(R.string.payer)
-                                    else stringResource(R.string.payee)
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(20.dp))
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                        ExposedDropdownMenuBox(
+                            expanded = payeeMenuExpanded && filteredPayees.isNotEmpty(),
+                            onExpandedChange = { payeeMenuExpanded = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = payeeText,
+                                onValueChange = {
+                                    payeeText = it
+                                    payeeMenuExpanded = it.isNotBlank()
+                                },
+                                label = {
+                                    Text(
+                                        if (selectedType == TransactionTypeOption.INCOME) stringResource(R.string.payer)
+                                        else stringResource(R.string.payee)
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(20.dp))
+                                },
+                                trailingIcon = {
+                                    if (payeeText.isNotBlank()) {
+                                        IconButton(onClick = {
+                                            payeeText = ""
+                                            payeeMenuExpanded = false
+                                        }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, enabled = true)
+                                    .fillMaxWidth(),
+                                singleLine = true
+                            )
+
+                            ExposedDropdownMenu(
+                                expanded = payeeMenuExpanded && filteredPayees.isNotEmpty(),
+                                onDismissRequest = { payeeMenuExpanded = false },
+                                modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            ) {
+                                filteredPayees.forEach { party ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = party.name,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                                )
+                                                if (!party.iban.isNullOrBlank()) {
+                                                    Text(
+                                                        text = party.iban,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.History,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        },
+                                        onClick = {
+                                            payeeText = party.name
+                                            if (!party.iban.isNullOrBlank()) {
+                                                upiId = party.iban
+                                            }
+                                            payeeMenuExpanded = false
+                                            party.id?.let { pid ->
+                                                if (selectedCategoryId == null || selectedCategoryId == 0L) {
+                                                    val suggestedCatId = onPayeeSelected?.invoke(pid)
+                                                    if (suggestedCatId != null && suggestedCatId != 0L) {
+                                                        val cat = allCategories.flatMap { it.flatten() }.find { it.id == suggestedCatId }
+                                                        if (cat != null) {
+                                                            selectedCategoryId = cat.id
+                                                            selectedCategoryPath = cat.path
+                                                            selectedCategoryIcon = cat.icon
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
 
                         // UPI ID / VPA Field
                         val isUpiMethod = availableMethods.find { it.id == selectedMethodId }?.label?.contains("UPI", ignoreCase = true) == true
@@ -930,27 +1030,27 @@ fun ExpenseEditScreen(
                                     }
                                 },
                                 placeholder = { Text("e.g. merchant@upi or number@bank") },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true
                             )
                         } else if (payeeText.isNotBlank()) {
-                            TextButton(
-                                onClick = { showUpiFieldManual = true },
-                                modifier = Modifier.align(Alignment.End),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
                             ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_upi_rupee),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "+ Add UPI ID",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
+                                AssistChip(
+                                    onClick = { showUpiFieldManual = true },
+                                    label = { Text("Add UPI ID / VPA", style = MaterialTheme.typography.labelSmall) },
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_upi_rupee),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
                                 )
                             }
                         }
@@ -1127,21 +1227,22 @@ fun ExpenseEditScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Date & Time Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                                 .clickable { showDatePicker = true }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -1158,10 +1259,11 @@ fun ExpenseEditScreen(
                         Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surface)
+                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                                 .clickable { showTimePicker = true }
-                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -1183,10 +1285,11 @@ fun ExpenseEditScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surface)
+                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                                     .clickable { showMethodMenu = true }
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -1246,7 +1349,7 @@ fun ExpenseEditScreen(
                             leadingIcon = {
                                 Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null, modifier = Modifier.size(18.dp))
                             },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -1302,7 +1405,7 @@ fun ExpenseEditScreen(
                         leadingIcon = {
                             Icon(Icons.AutoMirrored.Filled.Notes, contentDescription = null, modifier = Modifier.size(18.dp))
                         },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 1,
                         maxLines = 3
@@ -1383,10 +1486,10 @@ fun ExpenseEditScreen(
             ) {
                 TagsScreen(
                     action = ManageAction.SELECT_MAPPING,
-                    tags = allTags,
+                    tags = currentAllTags,
                     selectedTagIds = selectedTags.map { it.id }.toSet(),
                     onToggleSelectTag = { tagId ->
-                        val tag = allTags.find { it.id == tagId }
+                        val tag = currentAllTags.find { it.id == tagId }
                         if (tag != null) {
                             selectedTags = if (selectedTags.any { it.id == tagId }) {
                                 selectedTags.filter { it.id != tagId }
@@ -1395,7 +1498,17 @@ fun ExpenseEditScreen(
                             }
                         }
                     },
-                    onAddTag = onAddTag,
+                    onAddTag = { label ->
+                        val newTag = onAddTag(label)
+                        if (newTag != null) {
+                            if (currentAllTags.none { it.id == newTag.id }) {
+                                currentAllTags = currentAllTags + newTag
+                            }
+                            if (selectedTags.none { it.id == newTag.id }) {
+                                selectedTags = selectedTags + newTag
+                            }
+                        }
+                    },
                     onUpdateTag = { _, _, _ -> },
                     onDeleteTag = {},
                     onConfirm = { showTagSheet = false },

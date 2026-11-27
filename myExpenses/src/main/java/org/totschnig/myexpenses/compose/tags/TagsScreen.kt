@@ -110,16 +110,8 @@ fun TagsScreen(
     val allowSelection = action != Action.MANAGE
     val allowModifications = action != Action.SELECT_FILTER
 
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    var searchQuery by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(""))
-    }
-    val queryText = searchQuery.text
-    val trimmedQuery = queryText.trim()
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val trimmedQuery = searchQuery.trim()
     val exactMatch = tags.any { it.label.equals(trimmedQuery, ignoreCase = true) }
     val canAddTag = allowModifications && trimmedQuery.isNotBlank() && !exactMatch
 
@@ -127,7 +119,7 @@ fun TagsScreen(
     var tagToDelete by remember { mutableStateOf<Tag?>(null) }
 
     // Filter tags
-    val filteredTags = remember(tags, queryText) {
+    val filteredTags = remember(tags, searchQuery) {
         if (trimmedQuery.isEmpty()) tags
         else tags.filter { it.label.contains(trimmedQuery, ignoreCase = true) }
     }
@@ -342,16 +334,17 @@ fun TagsScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(end = 4.dp)
                     ) {
-                        if (queryText.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = TextFieldValue("") }) {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear")
                             }
                         }
                         if (canAddTag) {
                             IconButton(
                                 onClick = {
-                                    onAddTag(trimmedQuery)
-                                    searchQuery = TextFieldValue("")
+                                    val toAdd = trimmedQuery
+                                    searchQuery = ""
+                                    onAddTag(toAdd)
                                 }
                             ) {
                                 Icon(
@@ -365,28 +358,28 @@ fun TagsScreen(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
+                    capitalization = KeyboardCapitalization.None,
                     autoCorrectEnabled = false,
                     imeAction = ImeAction.Search
                 ),
                 keyboardActions = KeyboardActions(
                     onSearch = {
                         if (canAddTag) {
-                            onAddTag(trimmedQuery)
-                            searchQuery = TextFieldValue("")
+                            val toAdd = trimmedQuery
+                            searchQuery = ""
+                            onAddTag(toAdd)
                         }
                     },
                     onDone = {
                         if (canAddTag) {
-                            onAddTag(trimmedQuery)
-                            searchQuery = TextFieldValue("")
+                            val toAdd = trimmedQuery
+                            searchQuery = ""
+                            onAddTag(toAdd)
                         }
                     }
                 ),
                 shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
+                modifier = Modifier.fillMaxWidth()
             )
 
             // Inline Create Tag Action (when typing a new tag that doesn't already exist)
@@ -395,8 +388,9 @@ fun TagsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            onAddTag(trimmedQuery)
-                            searchQuery = TextFieldValue("")
+                            val toAdd = trimmedQuery
+                            searchQuery = ""
+                            onAddTag(toAdd)
                         },
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
@@ -464,7 +458,7 @@ fun TagsScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                         )
                         Text(
-                            text = if (queryText.isNotEmpty()) "No tags matching \"$trimmedQuery\"" else "No tags yet",
+                            text = if (searchQuery.isNotEmpty()) "No tags matching \"$trimmedQuery\"" else "No tags yet",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
