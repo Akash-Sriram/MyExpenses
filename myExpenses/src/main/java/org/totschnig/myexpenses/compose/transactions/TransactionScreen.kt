@@ -167,6 +167,14 @@ import org.totschnig.myexpenses.viewmodel.data.PeriodBalanceSummary
 import timber.log.Timber
 import java.math.RoundingMode
 import kotlin.math.absoluteValue
+import androidx.compose.material.icons.filled.FindInPage
+import androidx.compose.material3.OutlinedButton
+import kotlinx.coroutines.launch
+import org.totschnig.myexpenses.compose.accounts.CreditCardCycleCard
+import org.totschnig.myexpenses.compose.reconcile.StatementReconciliationDialog
+import org.totschnig.myexpenses.model.PREDEFINED_NAME_BANK
+import org.totschnig.myexpenses.model.PREDEFINED_NAME_CCARD
+import org.totschnig.myexpenses.viewmodel.data.Transaction2
 
 enum class FabStyle {
     Standard, Compact
@@ -238,6 +246,14 @@ fun TransactionScreen(
     var isSearchOpen by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    var showReconcileDialog by rememberSaveable { mutableStateOf(false) }
+    var reconcileTxList by remember { mutableStateOf<List<Transaction2>>(emptyList()) }
+
+    LaunchedEffect(showReconcileDialog, currentAccount.id) {
+        if (showReconcileDialog && currentAccount is FullAccount) {
+            reconcileTxList = viewModel.loadTransactionsForReconcile(currentAccount.id)
+        }
+    }
 
     if (isSearchOpen) {
         BackHandler {
@@ -488,7 +504,9 @@ fun TransactionScreen(
                                         bankIcon = bankIcon,
                                         onAccountEvent = onAccountEvent,
                                         onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) },
-                                        hideBalances = hideBalances
+                                        hideBalances = hideBalances,
+                                        viewModel = viewModel,
+                                        onOpenReconcile = { showReconcileDialog = true }
                                     )
                                 },
                                 actions = {
@@ -717,6 +735,24 @@ fun TransactionScreen(
             }
         }
     }
+
+    if (showReconcileDialog && currentAccount is FullAccount) {
+        val fullAcc = currentAccount as FullAccount
+        StatementReconciliationDialog(
+            accountLabel = fullAcc.label,
+            currentBalance = fullAcc.currentBalance,
+            currencyUnit = fullAcc.currencyUnit,
+            appTransactions = reconcileTxList,
+            onDismiss = { showReconcileDialog = false },
+            onAddMissingTransaction = { missingTx ->
+                viewModel.saveStatementTransaction(missingTx, fullAcc)
+                coroutineScope.launch {
+                    reconcileTxList = viewModel.loadTransactionsForReconcile(fullAcc.id)
+                }
+            }
+        )
+    }
+
     showTradeScreen?.let { tradeAction ->
         TradeScreen(
             onDismiss = { showTradeScreen = null },
@@ -780,6 +816,8 @@ private fun BalanceHeader(
     onAccountEvent: AccountEventHandler,
     onLoadPeriodSummary: (suspend (BaseAccount, BalancePeriod) -> PeriodBalanceSummary)? = null,
     hideBalances: Boolean = false,
+    viewModel: MyExpensesV2ViewModel? = null,
+    onOpenReconcile: (() -> Unit)? = null
 ) {
     var isSummaryPopupVisible by rememberSaveable { mutableStateOf(false) }
     var selectedPeriod by rememberSaveable { mutableStateOf(BalancePeriod.SALARY_CYCLE) }
@@ -894,6 +932,44 @@ private fun BalanceHeader(
                                     selectedPeriod = selectedPeriod,
                                     onPeriodSelected = { selectedPeriod = it }
                                 )
+
+                                if (currentAccount is FullAccount) {
+                                    val isCcard = currentAccount.type.name == PREDEFINED_NAME_CCARD
+                                    val isBank = currentAccount.type.name == PREDEFINED_NAME_BANK
+
+                                    if (isCcard && viewModel != null) {
+                                        val ccDetail by viewModel.getCreditCardDetail(currentAccount.id)
+                                            .collectAsState(initial = null)
+                                        Spacer(Modifier.height(12.dp))
+                                        CreditCardCycleCard(
+                                            accountLabel = currentAccount.label,
+                                            currentBalancePaise = currentAccount.currentBalance,
+                                            currencyUnit = currentAccount.currencyUnit,
+                                            detail = ccDetail
+                                        )
+                                    } else if (isBank && onOpenReconcile != null) {
+                                        Spacer(Modifier.height(12.dp))
+                                        OutlinedButton(
+                                            onClick = {
+                                                isSummaryPopupVisible = false
+                                                onOpenReconcile()
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.FindInPage,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                "Verify Balance & Reconcile Statement",
+                                                style = MaterialTheme.typography.labelMedium
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

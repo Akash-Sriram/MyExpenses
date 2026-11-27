@@ -17,7 +17,10 @@ data class UpiReceiptData(
     val accountOrBankHint: String? = null,
     val paymentMethodHint: String = "UPI",
     val isExpense: Boolean = true,
-    val rawText: String? = null
+    val rawText: String? = null,
+    val isTransfer: Boolean = false,
+    val targetAccountHint: String? = null,
+    val suggestedTags: List<String> = emptyList()
 ) : Parcelable {
     val isIncome: Boolean
         get() = !isExpense

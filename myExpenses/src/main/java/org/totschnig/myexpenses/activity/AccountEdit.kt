@@ -161,6 +161,7 @@ class AccountEdit : ProtectedFragmentActivity(), OnDialogResultListener {
         }
 
         var currentColor by remember { mutableIntStateOf(account.color) }
+        val ccDetail by viewModel.loadCreditCardDetail(account.id).observeAsState()
 
         AccountEditScreen(
             isNewAccount = isNew,
@@ -173,6 +174,8 @@ class AccountEdit : ProtectedFragmentActivity(), OnDialogResultListener {
             initialColor = currentColor,
             initialCriterion = initialCriterionStr,
             initialIsCriterionNegative = initialCriterionNegative,
+            initialStatementDay = ccDetail?.statementDayOfMonth ?: 15,
+            initialDueDay = ccDetail?.dueDayOfMonth ?: 5,
             initialExchangeRate = initialExchangeRateStr,
             initialExcludeFromTotals = account.excludeFromTotals,
             initialDynamicExchangeRates = account.dynamicExchangeRates,
@@ -181,6 +184,9 @@ class AccountEdit : ProtectedFragmentActivity(), OnDialogResultListener {
             homeCurrency = homeCurrency,
             currencyContextLookup = { code -> currencyContext[code] },
             tags = tags,
+            onSaveCreditCardCycle = { limitPaise, sDay, dDay ->
+                viewModel.saveCreditCardCycle(account.id, limitPaise, sDay, dDay)
+            },
             onSelectTags = {
                 val intent = Intent(this, ManageTags::class.java).apply {
                     forwardDataEntryFromWidget(this)

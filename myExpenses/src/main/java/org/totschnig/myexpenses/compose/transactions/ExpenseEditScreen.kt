@@ -1127,6 +1127,27 @@ fun ExpenseEditScreen(
                                                 upiId = party.iban
                                             }
                                             payeeMenuExpanded = false
+
+                                            val isCardTransfer = party.name.contains("BIL*INFT*", ignoreCase = true) ||
+                                                    party.name.contains("5007") ||
+                                                    party.name.contains("Coral Credit Card", ignoreCase = true) ||
+                                                    (party.name.contains("Credit Card", ignoreCase = true) && party.name.contains("Payment", ignoreCase = true))
+
+                                            if (isCardTransfer) {
+                                                selectedType = TransactionTypeOption.TRANSFER
+                                                val targetAcc = accounts.find {
+                                                    it.label.contains("Coral", ignoreCase = true) ||
+                                                    it.label.contains("Credit Card", ignoreCase = true)
+                                                }
+                                                if (targetAcc != null) {
+                                                    transferAccountId = targetAcc.id
+                                                }
+                                                val ccTag = allTags.find { it.name.equals("credit card", ignoreCase = true) }
+                                                if (ccTag != null && ccTag !in selectedTags) {
+                                                    selectedTags = selectedTags + ccTag
+                                                }
+                                            }
+
                                             party.id?.let { pid ->
                                                 if (selectedCategoryId == null || selectedCategoryId == 0L) {
                                                     val suggestedCatId = onPayeeSelected?.invoke(pid)

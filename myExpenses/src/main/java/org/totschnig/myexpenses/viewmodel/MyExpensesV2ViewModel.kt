@@ -15,6 +15,8 @@ import org.totschnig.myexpenses.provider.KEY_DESCRIPTION
 import org.totschnig.myexpenses.provider.KEY_IBAN
 import org.totschnig.myexpenses.ui.DisplayParty
 import org.totschnig.myexpenses.viewmodel.data.Category
+import org.totschnig.myexpenses.domain.loan.CreditCardDetail
+import org.totschnig.myexpenses.reconcile.StatementTransaction
 import androidx.annotation.OpenForTesting
 import androidx.annotation.StringRes
 import androidx.datastore.preferences.core.edit
@@ -1978,4 +1980,74 @@ open class MyExpensesV2ViewModel(
         val startLabel: String,
         val endLabel: String
     )
+
+    fun getCreditCardDetail(accountId: Long): kotlinx.coroutines.flow.Flow<CreditCardDetail?> {
+        return repositoryCreditCard.getCreditCardDetails(accountId)
+    }
+
+    suspend fun updateCreditCardStatement(
+        accountId: Long,
+        totalDue: Long,
+        minDue: Long,
+        statementDay: Int,
+        dueDay: Int
+    ) = withContext(coroutineDispatcher) {
+        repositoryCreditCard.updateCreditCardStatement(accountId, totalDue, minDue, statementDay, dueDay)
+    }
+
+    suspend fun saveCreditCardDetail(detail: CreditCardDetail) = withContext(coroutineDispatcher) {
+        repositoryCreditCard.saveCreditCardDetail(detail)
+    }
+
+    suspend fun loadTransactionsForReconcile(accountId: Long): List<Transaction2> = withContext(coroutineDispatcher) {
+        val proj = Transaction2.projection(grouping = Grouping.NONE, extended = true, prefHandler = prefHandler)
+        val selection = if (accountId > 0) "$KEY_ACCOUNTID = ?" else null
+        val selectionArgs = if (accountId > 0) arrayOf(accountId.toString()) else null
+        val sortOrder = "$KEY_DATE DESC"
+
+        contentResolver.query(
+            TransactionProvider.TRANSACTIONS_URI,
+            proj,
+            selection,
+            selectionArgs,
+            sortOrder
+        )?.use { cursor ->
+            val list = mutableListOf<Transaction2>()
+            while (cursor.moveToNext()) {
+                list.add(
+                    Transaction2.fromCursor(
+                        currencyContext = currencyContext,
+                        cursor = cursor,
+                        tags = tags.value,
+                        grouping = Grouping.NONE
+                    )
+                )
+            }
+            list
+        } ?: emptyList()
+    }
+
+    fun saveStatementTransaction(statementTx: StatementTransaction, account: FullAccount) {
+        viewModelScope.launch(coroutineDispatcher) {
+            val isDeposit = statementTx.deposit > BigDecimal.ZERO
+            val amountMajor = if (isDeposit) statementTx.deposit else statementTx.withdrawal
+            val amountMinor = Money.convertBigDecimal(amountMajor, account.currencyUnit.fractionDigits)
+            val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
+
+            val dateEpoch = statementTx.date.atStartOfDay(ZoneId.systemDefault()).toEpochSecond()
+
+            val resolvedPartyId = repository.requireRootParty(statementTx.payeeOrRemarks)
+            val party = DisplayParty(resolvedPartyId, statementTx.payeeOrRemarks)
+
+            val txData = TransactionEditData(
+                accountId = account.id,
+                amount = Money(account.currencyUnit, signedAmountMinor),
+                date = dateEpoch,
+                party = party,
+                comment = statementTx.payeeOrRemarks,
+                referenceNumber = statementTx.utr ?: statementTx.ref
+            )
+            saveTransaction(txData)
+        }
+    }
 }

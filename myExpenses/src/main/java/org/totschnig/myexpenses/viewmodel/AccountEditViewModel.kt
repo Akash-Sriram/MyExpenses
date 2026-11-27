@@ -5,8 +5,10 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.liveData
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.db2.*
+import org.totschnig.myexpenses.domain.loan.CreditCardDetail
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.model2.Account
 
@@ -90,5 +92,25 @@ class AccountEditViewModel(application: Application, savedStateHandle: SavedStat
             currencyUnit?.let { repository.storeCustomFractionDigits(it) }
             account.id to account.uuid!!
         })
+    }
+
+    fun loadCreditCardDetail(accountId: Long): LiveData<CreditCardDetail?> = liveData(context = coroutineContext()) {
+        repositoryCreditCard.getCreditCardDetails(accountId).collect { emit(it) }
+    }
+
+    fun saveCreditCardCycle(accountId: Long, limitPaise: Long, statementDay: Int, dueDay: Int) {
+        viewModelScope.launch(coroutineContext()) {
+            val existing = repositoryCreditCard.getCreditCardDetails(accountId).firstOrNull()
+            val detail = CreditCardDetail(
+                id = existing?.id ?: 0L,
+                accountId = accountId,
+                creditLimit = limitPaise,
+                statementDayOfMonth = statementDay,
+                dueDayOfMonth = dueDay,
+                totalDueAmount = existing?.totalDueAmount ?: 0L,
+                minimumDueAmount = existing?.minimumDueAmount ?: 0L
+            )
+            repositoryCreditCard.saveCreditCardDetail(detail)
+        }
     }
 }

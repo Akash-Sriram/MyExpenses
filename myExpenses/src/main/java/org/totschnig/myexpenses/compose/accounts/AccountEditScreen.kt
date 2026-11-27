@@ -85,6 +85,7 @@ import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.activity.getAccountTypeIcon
 import org.totschnig.myexpenses.model.AccountType
 import org.totschnig.myexpenses.model.CurrencyUnit
+import org.totschnig.myexpenses.model.PREDEFINED_NAME_CCARD
 import org.totschnig.myexpenses.model2.Account
 import org.totschnig.myexpenses.viewmodel.data.Currency
 import org.totschnig.myexpenses.viewmodel.data.Tag
@@ -121,6 +122,8 @@ fun AccountEditScreen(
     initialExchangeRate: String = "1.0",
     initialExcludeFromTotals: Boolean = false,
     initialDynamicExchangeRates: Boolean = false,
+    initialStatementDay: Int = 15,
+    initialDueDay: Int = 5,
     availableCurrencies: List<Currency>,
     availableAccountTypes: List<AccountType>,
     homeCurrency: CurrencyUnit,
@@ -129,6 +132,7 @@ fun AccountEditScreen(
     onSelectTags: () -> Unit,
     onRemoveTag: (Tag) -> Unit,
     onColorPaletteRequested: () -> Unit,
+    onSaveCreditCardCycle: ((limitPaise: Long, statementDay: Int, dueDay: Int) -> Unit)? = null,
     onSave: (
         label: String,
         description: String,
@@ -152,7 +156,9 @@ fun AccountEditScreen(
     var selectedAccountType by remember { mutableStateOf(initialAccountType) }
     var selectedColor by remember { mutableIntStateOf(initialColor) }
     var criterionStr by remember { mutableStateOf(initialCriterion) }
-    var isCriterionNegative by remember { mutableStateOf(initialIsCriterionNegative) }
+    var isCriterionNegative by remember { mutableStateOf(initialIsCriterionNegative || selectedAccountType.name == PREDEFINED_NAME_CCARD) }
+    var statementDayStr by remember { mutableStateOf(initialStatementDay.toString()) }
+    var dueDayStr by remember { mutableStateOf(initialDueDay.toString()) }
     var exchangeRateStr by remember { mutableStateOf(initialExchangeRate) }
     var excludeFromTotals by remember { mutableStateOf(initialExcludeFromTotals) }
     var dynamicExchangeRates by remember { mutableStateOf(initialDynamicExchangeRates) }
@@ -175,7 +181,8 @@ fun AccountEditScreen(
             selectedColor != initialColor ||
             criterionStr != initialCriterion ||
             isCriterionNegative != initialIsCriterionNegative ||
-            excludeFromTotals != initialExcludeFromTotals
+            excludeFromTotals != initialExcludeFromTotals ||
+            (selectedAccountType.name == PREDEFINED_NAME_CCARD && (statementDayStr != initialStatementDay.toString() || dueDayStr != initialDueDay.toString()))
 
     fun handleBack() {
         if (isDirty) {
@@ -215,6 +222,13 @@ fun AccountEditScreen(
                 1.0
             }
         } else 1.0
+
+        if (selectedAccountType.name == PREDEFINED_NAME_CCARD) {
+            val limitPaise = (parsedCriterion?.abs()?.movePointRight(currentCurrencyUnit.fractionDigits)?.toLong()) ?: 0L
+            val sDay = statementDayStr.toIntOrNull() ?: 15
+            val dDay = dueDayStr.toIntOrNull() ?: 5
+            onSaveCreditCardCycle?.invoke(limitPaise, sDay, dDay)
+        }
 
         onSave(
             trimmedLabel,
@@ -696,12 +710,38 @@ fun AccountEditScreen(
                     OutlinedTextField(
                         value = criterionStr,
                         onValueChange = { criterionStr = it },
-                        placeholder = { Text("Optional threshold") },
+                        placeholder = { Text(if (selectedAccountType.name == PREDEFINED_NAME_CCARD) "e.g. 50000" else "Optional threshold") },
                         prefix = { Text(currentCurrencyUnit.symbol + " ") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    if (selectedAccountType.name == PREDEFINED_NAME_CCARD) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = statementDayStr,
+                                onValueChange = { statementDayStr = it.filter { ch -> ch.isDigit() }.take(2) },
+                                label = { Text("Statement Day") },
+                                suffix = { Text("th") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = dueDayStr,
+                                onValueChange = { dueDayStr = it.filter { ch -> ch.isDigit() }.take(2) },
+                                label = { Text("Payment Due Day") },
+                                suffix = { Text("th") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
                 }
             }
 

@@ -183,6 +183,20 @@ object UpiReceiptParser {
         val isIncome = containsRefundOrIncome(joined) || isRecipientMe
         val isExpense = !isIncome
 
+        val isCardTransfer = joined.contains("BIL*INFT*", ignoreCase = true) ||
+                             joined.contains("BIL/INFT", ignoreCase = true) ||
+                             joined.contains("5007") ||
+                             (joined.contains("credit card", ignoreCase = true) && (joined.contains("bill", ignoreCase = true) || joined.contains("payment", ignoreCase = true)))
+
+        val targetAccountHint = when {
+            joined.contains("5007") || (isCardTransfer && !joined.contains("Amazon", ignoreCase = true)) -> "Coral Credit Card"
+            joined.contains("Amazon Paylater", ignoreCase = true) || joined.contains("Paylater", ignoreCase = true) -> "Amazon Paylater"
+            joined.contains("Amazon Pay", ignoreCase = true) && isCardTransfer -> "Amazon Pay CC"
+            else -> null
+        }
+
+        val suggestedTags = if (isCardTransfer) listOf("credit card") else emptyList()
+
         val payeeName = if (isRecipientMe) {
             extractSender(normalizedLines, joined)?.takeIf { !isUserRecipient(it, null, effectiveUserNames, effectiveUserPhones) }
         } else {
@@ -201,7 +215,10 @@ object UpiReceiptParser {
             accountOrBankHint = bankHint,
             paymentMethodHint = paymentMethod,
             isExpense = isExpense,
-            rawText = joined
+            rawText = joined,
+            isTransfer = isCardTransfer,
+            targetAccountHint = targetAccountHint,
+            suggestedTags = suggestedTags
         )
     }
 
