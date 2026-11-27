@@ -554,14 +554,19 @@ fun ExpenseEditScreen(
         selectedCategoryId, selectedTags, attachments, selectedType, selectedAccountId, transferAccountId
     ) {
         val initialAmt = initialData?.amount?.amountMajor?.abs() ?: BigDecimal.ZERO
-        amount.compareTo(initialAmt) != 0 ||
-        payeeText != (initialData?.party?.name ?: "") ||
-        upiId != (initialData?.party?.iban ?: "") ||
-        comment != (initialData?.comment ?: "") ||
-        referenceNumber != (initialData?.referenceNumber ?: "") ||
-        selectedCategoryId != initialData?.categoryId ||
-        selectedTags.map { it.id }.toSet() != (initialData?.tags?.map { it.id }?.toSet() ?: emptySet()) ||
-        attachments.map { it.toString() }.toSet() != (initialData?.allAttachments?.map { it.toString() }?.toSet() ?: emptySet()) ||
+        val currentTagIds = selectedTags.map { it.id }.toSet()
+        val initialTagIds = initialData?.tags?.map { it.id }?.toSet() ?: emptySet<Long>()
+        val currentAttachmentUris = attachments.map { it.toString() }.toSet()
+        val initialAttachmentUris = initialData?.allAttachments?.map { it.toString() }?.toSet() ?: emptySet<String>()
+
+        (amount.compareTo(initialAmt) != 0) ||
+        (payeeText != (initialData?.party?.name ?: "")) ||
+        (upiId != (initialData?.party?.iban ?: "")) ||
+        (comment != (initialData?.comment ?: "")) ||
+        (referenceNumber != (initialData?.referenceNumber ?: "")) ||
+        (selectedCategoryId != initialData?.categoryId) ||
+        (currentTagIds != initialTagIds) ||
+        (currentAttachmentUris != initialAttachmentUris) ||
         (initialData != null && selectedAccountId != initialData.accountId)
     }
 
@@ -643,7 +648,7 @@ fun ExpenseEditScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(stringResource(R.string.cancel))
+                    Text(stringResource(android.R.string.cancel))
                 }
             }
         )
