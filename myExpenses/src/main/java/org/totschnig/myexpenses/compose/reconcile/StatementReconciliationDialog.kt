@@ -70,9 +70,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.CurrencyUnit
-import org.totschnig.myexpenses.reconcile.BankStatementModelsKt
+import org.totschnig.myexpenses.reconcile.BalanceCheckpoint
+import org.totschnig.myexpenses.reconcile.BalanceVerificationResult
 import org.totschnig.myexpenses.reconcile.BankStatementParser
 import org.totschnig.myexpenses.reconcile.MatchStatus
+import org.totschnig.myexpenses.reconcile.ReconcileResult
 import org.totschnig.myexpenses.reconcile.ReconciliationReport
 import org.totschnig.myexpenses.reconcile.StatementReconciler
 import org.totschnig.myexpenses.reconcile.StatementTransaction
@@ -233,8 +235,8 @@ private fun QuickBalanceCheckContent(
     onPasteClipboard: () -> Unit,
     currentBalanceMajor: BigDecimal,
     currencyUnit: CurrencyUnit,
-    checkpoint: org.totschnig.myexpenses.reconcile.BalanceCheckpoint?,
-    verificationResult: org.totschnig.myexpenses.reconcile.BalanceVerificationResult?,
+    checkpoint: BalanceCheckpoint?,
+    verificationResult: BalanceVerificationResult?,
     onSwitchToStatementReconcile: () -> Unit
 ) {
     LazyColumn(
@@ -516,7 +518,7 @@ private fun StatementReconcileContent(
 
 @Composable
 private fun StatementItemCard(
-    item: org.totschnig.myexpenses.reconcile.ReconcileResult,
+    item: ReconcileResult,
     currencyUnit: CurrencyUnit,
     onAdd: () -> Unit
 ) {
