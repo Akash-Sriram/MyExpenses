@@ -1142,7 +1142,7 @@ fun ExpenseEditScreen(
                                                 if (targetAcc != null) {
                                                     transferAccountId = targetAcc.id
                                                 }
-                                                val ccTag = allTags.find { it.name.equals("credit card", ignoreCase = true) }
+                                                val ccTag = allTags.find { it.label.equals("credit card", ignoreCase = true) }
                                                 if (ccTag != null && ccTag !in selectedTags) {
                                                     selectedTags = selectedTags + ccTag
                                                 }
