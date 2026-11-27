@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,6 +76,7 @@ import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -122,6 +125,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -207,6 +211,43 @@ enum class TransactionTypeOption {
     TRANSFER
 }
 
+private val BigDecimalSaver = Saver<BigDecimal, String>(
+    save = { it.toPlainString() },
+    restore = { it.toBigDecimalOrNull() ?: BigDecimal.ZERO }
+)
+
+private val LocalDateSaver = Saver<LocalDate, String>(
+    save = { it.toString() },
+    restore = { try { LocalDate.parse(it) } catch (_: Exception) { LocalDate.now() } }
+)
+
+private val LocalTimeSaver = Saver<LocalTime, String>(
+    save = { it.toString() },
+    restore = { try { LocalTime.parse(it) } catch (_: Exception) { LocalTime.now() } }
+)
+
+private val TagsListSaver = Saver<List<Tag>, List<String>>(
+    save = { list -> list.map { "${it.id}|${it.label}" } },
+    restore = { list ->
+        list.mapNotNull { item ->
+            val parts = item.split("|", limit = 2)
+            val id = parts.getOrNull(0)?.toLongOrNull()
+            val label = parts.getOrNull(1)
+            if (id != null && label != null) Tag(id, label) else null
+        }
+    }
+)
+
+private val UriListSaver = Saver<List<Uri>, List<String>>(
+    save = { list -> list.map { it.toString() } },
+    restore = { list -> list.map { Uri.parse(it) } }
+)
+
+private val NullableUriSaver = Saver<Uri?, String>(
+    save = { it?.toString() ?: "" },
+    restore = { it.takeIf { s -> s.isNotEmpty() }?.let { s -> Uri.parse(s) } }
+)
+
 /**
  * Modern Material 3 Native Jetpack Compose Transaction Editor for Expenses.
  * Eliminates the legacy XML ExpenseEdit activity with inline calculator,
@@ -257,7 +298,7 @@ fun ExpenseEditScreen(
 
     // Amount & Calculator
     val initialAmountMajor = initialData?.amount?.amountMajor?.abs() ?: BigDecimal.ZERO
-    var amount by remember {
+    var amount by rememberSaveable(stateSaver = BigDecimalSaver) {
         mutableStateOf(initialAmountMajor)
     }
     var amountText by rememberSaveable {
@@ -365,10 +406,10 @@ fun ExpenseEditScreen(
     }
 
     // Date & Time
-    var date by remember {
+    var date by rememberSaveable(stateSaver = LocalDateSaver) {
         mutableStateOf(initialData?.date?.toLocalDate() ?: LocalDate.now())
     }
-    var time by remember {
+    var time by rememberSaveable(stateSaver = LocalTimeSaver) {
         mutableStateOf(initialData?.date?.toLocalTime() ?: LocalTime.now())
     }
 
@@ -376,7 +417,7 @@ fun ExpenseEditScreen(
     var currentAllTags by remember(allTags) {
         mutableStateOf(allTags)
     }
-    var selectedTags by remember {
+    var selectedTags by rememberSaveable(stateSaver = TagsListSaver) {
         mutableStateOf(initialData?.tags ?: emptyList())
     }
     var showTagSheet by remember { mutableStateOf(false) }
@@ -393,10 +434,10 @@ fun ExpenseEditScreen(
     var referenceNumber by rememberSaveable {
         mutableStateOf(initialData?.referenceNumber ?: "")
     }
-    var attachments by remember(initialData?.id, initialData?.uuid) {
+    var attachments by rememberSaveable(stateSaver = UriListSaver) {
         mutableStateOf(initialData?.allAttachments ?: emptyList())
     }
-    var pictureUri by remember(initialData?.id, initialData?.uuid) {
+    var pictureUri by rememberSaveable(stateSaver = NullableUriSaver) {
         mutableStateOf(initialData?.pictureUri ?: initialData?.allAttachments?.firstOrNull())
     }
 
@@ -505,13 +546,47 @@ fun ExpenseEditScreen(
         initialMinute = time.minute
     )
 
+    val isTransfer = selectedType == TransactionTypeOption.TRANSFER
+    val isSelfTransfer = isTransfer && (selectedAccountId == transferAccountId)
+
+    val isDirty = remember(
+        amount, payeeText, comment, referenceNumber, upiId,
+        selectedCategoryId, selectedTags, attachments, selectedType, selectedAccountId, transferAccountId
+    ) {
+        val initialAmt = initialData?.amount?.amountMajor?.abs() ?: BigDecimal.ZERO
+        amount.compareTo(initialAmt) != 0 ||
+        payeeText != (initialData?.party?.name ?: "") ||
+        upiId != (initialData?.party?.iban ?: "") ||
+        comment != (initialData?.comment ?: "") ||
+        referenceNumber != (initialData?.referenceNumber ?: "") ||
+        selectedCategoryId != initialData?.categoryId ||
+        selectedTags.map { it.id }.toSet() != (initialData?.tags?.map { it.id }?.toSet() ?: emptySet()) ||
+        attachments.map { it.toString() }.toSet() != (initialData?.allAttachments?.map { it.toString() }?.toSet() ?: emptySet()) ||
+        (initialData != null && selectedAccountId != initialData.accountId)
+    }
+
+    var showDiscardDialog by rememberSaveable { mutableStateOf(false) }
+
+    val attemptClose = {
+        if (isDirty) {
+            showDiscardDialog = true
+        } else {
+            onClose()
+        }
+    }
+
+    BackHandler(enabled = isDirty) {
+        showDiscardDialog = true
+    }
+
     fun handleSave() {
+        if (isSelfTransfer) return
+
         val currency = selectedAccount?.currency ?: CurrencyUnit("INR", "₹", 2)
         val sign = if (selectedType == TransactionTypeOption.INCOME) 1 else -1
         val finalAmountPaise = (amount * BigDecimal.TEN.pow(currency.fractionDigits)).toLong() * sign
 
         val fullDateTime = LocalDateTime.of(date, time)
-        val isTransfer = selectedType == TransactionTypeOption.TRANSFER
 
         val resultData = (initialData ?: TransactionEditData(
             uuid = generateUuid(),
@@ -546,9 +621,37 @@ fun ExpenseEditScreen(
         onSave(resultData)
     }
 
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = {
+                Text(stringResource(R.string.dialog_confirm_discard_changes), fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(stringResource(R.string.confirmation_load_template_discard_data))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardDialog = false
+                        onClose()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(stringResource(R.string.discard))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     val isLarge = booleanResource(R.bool.isLarge)
     Dialog(
-        onDismissRequest = onClose,
+        onDismissRequest = attemptClose,
         properties = DialogProperties(
             usePlatformDefaultWidth = isLarge
         )
@@ -583,14 +686,14 @@ fun ExpenseEditScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onClose) {
+                    IconButton(onClick = attemptClose) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.menu_close))
                     }
                 },
                 actions = {
                     Button(
                         onClick = ::handleSave,
-                        enabled = amount > BigDecimal.ZERO && selectedAccount != null,
+                        enabled = amount > BigDecimal.ZERO && selectedAccount != null && (!isTransfer || !isSelfTransfer),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
@@ -614,6 +717,7 @@ fun ExpenseEditScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -626,7 +730,20 @@ fun ExpenseEditScreen(
                 TransactionTypeOption.entries.forEachIndexed { index, option ->
                     SegmentedButton(
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = TransactionTypeOption.entries.size),
-                        onClick = { selectedType = option },
+                        onClick = {
+                            if (selectedType != option) {
+                                selectedType = option
+                                if (selectedCategoryId != null && (option == TransactionTypeOption.EXPENSE || option == TransactionTypeOption.INCOME)) {
+                                    val targetFlag = if (option == TransactionTypeOption.INCOME) FLAG_INCOME else FLAG_EXPENSE
+                                    val currentCat = allCategories.flatMap { it.flatten() }.find { it.id == selectedCategoryId }
+                                    if (currentCat != null && currentCat.typeFlags != targetFlag && currentCat.typeFlags != FLAG_NEUTRAL) {
+                                        selectedCategoryId = null
+                                        selectedCategoryPath = null
+                                        selectedCategoryIcon = null
+                                    }
+                                }
+                            }
+                        },
                         selected = selectedType == option,
                         colors = SegmentedButtonDefaults.colors(
                             activeContainerColor = when (option) {
@@ -841,6 +958,9 @@ fun ExpenseEditScreen(
                                     },
                                     onClick = {
                                         selectedAccountId = account.id
+                                        if (selectedType == TransactionTypeOption.TRANSFER && transferAccountId == account.id) {
+                                            transferAccountId = accounts.firstOrNull { it.id != account.id }?.id ?: 0L
+                                        }
                                         showAccountMenu = false
                                     }
                                 )
@@ -850,65 +970,79 @@ fun ExpenseEditScreen(
 
                     // Target Account for Transfers
                     if (selectedType == TransactionTypeOption.TRANSFER) {
-                        Box {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surface)
-                                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-                                    .clickable { showTransferAccountMenu = true }
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(12.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(transferAccount?.color ?: android.graphics.Color.GRAY))
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Column {
-                                        Text(
-                                            text = stringResource(R.string.transfer_to_account),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Column {
+                            Box {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surface)
+                                        .border(
+                                            1.dp,
+                                            if (isSelfTransfer) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+                                            RoundedCornerShape(12.dp)
                                         )
-                                        Text(
-                                            text = transferAccount?.label ?: stringResource(R.string.account),
-                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                        .clickable { showTransferAccountMenu = true }
+                                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(transferAccount?.color ?: android.graphics.Color.GRAY))
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = stringResource(R.string.transfer_to_account),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                text = transferAccount?.label ?: stringResource(R.string.account),
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                            )
+                                        }
+                                    }
+                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+
+                                DropdownMenu(
+                                    expanded = showTransferAccountMenu,
+                                    onDismissRequest = { showTransferAccountMenu = false }
+                                ) {
+                                    accounts.filter { it.id != selectedAccountId }.forEach { account ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(10.dp)
+                                                            .clip(CircleShape)
+                                                            .background(Color(account.color))
+                                                    )
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text(account.label)
+                                                }
+                                            },
+                                            onClick = {
+                                                transferAccountId = account.id
+                                                showTransferAccountMenu = false
+                                            }
                                         )
                                     }
                                 }
-                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-
-                            DropdownMenu(
-                                expanded = showTransferAccountMenu,
-                                onDismissRequest = { showTransferAccountMenu = false }
-                            ) {
-                                accounts.filter { it.id != selectedAccountId }.forEach { account ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(10.dp)
-                                                        .clip(CircleShape)
-                                                        .background(Color(account.color))
-                                                )
-                                                Spacer(Modifier.width(8.dp))
-                                                Text(account.label)
-                                            }
-                                        },
-                                        onClick = {
-                                            transferAccountId = account.id
-                                            showTransferAccountMenu = false
-                                        }
-                                    )
-                                }
+                            if (isSelfTransfer) {
+                                Text(
+                                    text = "Transfer source and destination accounts must be different",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                                )
                             }
                         }
                     }
