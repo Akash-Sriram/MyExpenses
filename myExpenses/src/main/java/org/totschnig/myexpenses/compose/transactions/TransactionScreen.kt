@@ -281,10 +281,11 @@ fun TransactionScreen(
     }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentWindowInsets = windowInsets,
-        containerColor = containerColor,
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentWindowInsets = windowInsets,
+            containerColor = containerColor,
         topBar = {
             val isInSelectionMode = viewModel.selectionState.value.isNotEmpty()
             val height = 52.dp + 30.dp * (LocalDensity.current.fontScale - 1)
@@ -798,6 +799,7 @@ fun TransactionScreen(
                 )
             }
         )
+    }
     }
 }
 
