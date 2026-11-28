@@ -2133,8 +2133,8 @@ open class MyExpensesV2ViewModel(
         if (statementTx.isRefund || (isDeposit && (statementTx.rawText.contains("RFND", ignoreCase = true) || statementTx.rawText.contains("REFUND", ignoreCase = true)))) {
             categoryId = findRefundCategoryId()
         }
-        if (categoryId == null && resolvedPartyId != null) {
-            categoryId = getAutofillForPayee(resolvedPartyId)
+        if (categoryId == null) {
+            resolvedPartyId?.let { categoryId = getAutofillForPayee(it) }
         }
 
         val comment = statementTx.comment ?: statementTx.payeeOrRemarks
