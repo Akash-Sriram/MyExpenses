@@ -71,12 +71,19 @@ object BhimReceiptRule : ReceiptParserRule {
             upiId = UpiReceiptParser.extractUpiId(lines, effectiveUserPhones, fullText)
         }
 
-        // 3. Reference / Transaction ID: Labeled under "Transaction ID"
+        // 3. Reference / Transaction ID: Labeled under or alongside "Transaction ID"
         var utr: String? = null
-        val txnIdx = lines.indexOfFirst { it.matches(Regex("""(?i)^\s*transaction\s+id\s*$""")) }
-        if (txnIdx >= 0 && txnIdx + 1 < lines.size) {
-            val cand = lines[txnIdx + 1].trim().split(" ", "\t").firstOrNull { it.matches(Regex("""\d{10,24}""")) }
-            if (cand != null) utr = cand
+        val txnIdx = lines.indexOfFirst { it.contains("transaction id", ignoreCase = true) }
+        if (txnIdx >= 0) {
+            val sameLineCand = lines[txnIdx].trim().split(Regex("""[\s,;]+""")).map { it.trim(':', ',', ';', '-') }.firstOrNull { it.matches(Regex("""\d{10,24}""")) }
+            if (sameLineCand != null) {
+                utr = sameLineCand
+            } else if (txnIdx + 1 < lines.size) {
+                val nextLineCand = lines[txnIdx + 1].trim().split(Regex("""[\s,;]+""")).map { it.trim(':', ',', ';', '-') }.firstOrNull { it.matches(Regex("""\d{10,24}""")) }
+                if (nextLineCand != null) {
+                    utr = nextLineCand
+                }
+            }
         }
         if (utr == null) {
             utr = UpiReceiptParser.extractUtr(lines, fullText)
