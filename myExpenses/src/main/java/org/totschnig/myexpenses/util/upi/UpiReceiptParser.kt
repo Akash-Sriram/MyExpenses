@@ -1229,6 +1229,7 @@ object UpiReceiptParser {
                 return "$userPart@$domain"
             }
         }
+        return candidate
     }
 
     internal fun extractComment(lines: List<String>, payeeName: String?, fullText: String): String? {
