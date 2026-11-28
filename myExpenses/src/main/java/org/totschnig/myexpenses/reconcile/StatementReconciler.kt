@@ -134,7 +134,7 @@ object StatementReconciler {
                         val payeeMatch = tx.payee.isNotBlank() && (
                             st.payeeOrRemarks.contains(tx.payee, ignoreCase = true) ||
                             tx.payee.contains(st.payeeOrRemarks, ignoreCase = true) ||
-                            hasPayeeTokenAffinity(st.payeeOrRemarks, tx.payee)
+                            hasPayeeAffinity(st.payeeOrRemarks, tx.payee, tx.comment)
                         )
                         val commentMatch = !st.comment.isNullOrBlank() && !tx.comment.isNullOrBlank() && (
                             st.comment.contains(tx.comment, ignoreCase = true) ||
