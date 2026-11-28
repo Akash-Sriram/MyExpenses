@@ -269,7 +269,7 @@ object UpiReceiptParser {
         )
     }
 
-    private fun detectPaymentMethod(text: String): String {
+    internal fun detectPaymentMethod(text: String): String {
         val lower = text.lowercase(Locale.ROOT)
         return when {
             lower.contains("auto-pay") || lower.contains("auto debit") || lower.contains("standing instruction") || lower.contains("mandate") || lower.contains("nach") || (lower.contains("remarks") && lower.contains("auto")) -> "Auto Debit"
