@@ -171,7 +171,6 @@ import androidx.compose.material.icons.filled.FindInPage
 import androidx.compose.material3.OutlinedButton
 import kotlinx.coroutines.launch
 import org.totschnig.myexpenses.compose.accounts.CreditCardCycleCard
-import org.totschnig.myexpenses.compose.reconcile.StatementReconciliationDialog
 import org.totschnig.myexpenses.model.PREDEFINED_NAME_BANK
 import org.totschnig.myexpenses.model.PREDEFINED_NAME_CCARD
 import org.totschnig.myexpenses.viewmodel.data.Transaction2
@@ -246,14 +245,6 @@ fun TransactionScreen(
     var isSearchOpen by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedTypeFilter by rememberSaveable { mutableStateOf<String?>(null) }
-    var showReconcileDialog by rememberSaveable { mutableStateOf(false) }
-    var reconcileTxList by remember { mutableStateOf<List<Transaction2>>(emptyList()) }
-
-    LaunchedEffect(showReconcileDialog, currentAccount.id) {
-        if (showReconcileDialog && currentAccount is FullAccount) {
-            reconcileTxList = viewModel.loadTransactionsForReconcile(currentAccount.id)
-        }
-    }
 
     if (isSearchOpen) {
         BackHandler {
@@ -507,7 +498,7 @@ fun TransactionScreen(
                                         onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) },
                                         hideBalances = hideBalances,
                                         viewModel = viewModel,
-                                        onOpenReconcile = { showReconcileDialog = true }
+                                        onOpenReconcile = { (currentAccount as? FullAccount)?.let { viewModel.startReconcile(it) } }
                                     )
                                 },
                                 actions = {
@@ -735,30 +726,6 @@ fun TransactionScreen(
                 TransactionListPage(accountList.first(), true, pageContent)
             }
         }
-    }
-
-    if (showReconcileDialog && currentAccount is FullAccount) {
-        val fullAcc = currentAccount as FullAccount
-        StatementReconciliationDialog(
-            accountLabel = fullAcc.label,
-            currentBalance = fullAcc.currentBalance,
-            currencyUnit = fullAcc.currencyUnit,
-            appTransactions = reconcileTxList,
-            onDismiss = { showReconcileDialog = false },
-            onAddMissingTransaction = { missingTx ->
-                viewModel.saveStatementTransaction(missingTx, fullAcc)
-                coroutineScope.launch {
-                    reconcileTxList = viewModel.loadTransactionsForReconcile(fullAcc.id)
-                }
-            },
-            onAddAllMissingTransactions = { missingList ->
-                viewModel.saveStatementTransactions(missingList, fullAcc) {
-                    coroutineScope.launch {
-                        reconcileTxList = viewModel.loadTransactionsForReconcile(fullAcc.id)
-                    }
-                }
-            }
-        )
     }
 
     showTradeScreen?.let { tradeAction ->

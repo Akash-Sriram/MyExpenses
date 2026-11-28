@@ -54,6 +54,7 @@ import org.totschnig.myexpenses.compose.filter.TYPE_COMPLEX
 import org.totschnig.myexpenses.compose.main.AppEvent
 import org.totschnig.myexpenses.compose.main.AppEventHandler
 import org.totschnig.myexpenses.compose.main.MainScreenAdaptive
+import org.totschnig.myexpenses.compose.reconcile.StatementReconciliationDialog
 import org.totschnig.myexpenses.compose.transactions.Action
 import org.totschnig.myexpenses.compose.transactions.ExpenseEditScreen
 import org.totschnig.myexpenses.compose.transactions.ImportTradesDialog
@@ -80,6 +81,7 @@ import org.totschnig.myexpenses.viewmodel.data.AggregateAccount
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.FullAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
+import org.totschnig.myexpenses.viewmodel.data.Transaction2
 import org.totschnig.myexpenses.viewmodel.data.toAccount
 import timber.log.Timber
 import java.math.RoundingMode
@@ -302,6 +304,34 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                 },
                                 onPayeeSelected = { payeeId ->
                                     viewModel.getAutofillForPayee(payeeId)
+                                }
+                            )
+                        }
+
+                        val accountToReconcile by viewModel.accountToReconcile.collectAsStateWithLifecycle()
+                        accountToReconcile?.let { account ->
+                            var reconcileTxList by remember(account.id) { mutableStateOf<List<Transaction2>>(emptyList()) }
+                            LaunchedEffect(account.id) {
+                                reconcileTxList = viewModel.loadTransactionsForReconcile(account.id)
+                            }
+                            StatementReconciliationDialog(
+                                accountLabel = account.label,
+                                currentBalance = account.currentBalance,
+                                currencyUnit = account.currencyUnit,
+                                appTransactions = reconcileTxList,
+                                onDismiss = { viewModel.clearAccountToReconcile() },
+                                onAddMissingTransaction = { missingTx ->
+                                    viewModel.saveStatementTransaction(missingTx, account)
+                                    lifecycleScope.launch {
+                                        reconcileTxList = viewModel.loadTransactionsForReconcile(account.id)
+                                    }
+                                },
+                                onAddAllMissingTransactions = { missingList ->
+                                    viewModel.saveStatementTransactions(missingList, account) {
+                                        lifecycleScope.launch {
+                                            reconcileTxList = viewModel.loadTransactionsForReconcile(account.id)
+                                        }
+                                    }
                                 }
                             )
                         }

@@ -2133,4 +2133,16 @@ open class MyExpensesV2ViewModel(
             }
         }
     }
+
+    private val _accountToReconcile = MutableStateFlow<FullAccount?>(null)
+    val accountToReconcile: StateFlow<FullAccount?> = _accountToReconcile.asStateFlow()
+
+    fun startReconcile(account: FullAccount) {
+        _accountToReconcile.value = account
+    }
+
+    fun clearAccountToReconcile() {
+        _accountToReconcile.value = null
+    }
 }
+
