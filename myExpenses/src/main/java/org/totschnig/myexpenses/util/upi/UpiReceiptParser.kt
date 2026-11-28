@@ -171,13 +171,19 @@ object UpiReceiptParser {
         }.distinct()
 
         val amount = extractAmount(normalizedLines, joined)
-        val upiId = extractUpiId(normalizedLines, effectiveUserPhones, joined)
-        val rawPayee = extractPayee(normalizedLines, upiId, joined)
+        val bhim = extractBhimLayout(normalizedLines, joined)
+        val upiId = bhim?.upiId ?: extractUpiId(normalizedLines, effectiveUserPhones, joined)
+        val rawPayee = bhim?.payee ?: extractPayee(normalizedLines, upiId, joined)
         val dateTime = extractDateTime(normalizedLines, joined)
         val utr = extractUtr(normalizedLines, joined)
         val bankHint = extractBankHint(normalizedLines, joined)
         val paymentMethod = detectPaymentMethod(joined)
-        val comment = extractComment(normalizedLines, rawPayee, joined)
+        val comment = if (bhim != null) {
+            if (bhim.noRemark) null else extractComment(normalizedLines, rawPayee, joined)?.takeIf { c ->
+                val compact = c.lowercase(Locale.ROOT).replace(Regex("""\s+"""), "")
+                upiId == null || !upiId.lowercase(Locale.ROOT).contains(compact)
+            }
+        } else extractComment(normalizedLines, rawPayee, joined)
 
         val isRecipientMe = isUserRecipient(rawPayee, upiId, effectiveUserNames, effectiveUserPhones)
         val isIncome = containsRefundOrIncome(joined) || isRecipientMe
@@ -1183,6 +1189,53 @@ object UpiReceiptParser {
             }
         }
         return candidate
+    }
+
+    private data class BhimLayout(val payee: String?, val upiId: String?, val noRemark: Boolean)
+
+    private fun extractBhimLayout(lines: List<String>, fullText: String): BhimLayout? {
+        val lower = fullText.lowercase(Locale.ROOT)
+        if (!lower.contains("banking name") || !lower.contains("to upi id")) return null
+        val noRemark = Regex("""(?i)\bno\s+remarks?\b""").containsMatchIn(fullText)
+        val rightColumnNoise = Regex("""(?i)\b(?:no\s+remarks?|remarks?|date\s*&\s*time|date\s+and\s+time|transaction\s+id)\b""")
+        val stopLabel = Regex("""(?i)(transaction\s+id|date\s*&\s*time|to\s+upi\s+id|debited\s+account|process\s+details|remarks?)""")
+
+        // Payee: lines after "Banking Name" until next label
+        val bnIdx = lines.indexOfFirst { it.contains("banking name", ignoreCase = true) }
+        var payee: String? = null
+        if (bnIdx >= 0) {
+            val parts = mutableListOf<String>()
+            val sameLine = lines[bnIdx].replace(Regex("""(?i).*banking\s+name\s*[:\-]?"""), "").trim()
+            if (sameLine.isNotEmpty()) parts += sameLine
+            for (i in (bnIdx + 1) until minOf(lines.size, bnIdx + 4)) {
+                val l = lines[i]
+                val m = stopLabel.find(l)
+                if (m != null) {
+                    val before = l.substring(0, m.range.first).trim()
+                    if (before.isNotEmpty()) parts += before
+                    break
+                }
+                parts += l.trim()
+            }
+            payee = parts.joinToString(" ").replace(Regex("""\s+"""), " ").trim().takeIf { it.length >= 2 }
+        }
+
+        // UPI ID: wrapped lines after "To UPI ID" until "Debited account", stitched without spaces
+        val upiIdx = lines.indexOfFirst { it.contains("to upi id", ignoreCase = true) }
+        var upiId: String? = null
+        if (upiIdx >= 0) {
+            val sb = StringBuilder()
+            sb.append(lines[upiIdx].replace(Regex("""(?i).*to\s+upi\s+id"""), ""))
+            for (i in (upiIdx + 1) until minOf(lines.size, upiIdx + 7)) {
+                val l = lines[i]
+                if (Regex("""(?i)debited\s+account|process\s+details|icici|hdfc|sbi\b|axis""").containsMatchIn(l) && !l.contains("@")) break
+                sb.append(l)
+                if (l.contains("@")) break
+            }
+            val stitched = rightColumnNoise.replace(sb.toString(), "").replace(Regex("""\s+"""), "")
+            upiId = Regex("""[A-Za-z0-9.\-_]{2,}@[A-Za-z]{2,}""").find(stitched)?.value
+        }
+        return BhimLayout(payee, upiId, noRemark)
     }
 
     private fun extractComment(lines: List<String>, payeeName: String?, fullText: String): String? {
