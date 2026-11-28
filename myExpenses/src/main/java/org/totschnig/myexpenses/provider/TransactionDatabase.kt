@@ -443,7 +443,9 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
           val name = cursor.getString(1)
           val iban = if (cursor.isNull(2)) null else cursor.getString(2)
           rootPayees.add(Triple(id, name, iban))
-        val corporateSuffixRegex = Regex(
+        }
+      }
+      val corporateSuffixRegex = Regex(
             """(?i)\s+(?:marketplace\s+private\s+limited|marketplace\s+pvt\s+ltd|marketplace|private\s+limited|pvt\s+ltd|pvt\.?\s*ltd\.?|india\s+private\s+limited|india\s+pvt\s+ltd|retail\s+limited|retail\s+private\s+limited|services\s+private\s+limited|technologies\s+private\s+limited|solutions\s+private\s+limited|payments\s+private\s+limited|enterprises|llp|ltd\.?|limited)\s*$"""
         )
         for ((dirtyId, dirtyName, iban) in rootPayees) {
@@ -479,7 +481,6 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
             execSQL("UPDATE $TABLE_PAYEES SET name = ? WHERE _id = ?", arrayOf<Any>(clean, dirtyId))
           }
         }
-      }
 
       // 4. Deduplicate redundant child branches under the same parent
       query("SELECT _id, parent_id, iban FROM $TABLE_PAYEES WHERE $KEY_PARENTID IS NOT NULL ORDER BY _id ASC").use { cursor ->
