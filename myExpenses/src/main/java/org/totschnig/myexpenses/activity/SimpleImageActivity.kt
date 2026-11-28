@@ -47,6 +47,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import java.io.File
+import timber.log.Timber
 import kotlinx.coroutines.Dispatchers
 import org.totschnig.myexpenses.util.AppDirHelper
 import org.totschnig.myexpenses.util.PictureDirHelper
@@ -105,17 +107,25 @@ fun SimpleImageViewerScreen(
         isLoading = true
         loadError = false
         withContext(Dispatchers.IO) {
-            // 1. Try ImageDecoder
+            // 1. Try file scheme or ImageDecoder
             try {
-                bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                if (uri.scheme == "file") {
+                    val path = uri.path
+                    if (path != null) {
+                        val file = File(path)
+                        if (file.exists() && file.length() > 0) {
+                            bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        }
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source)
+                    bitmap = ImageDecoder.decodeBitmap(source)
                 } else {
                     @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                    bitmap = MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }
             } catch (e: Exception) {
-                CrashHandler.report(e)
+                Timber.w(e, "ImageDecoder initial attempt failed for uri: %s", uri)
             }
 
             // 2. Fallback to openInputStream
@@ -135,6 +145,21 @@ fun SimpleImageViewerScreen(
                         bitmap = BitmapFactory.decodeFile(file.absolutePath)
                     }
                 } catch (_: Exception) {}
+            }
+
+            // 4. Auto-heal missing or corrupted attachment via AttachmentHealHelper
+            if (bitmap == null) {
+                try {
+                    val fileName = uri.lastPathSegment?.substringAfterLast('/')
+                    if (!fileName.isNullOrBlank()) {
+                        val healedFile = org.totschnig.myexpenses.util.AttachmentHealHelper.restoreAttachmentFile(context, fileName)
+                        if (healedFile != null && healedFile.exists() && healedFile.length() > 0) {
+                            bitmap = BitmapFactory.decodeFile(healedFile.absolutePath)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "AttachmentHealHelper recovery failed for uri: %s", uri)
+                }
             }
 
             if (bitmap == null) {

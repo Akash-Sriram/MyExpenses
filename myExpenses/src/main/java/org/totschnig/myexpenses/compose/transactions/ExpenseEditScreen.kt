@@ -2495,9 +2495,21 @@ private fun copyUriToAppStorage(context: Context, sourceUri: Uri): Uri {
                 input.copyTo(output)
             }
         }
-        destUri
+        val destFile = try { PictureDirHelper.getFileForUri(context, destUri) } catch (_: Exception) { null }
+        if (destFile != null && destFile.exists() && destFile.length() > 0) {
+            destUri
+        } else {
+            try { destFile?.delete() } catch (_: Exception) {}
+            try {
+                context.contentResolver.takePersistableUriPermission(sourceUri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {}
+            sourceUri
+        }
     } catch (e: Exception) {
         Timber.e(e, "Failed to copy file to app storage, using source uri")
+        try {
+            context.contentResolver.takePersistableUriPermission(sourceUri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        } catch (_: Exception) {}
         sourceUri
     }
 }

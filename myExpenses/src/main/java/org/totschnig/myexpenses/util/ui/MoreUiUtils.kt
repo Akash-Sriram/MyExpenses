@@ -61,6 +61,7 @@ import org.totschnig.myexpenses.viewmodel.data.AttachmentInfo
 import org.totschnig.myexpenses.viewmodel.data.BaseAccount
 import org.totschnig.myexpenses.viewmodel.data.PageAccount
 import org.totschnig.myexpenses.util.AppDirHelper
+import org.totschnig.myexpenses.util.AttachmentHealHelper
 import java.io.File
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -280,8 +281,26 @@ fun attachmentInfoMap(context: Context, withFile: Boolean = false): Map<Uri, Att
                         }
                     }
 
-                    if (bitmap != null) {
-                        AttachmentInfo.of(mimeType, bitmap, contentDescription, if (withFile) file else null)
+                    val resolvedBitmap = bitmap ?: run {
+                        val fileName = contentDescription ?: resolvedUri.lastPathSegment?.substringAfterLast('/')
+                        if (!fileName.isNullOrBlank()) {
+                            val healed = AttachmentHealHelper.restoreAttachmentFile(context, fileName)
+                            if (healed != null && healed.exists() && healed.length() > 0) {
+                                try {
+                                    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                    BitmapFactory.decodeFile(healed.absolutePath, boundsOptions)
+                                    val inSampleSize = calculateInSampleSize(boundsOptions, sizePx, sizePx)
+                                    val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+                                    BitmapFactory.decodeFile(healed.absolutePath, decodeOptions)
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            } else null
+                        } else null
+                    }
+
+                    if (resolvedBitmap != null) {
+                        AttachmentInfo.of(mimeType, resolvedBitmap, contentDescription, if (withFile) file else null)
                     } else {
                         AttachmentInfo.of(
                             mimeType,
@@ -312,8 +331,16 @@ fun attachmentInfoMap(context: Context, withFile: Boolean = false): Map<Uri, Att
                     context.assets.open(file).use(BitmapFactory::decodeStream), file, null
                 )
             } else {
-                val file = resolvedUri.path?.let { File(it) }
-                if (file != null && file.exists()) {
+                val initialFile = resolvedUri.path?.let { File(it) }
+                val file = if (initialFile != null && initialFile.exists() && initialFile.length() > 0) {
+                    initialFile
+                } else {
+                    val fileName = resolvedUri.lastPathSegment?.substringAfterLast('/')
+                    if (!fileName.isNullOrBlank()) {
+                        AttachmentHealHelper.restoreAttachmentFile(context, fileName)
+                    } else null
+                }
+                if (file != null && file.exists() && file.length() > 0) {
                     val mimeType = getMimeType(file.name)
                     if (mimeType.startsWith("image")) {
                         try {

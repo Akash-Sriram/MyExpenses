@@ -11,9 +11,13 @@ object BankStatementParser {
         DateTimeFormatter.ofPattern("dd.MM.yyyy"),
         DateTimeFormatter.ofPattern("dd/MM/yyyy"),
         DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+        DateTimeFormatter.ofPattern("dd/MM/yy"),
+        DateTimeFormatter.ofPattern("dd-MM-yy"),
         DateTimeFormatter.ofPattern("yyyy-MM-dd"),
         DateTimeFormatter.ofPattern("dd-MMM-yy", java.util.Locale.ENGLISH),
-        DateTimeFormatter.ofPattern("dd-MMM-yyyy", java.util.Locale.ENGLISH)
+        DateTimeFormatter.ofPattern("dd-MMM-yyyy", java.util.Locale.ENGLISH),
+        DateTimeFormatter.ofPattern("dd MMM yyyy", java.util.Locale.ENGLISH),
+        DateTimeFormatter.ofPattern("dd MMM yy", java.util.Locale.ENGLISH)
     )
 
     private val UTR_PATTERN = Pattern.compile("""\b([0-9]{12})\b""")
@@ -278,35 +282,47 @@ object BankStatementParser {
         val trimmed = smsText.trim()
         if (trimmed.isEmpty()) return null
 
-        val avlBalPattern = Pattern.compile("""(?i)(?:avl\s*bal(?:ance)?|available\s*balance|clear\s*bal|balance(?:\s*is)?)\s*[:\s]*\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)""")
-        val balMatcher = avlBalPattern.matcher(trimmed)
-        if (!balMatcher.find()) return null
+        val balPatterns = listOf(
+            Pattern.compile("""(?i)(?:avl\s*bal(?:ance)?|available\s*balance|clear\s*bal|tot\s*bal|total\s*balance|balance(?:\s*is)?|bal)(?:[\w\s/.-]{0,35}?)(?:is|[:=])?\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)"""),
+            Pattern.compile("""(?i)(?:rs\.?|inr|₹)\s*([0-9,]+(?:\.[0-9]{2})?)\s*(?:is\s*)?(?:your\s*)?(?:avl\s*bal(?:ance)?|available\s*balance|clear\s*bal)"""),
+            Pattern.compile("""(?i)balance\s*[:=]\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)""")
+        )
 
-        val balStr = balMatcher.group(1)?.replace(",", "") ?: return null
-        val avlBal = balStr.toBigDecimalOrNull() ?: return null
+        var avlBal: BigDecimal? = null
+        for (pattern in balPatterns) {
+            val matcher = pattern.matcher(trimmed)
+            if (matcher.find()) {
+                val balStr = matcher.group(1)?.replace(",", "")
+                avlBal = balStr?.toBigDecimalOrNull()
+                if (avlBal != null) break
+            }
+        }
+        if (avlBal == null) return null
 
-        val accPattern = Pattern.compile("""(?i)(?:acc(?:ount)?|a\/c)\s*(?:no\.?|num(?:ber)?|ending\s*(?:with)?)?[\s:\-.*X#]*([0-9]{3,4})""")
+        val accPattern = Pattern.compile("""(?i)(?:acc(?:ount)?|a\/c|acct)[\s\w/.-]{0,15}?(?:ending\s*(?:with)?)?[\s:\-.*X#]*([0-9]{3,4})\b""")
         val accMatcher = accPattern.matcher(trimmed)
         val accDigits = if (accMatcher.find()) accMatcher.group(1) else null
 
         val isDebit = trimmed.contains("debited", ignoreCase = true) ||
                       trimmed.contains("withdrawn", ignoreCase = true) ||
                       trimmed.contains("spent", ignoreCase = true) ||
-                      trimmed.contains("paid", ignoreCase = true)
+                      trimmed.contains("paid", ignoreCase = true) ||
+                      trimmed.contains("purchase of", ignoreCase = true) ||
+                      trimmed.contains("dr", ignoreCase = true)
 
-        val txnAmtPattern = Pattern.compile("""(?i)(?:debited|credited|spent|withdrawn|paid|received|transfer\s*of)\s*(?:by|for)?\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)""")
+        val txnAmtPattern = Pattern.compile("""(?i)(?:debited|credited|spent|withdrawn|paid|received|transfer\s*of|txn\s*of)\s*(?:by|for|of)?\s*[:\s]*\s*(?:rs\.?|inr|₹)?\s*([0-9,]+(?:\.[0-9]{2})?)""")
         val txMatcher = txnAmtPattern.matcher(trimmed)
         val txnAmt = if (txMatcher.find()) {
             txMatcher.group(1)?.replace(",", "")?.toBigDecimalOrNull()
         } else null
 
-        val datePattern = Pattern.compile("""\b(\d{2}[-/.](?:[A-Za-z]{3}|\d{2})[-/.]\d{2,4})\b""")
+        val datePattern = Pattern.compile("""\b(\d{1,2}[-/. ](?:[A-Za-z]{3}|\d{1,2})[-/. ]\d{2,4})\b""")
         val dateMatcher = datePattern.matcher(trimmed)
         val date = if (dateMatcher.find()) {
             parseDate(dateMatcher.group(1) ?: "")
         } else null
 
-        val infoPattern = Pattern.compile("""(?i)(?:info[:\s*]*|remarks?[:\s*]*|ref[:\s*]*)([A-Za-z0-9*_-]+)""")
+        val infoPattern = Pattern.compile("""(?i)(?:info[:\s*]*|remarks?[:\s*]*|ref[:\s*]*|upi\s*ref[:\s*]*)([A-Za-z0-9*_-]+)""")
         val infoMatcher = infoPattern.matcher(trimmed)
         val info = if (infoMatcher.find()) infoMatcher.group(1) else null
 

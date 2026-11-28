@@ -1,7 +1,13 @@
 package org.totschnig.myexpenses.compose.reconcile
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +33,23 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FindInPage
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -48,6 +64,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +72,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,20 +80,30 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.totschnig.myexpenses.R
 import org.totschnig.myexpenses.model.CurrencyUnit
 import org.totschnig.myexpenses.reconcile.BalanceCheckpoint
 import org.totschnig.myexpenses.reconcile.BalanceVerificationResult
+import org.totschnig.myexpenses.reconcile.BankSmsScanner
 import org.totschnig.myexpenses.reconcile.BankStatementParser
+import org.totschnig.myexpenses.reconcile.DocumentReadResult
 import org.totschnig.myexpenses.reconcile.MatchStatus
 import org.totschnig.myexpenses.reconcile.ReconcileResult
 import org.totschnig.myexpenses.reconcile.ReconciliationReport
+import org.totschnig.myexpenses.reconcile.SmsScanResult
+import org.totschnig.myexpenses.reconcile.StatementDocumentReader
 import org.totschnig.myexpenses.reconcile.StatementReconciler
 import org.totschnig.myexpenses.reconcile.StatementTransaction
 import org.totschnig.myexpenses.viewmodel.data.Transaction2
@@ -103,33 +131,166 @@ fun StatementReconciliationDialog(
     onDismiss: () -> Unit,
     onAddMissingTransaction: (StatementTransaction) -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
     var selectedTab by rememberSaveable { mutableStateOf(ReconcileTab.QUICK_BALANCE) }
 
-    // Quick Balance State
-    var smsText by rememberSaveable { mutableStateOf("") }
     val currentBalanceMajor = remember(currentBalance, currencyUnit) {
         BigDecimal(currentBalance).movePointLeft(currencyUnit.fractionDigits)
     }
 
-    val checkpoint = remember(smsText) {
-        if (smsText.isNotBlank()) BankStatementParser.parseSmsBalance(smsText) else null
+    // --- SMS Inbox Intelligence State ---
+    var hasSmsPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.READ_SMS
+            ) == PackageManager.PERMISSION_GRANTED
+        )
     }
 
-    val verificationResult = remember(checkpoint, currentBalanceMajor) {
-        checkpoint?.let { BankStatementParser.verifyBalance(currentBalanceMajor, it) }
+    val smsPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasSmsPermission = isGranted
     }
 
-    // Statement Reconcile State
-    var statementInputText by rememberSaveable { mutableStateOf("") }
+    var isScanningSms by remember { mutableStateOf(false) }
+    var smsScanResult by remember { mutableStateOf<SmsScanResult?>(null) }
+    var selectedCheckpoint by remember { mutableStateOf<BalanceCheckpoint?>(null) }
+    var manualSmsText by rememberSaveable { mutableStateOf("") }
+
+    fun refreshSmsScan() {
+        if (hasSmsPermission) {
+            isScanningSms = true
+            coroutineScope.launch(Dispatchers.IO) {
+                val result = BankSmsScanner.scanInbox(context, accountLabel)
+                withContext(Dispatchers.Main) {
+                    smsScanResult = result
+                    selectedCheckpoint = result.latestCheckpoint
+                    isScanningSms = false
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(hasSmsPermission, accountLabel) {
+        refreshSmsScan()
+    }
+
+    val activeCheckpoint = remember(selectedCheckpoint, manualSmsText) {
+        if (manualSmsText.isNotBlank()) {
+            BankStatementParser.parseSmsBalance(manualSmsText) ?: selectedCheckpoint
+        } else {
+            selectedCheckpoint
+        }
+    }
+
+    val verificationResult = remember(activeCheckpoint, currentBalanceMajor) {
+        activeCheckpoint?.let { BankStatementParser.verifyBalance(currentBalanceMajor, it) }
+    }
+
+    // --- Statement Document Import State (PDF & CSV) ---
+    var importedFileName by remember { mutableStateOf<String?>(null) }
+    var importedPageCount by remember { mutableStateOf<Int?>(null) }
+    var isProcessingDoc by remember { mutableStateOf(false) }
+    var docErrorMessage by remember { mutableStateOf<String?>(null) }
     var reconciliationReport by remember { mutableStateOf<ReconciliationReport?>(null) }
     var itemFilter by rememberSaveable { mutableStateOf(ItemFilter.UNMATCHED_ONLY) }
 
-    fun runReconciliation() {
-        if (statementInputText.isNotBlank()) {
-            val parsed = BankStatementParser.parse(statementInputText)
-            reconciliationReport = StatementReconciler.reconcile(parsed, appTransactions)
+    // Password Prompt Dialog State for encrypted PDFs
+    var isPasswordDialogOpen by remember { mutableStateOf(false) }
+    var pendingPasswordDocUri by remember { mutableStateOf<Uri?>(null) }
+    var passwordInput by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+
+    fun processDocument(uri: Uri, password: String? = null) {
+        isProcessingDoc = true
+        docErrorMessage = null
+        coroutineScope.launch(Dispatchers.IO) {
+            val result = StatementDocumentReader.readDocument(context, uri, password)
+            withContext(Dispatchers.Main) {
+                isProcessingDoc = false
+                when (result) {
+                    is DocumentReadResult.Success -> {
+                        importedFileName = result.fileName
+                        importedPageCount = result.pageCount
+                        isPasswordDialogOpen = false
+                        passwordInput = ""
+                        passwordError = null
+                        reconciliationReport = StatementReconciler.reconcile(result.transactions, appTransactions)
+                    }
+                    is DocumentReadResult.PasswordRequired -> {
+                        pendingPasswordDocUri = result.uri
+                        importedFileName = result.fileName
+                        passwordError = result.errorMessage
+                        isPasswordDialogOpen = true
+                    }
+                    is DocumentReadResult.Error -> {
+                        docErrorMessage = result.message
+                    }
+                }
+            }
         }
+    }
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            processDocument(uri)
+        }
+    }
+
+    // Password Dialog
+    if (isPasswordDialogOpen && pendingPasswordDocUri != null) {
+        AlertDialog(
+            onDismissRequest = { isPasswordDialogOpen = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Password Protected PDF")
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Enter password to decrypt '${importedFileName ?: "Statement PDF"}'.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            passwordError = null
+                        },
+                        label = { Text("PDF Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        isError = passwordError != null,
+                        supportingText = passwordError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val uri = pendingPasswordDocUri ?: return@Button
+                        processDocument(uri, passwordInput)
+                    },
+                    enabled = passwordInput.isNotBlank()
+                ) {
+                    Text("Unlock & Import")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { isPasswordDialogOpen = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     Dialog(
@@ -176,45 +337,57 @@ fun StatementReconciliationDialog(
                     Tab(
                         selected = selectedTab == ReconcileTab.QUICK_BALANCE,
                         onClick = { selectedTab = ReconcileTab.QUICK_BALANCE },
-                        text = { Text("Quick Balance Check") }
+                        text = { Text("SMS Checkpoint") }
                     )
                     Tab(
                         selected = selectedTab == ReconcileTab.STATEMENT_RECONCILE,
                         onClick = { selectedTab = ReconcileTab.STATEMENT_RECONCILE },
-                        text = { Text("Bank Statement Matcher") }
+                        text = { Text("Document Import") }
                     )
                 }
 
                 when (selectedTab) {
                     ReconcileTab.QUICK_BALANCE -> {
                         QuickBalanceCheckContent(
-                            smsText = smsText,
-                            onSmsTextChange = { smsText = it },
+                            hasSmsPermission = hasSmsPermission,
+                            onRequestPermission = { smsPermissionLauncher.launch(Manifest.permission.READ_SMS) },
+                            isScanningSms = isScanningSms,
+                            smsScanResult = smsScanResult,
+                            selectedCheckpoint = activeCheckpoint,
+                            onSelectCheckpoint = {
+                                selectedCheckpoint = it
+                                manualSmsText = ""
+                            },
+                            onRefreshScan = ::refreshSmsScan,
+                            manualSmsText = manualSmsText,
+                            onManualSmsTextChange = { manualSmsText = it },
                             onPasteClipboard = {
-                                clipboardManager.getText()?.text?.let { smsText = it }
+                                clipboardManager.getText()?.text?.let { manualSmsText = it }
                             },
                             currentBalanceMajor = currentBalanceMajor,
                             currencyUnit = currencyUnit,
-                            checkpoint = checkpoint,
                             verificationResult = verificationResult,
                             onSwitchToStatementReconcile = { selectedTab = ReconcileTab.STATEMENT_RECONCILE }
                         )
                     }
 
                     ReconcileTab.STATEMENT_RECONCILE -> {
-                        StatementReconcileContent(
-                            inputText = statementInputText,
-                            onInputTextChange = {
-                                statementInputText = it
-                                reconciliationReport = null
+                        StatementDocumentImportContent(
+                            onPickDocument = {
+                                documentPickerLauncher.launch(
+                                    arrayOf(
+                                        "application/pdf",
+                                        "text/csv",
+                                        "text/comma-separated-values",
+                                        "text/plain",
+                                        "*/*"
+                                    )
+                                )
                             },
-                            onPasteClipboard = {
-                                clipboardManager.getText()?.text?.let {
-                                    statementInputText = it
-                                    reconciliationReport = null
-                                }
-                            },
-                            onReconcile = ::runReconciliation,
+                            isProcessing = isProcessingDoc,
+                            fileName = importedFileName,
+                            pageCount = importedPageCount,
+                            errorMessage = docErrorMessage,
                             report = reconciliationReport,
                             itemFilter = itemFilter,
                             onFilterChange = { itemFilter = it },
@@ -230,58 +403,123 @@ fun StatementReconciliationDialog(
 
 @Composable
 private fun QuickBalanceCheckContent(
-    smsText: String,
-    onSmsTextChange: (String) -> Unit,
+    hasSmsPermission: Boolean,
+    onRequestPermission: () -> Unit,
+    isScanningSms: Boolean,
+    smsScanResult: SmsScanResult?,
+    selectedCheckpoint: BalanceCheckpoint?,
+    onSelectCheckpoint: (BalanceCheckpoint) -> Unit,
+    onRefreshScan: () -> Unit,
+    manualSmsText: String,
+    onManualSmsTextChange: (String) -> Unit,
     onPasteClipboard: () -> Unit,
     currentBalanceMajor: BigDecimal,
     currencyUnit: CurrencyUnit,
-    checkpoint: BalanceCheckpoint?,
     verificationResult: BalanceVerificationResult?,
     onSwitchToStatementReconcile: () -> Unit
 ) {
+    var showManualInput by rememberSaveable { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // SMS Inbox Intelligence Status Banner
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Instant Balance Sanity Check",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Paste any bank SMS or statement snippet containing your available balance (e.g. 'Avl Bal Rs. 31,500.23'). MyExpenses will instantly verify whether your ledger matches your bank down to the paise.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Sms, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = "SMS Inbox Intelligence",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (hasSmsPermission) {
+                            IconButton(onClick = onRefreshScan, enabled = !isScanningSms) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Refresh SMS")
+                            }
+                        }
+                    }
+
+                    if (smsScanResult?.detectedBank != null || smsScanResult?.detectedDigits != null) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            smsScanResult.detectedBank?.let { bank ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = bank,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            smsScanResult.detectedDigits?.let { digits ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {
+                                    Text(
+                                        text = "A/c: ...$digits",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (!hasSmsPermission) {
+                        Text(
+                            text = "Grant SMS permission to automatically scan your inbox for bank balance updates without manual copy-pasting.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = onRequestPermission,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Enable Bank SMS Scan")
+                        }
+                    } else if (isScanningSms) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text("Scanning device SMS inbox...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else if (smsScanResult?.checkpoints.isNullOrEmpty()) {
+                        Text(
+                            text = "No bank balance SMS found for this account. You can paste an SMS manually below.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
 
-        item {
-            OutlinedTextField(
-                value = smsText,
-                onValueChange = onSmsTextChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Paste Bank SMS or Message") },
-                placeholder = { Text("ICICI Bank Acc XX407 debited Rs. 489.00 on 01-Nov-26 InfoBIL*INFT*FK15.Avl Bal Rs. 31,500.23...") },
-                trailingIcon = {
-                    IconButton(onClick = onPasteClipboard) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
-                    }
-                },
-                maxLines = 5
-            )
-        }
-
-        if (verificationResult != null && checkpoint != null) {
+        // Live Balance Verification Card
+        if (verificationResult != null && selectedCheckpoint != null) {
             item {
                 ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
@@ -324,7 +562,7 @@ private fun QuickBalanceCheckContent(
                         ) {
                             Text("Bank Available Balance:", style = MaterialTheme.typography.bodyMedium)
                             Text(
-                                "${currencyUnit.symbol} ${checkpoint.availableBalance.setScale(2, RoundingMode.HALF_UP).toPlainString()}",
+                                "${currencyUnit.symbol} ${selectedCheckpoint.availableBalance.setScale(2, RoundingMode.HALF_UP).toPlainString()}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -366,22 +604,165 @@ private fun QuickBalanceCheckContent(
                             ) {
                                 Icon(Icons.Default.FindInPage, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Find Missing Entries in Statement")
+                                Text("Reconcile via Statement Document")
+                            }
+                        }
+
+                        // Checkpoint detail metadata
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            selectedCheckpoint.transactionDate?.let { date ->
+                                Text("Checkpoint Date: $date", style = MaterialTheme.typography.labelSmall)
+                            }
+                            selectedCheckpoint.transactionAmount?.let { amt ->
+                                val sign = if (selectedCheckpoint.isDebit) "-" else "+"
+                                Text("Txn Amount: $sign ${currencyUnit.symbol} $amt", style = MaterialTheme.typography.labelSmall)
+                            }
+                            selectedCheckpoint.info?.let { info ->
+                                Text("Txn Info: $info", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
                 }
             }
         }
+
+        // Recent SMS Checkpoints Feed (if available)
+        val feed = smsScanResult?.checkpoints.orEmpty()
+        if (feed.isNotEmpty()) {
+            item {
+                Text(
+                    text = "Historical SMS Checkpoints (${feed.size})",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            items(feed) { cp ->
+                val isSelected = cp == selectedCheckpoint
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelectCheckpoint(cp) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = cp.transactionDate?.toString() ?: "Recent",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                cp.accountDigits?.let {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = "...$it",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            Text(
+                                text = cp.info ?: cp.rawText.take(50),
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "Avl: ${currencyUnit.symbol} ${cp.availableBalance.setScale(2, RoundingMode.HALF_UP).toPlainString()}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            cp.transactionAmount?.let { amt ->
+                                val sign = if (cp.isDebit) "-" else "+"
+                                Text(
+                                    text = "$sign ${currencyUnit.symbol} $amt",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (cp.isDebit) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Manual SMS Paste Fallback Section
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showManualInput = !showManualInput }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Manual SMS Text Entry",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Icon(
+                    imageVector = if (showManualInput) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null
+                )
+            }
+        }
+
+        if (showManualInput) {
+            item {
+                OutlinedTextField(
+                    value = manualSmsText,
+                    onValueChange = onManualSmsTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Paste Bank SMS or Message") },
+                    placeholder = { Text("ICICI Bank Acc XX407 debited Rs. 489.00 on 01-Nov-26... Avl Bal Rs. 31,500.23") },
+                    trailingIcon = {
+                        IconButton(onClick = onPasteClipboard) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
+                        }
+                    },
+                    maxLines = 4
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun StatementReconcileContent(
-    inputText: String,
-    onInputTextChange: (String) -> Unit,
-    onPasteClipboard: () -> Unit,
-    onReconcile: () -> Unit,
+private fun StatementDocumentImportContent(
+    onPickDocument: () -> Unit,
+    isProcessing: Boolean,
+    fileName: String?,
+    pageCount: Int?,
+    errorMessage: String?,
     report: ReconciliationReport?,
     itemFilter: ItemFilter,
     onFilterChange: (ItemFilter) -> Unit,
@@ -395,38 +776,133 @@ private fun StatementReconcileContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (report == null) {
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = onInputTextChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                label = { Text("Paste Bank Statement (CSV or Text)") },
-                placeholder = { Text("Paste ICICI statement lines, CSV text, or transaction dump...") },
-                trailingIcon = {
-                    IconButton(onClick = onPasteClipboard) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = "Paste")
+            // Document Import Prompt Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.UploadFile,
+                                contentDescription = null,
+                                modifier = Modifier.size(32.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Document-Only Statement Import",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Select your bank statement PDF (including password-encrypted statements) or CSV. MyExpenses extracts transactions with 100% precision and reconciles them against your ledger.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (isProcessing) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Text("Processing document & extracting tables...", style = MaterialTheme.typography.bodySmall)
+                        }
+                    } else {
+                        Button(
+                            onClick = onPickDocument,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Choose Statement File (PDF / CSV)")
+                        }
+                    }
+
+                    if (errorMessage != null) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                Text(
+                                    text = errorMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
                     }
                 }
-            )
-
-            Button(
-                onClick = onReconcile,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = inputText.isNotBlank()
-            ) {
-                Icon(Icons.Default.FindInPage, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Run 3-Tier Reconciliation")
             }
         } else {
-            // Reconciliation Summary Card
+            // Reconciled Statement Document Header Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text(
+                                text = fileName ?: "Statement Document",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            pageCount?.let { pages ->
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        text = "$pages pages",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = onPickDocument,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Change File", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
                     val matchPercent = if (report.totalStatementCount > 0) {
                         (report.matchedCount.toDouble() / report.totalStatementCount.toDouble()) * 100.0
                     } else 0.0
@@ -457,13 +933,13 @@ private fun StatementReconcileContent(
 
                     if (report.unmatchedCount > 0) {
                         Text(
-                            text = "⚠️ Found ${report.unmatchedCount} statement transactions missing from MyExpenses. Tap '+ Add' to record them immediately.",
+                            text = "Found ${report.unmatchedCount} statement transactions missing from MyExpenses. Tap '+ Add to App' to record them immediately.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
                     } else {
                         Text(
-                            text = "🎉 All statement transactions accounted for in MyExpenses!",
+                            text = "All statement transactions accounted for in MyExpenses!",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF2E7D32)
                         )
@@ -587,7 +1063,7 @@ private fun StatementItemCard(
 
                     is MatchStatus.UnmatchedInApp -> {
                         Text(
-                            text = "❌ Missing from MyExpenses",
+                            text = "Missing from MyExpenses",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                             fontWeight = FontWeight.Bold
