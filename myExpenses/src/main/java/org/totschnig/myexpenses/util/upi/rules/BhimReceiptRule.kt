@@ -64,7 +64,7 @@ object BhimReceiptRule : ReceiptParserRule {
                 if (l.contains("@")) break
             }
             val stitched = rightColumnNoise.replace(sb.toString(), "").replace(Regex("""\s+"""), "")
-            upiId = Regex("""[A-Za-z0-9.\-_]{2,}@[A-Za-z]{2,}""").find(stitched)?.value
+            upiId = Regex("""[A-Za-z0-9][A-Za-z0-9._\-]*@[A-Za-z]{2,}""").find(stitched)?.value
         }
         if (upiId == null) {
             upiId = UpiReceiptParser.extractUpiId(lines, effectiveUserPhones, fullText)
@@ -116,6 +116,8 @@ object BhimReceiptRule : ReceiptParserRule {
             bankHint = UpiReceiptParser.extractBankHint(lines, fullText)
         }
 
+        val paymentMethod = UpiReceiptParser.detectPaymentMethod(fullText)
+
         return UpiReceiptData(
             amount = amount,
             payeeName = payee,
@@ -125,7 +127,7 @@ object BhimReceiptRule : ReceiptParserRule {
             referenceNumber = utr,
             comment = comment,
             accountOrBankHint = bankHint,
-            paymentMethodHint = "UPI",
+            paymentMethodHint = paymentMethod,
             isExpense = true,
             rawText = fullText
         )

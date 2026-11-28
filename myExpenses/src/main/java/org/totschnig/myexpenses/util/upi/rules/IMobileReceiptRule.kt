@@ -96,6 +96,8 @@ object IMobileReceiptRule : ReceiptParserRule {
         // 4. Debit Account: Default to "ICICI Bank" for iMobile
         val bankHint = "ICICI Bank"
 
+        val paymentMethod = UpiReceiptParser.detectPaymentMethod(fullText)
+
         return UpiReceiptData(
             amount = amount,
             payeeName = payee,
@@ -105,7 +107,7 @@ object IMobileReceiptRule : ReceiptParserRule {
             referenceNumber = utr,
             comment = comment,
             accountOrBankHint = bankHint,
-            paymentMethodHint = "UPI",
+            paymentMethodHint = paymentMethod,
             isExpense = true,
             rawText = fullText
         )
