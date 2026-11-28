@@ -66,7 +66,7 @@ object UpiReceiptParser {
     private val IGNORE_PAYEE_WORDS = setOf(
         "sender", "sender:", "sent from", "sent from:", "paid from", "paid from:", "payer",
         "to", "to:", "paid to", "payment to", "sent to", "biller", "biller name", "beneficiary",
-        "beneficiary name", "customer name", "notes", "notes:",
+        "beneficiary name", "customer name", "notes", "notes:", "banking name", "debited account", "process details", "more details",
         "paid from", "payment completed", "transaction successful", "payment successful",
         "bill payment successful", "bill payment successful!", "bill paymentsuccessful!", "bill paymentsuccessful",
         "money sent", "money sent!", "biller id", "biller ld", "biller name", "bill amount", "transaction status",
@@ -1270,6 +1270,15 @@ object UpiReceiptParser {
             "samsung wallet", "google pay", "phonepe", "paytm", "paid from", "sent from"
         )
         if (placeholders.any { lower == it || lower.contains("samsung wallet") || lower.contains("google pay") || lower.contains("phonepe") }) return false
+        // BHIM / bank "empty" remark placeholders: "NO REMARK", "No Remarks", "No comment", "Not available"
+        if (lower.matches(Regex("""^(?:no|nil|without)\s+(?:remarks?|comments?|message|notes?|description)$""")) || lower == "not available") return false
+        // Two-column layouts (BHIM) can leak the UPI ID / payee fragment under the Remarks label
+        if (candidate.contains("@") || candidate.matches(Regex("""^-?\d{5,}.*"""))) return false
+        if (payeeName != null) {
+            val compactPayee = payeeName.lowercase(Locale.ROOT).replace(Regex("""\s+"""), "")
+            val compactCand = lower.replace(Regex("""\s+"""), "")
+            if (compactCand.length >= 4 && compactPayee.contains(compactCand)) return false
+        }
 
         // Must not match payee name
         if (payeeName != null) {
