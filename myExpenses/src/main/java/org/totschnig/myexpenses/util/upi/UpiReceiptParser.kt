@@ -1186,7 +1186,15 @@ object UpiReceiptParser {
     }
 
     private fun extractComment(lines: List<String>, payeeName: String?, fullText: String): String? {
-        // 1. Explicit labeled comments: "Notes: ...", "Remarks: ...", "Message: ..."
+        // 1. Explicit labeled comments across fullText or line-by-line: "Notes: ...", "Remarks: ...", "Message: ..."
+        val explicitInFullText = Regex("""(?i)\b(?:notes?|remarks?|message|comments?|purpose)\s*[:\-]?\s*[\n\r\s]*\s*([a-zA-Z0-9\s.,'#\-]{2,50})""").find(fullText)
+        if (explicitInFullText != null) {
+            val candidate = cleanComment(explicitInFullText.groupValues[1].lines().firstOrNull() ?: "")
+            if (isValidUserComment(candidate, payeeName) && !isSystemForText(candidate)) {
+                return candidate
+            }
+        }
+
         for (i in lines.indices) {
             val line = lines[i]
             val m = Regex("""(?i)^\s*(?:notes?|remarks?|message|comments?|purpose)\s*[:\-]\s*(.+)""").find(line)
@@ -1225,7 +1233,7 @@ object UpiReceiptParser {
                 val candidateLine = lines[idx].trim()
                 if (candidateLine.isEmpty()) continue
                 if (isReferenceOrAccountLine(candidateLine) || containsDate(candidateLine)) break
-                if (candidateLine.matches(Regex("""(?i).*(?:paid\s+successfully!?|payment\s+successful!?|transaction\s+successful!?).*"""))) break
+                if (candidateLine.matches(Regex("""(?i).*(?:paid\s+successfully!?|payment\s+successful!?|transaction\s+successful!?|paid\s+from|sent\s+from|wallet).*"""))) break
                 val cleanedAmt = cleanAmountCandidate(candidateLine)
                 if (STANDALONE_AMOUNT_PATTERN.matcher(cleanedAmt).matches() || RUPEE_AMOUNT_PATTERN.matcher(candidateLine).find()) {
                     break
@@ -1245,21 +1253,23 @@ object UpiReceiptParser {
         val systemWords = listOf(
             "business", "queries", "assistance", "support", "help",
             "more details", "terms", "customer care", "loan", "personal loan",
-            "further", "any", "feedback", "cashback", "savings"
+            "further", "any", "feedback", "cashback", "savings", "powered by", "upi",
+            "axis bank", "hdfc bank", "icici bank", "samsung wallet"
         )
-        return systemWords.any { lower == it || lower.startsWith("$it ") }
+        return systemWords.any { lower == it || lower.startsWith("$it ") || lower.contains(it) }
     }
 
     private fun isValidUserComment(candidate: String, payeeName: String?): Boolean {
         if (candidate.length < 2) return false
         val lower = candidate.lowercase(Locale.ROOT).trim()
 
-        // Ignore generic default bank remark placeholders
+        // Ignore generic default bank remark placeholders and app banners
         val placeholders = listOf(
             "upi payment", "upi txn", "upi transfer", "payment", "upi",
-            "na", "nil", "none", "n/a", "ok", "yes", "no", "success"
+            "na", "nil", "none", "n/a", "ok", "yes", "no", "success",
+            "samsung wallet", "google pay", "phonepe", "paytm", "paid from", "sent from"
         )
-        if (placeholders.contains(lower)) return false
+        if (placeholders.any { lower == it || lower.contains("samsung wallet") || lower.contains("google pay") || lower.contains("phonepe") }) return false
 
         // Must not match payee name
         if (payeeName != null) {

@@ -16,7 +16,34 @@ import kotlin.coroutines.suspendCoroutine
 object UpiOcrScanner {
 
     suspend fun scanReceipt(context: Context, uri: Uri): Result<UpiReceiptData> = withContext(Dispatchers.IO) {
-        try {
+        // 1. Primary: RapidOCR (PaddleOCR PP-OCRv4 ONNX Runtime with 2D Key-Value Pairing)
+        val rapidResult = try {
+            RapidOcrScanner.scan(context, uri)
+        } catch (e: Throwable) {
+            Timber.w(e, "RapidOCR attempt failed, falling back to ML Kit")
+            Result.failure(e)
+        }
+
+        if (rapidResult.isSuccess) {
+            val data = rapidResult.getOrNull()
+            if (data != null && data.isValid) {
+                Timber.i(
+                    "RapidOCR successfully scanned receipt: amount=%s, payee=%s, comment=%s, utr=%s",
+                    data.amount,
+                    data.payeeName,
+                    data.comment,
+                    data.referenceNumber
+                )
+                return@withContext rapidResult
+            }
+        }
+
+        // 2. Graceful Fallback: Google ML Kit
+        scanWithMlKit(context, uri)
+    }
+
+    private suspend fun scanWithMlKit(context: Context, uri: Uri): Result<UpiReceiptData> {
+        return try {
             val image = InputImage.fromFilePath(context, uri)
             val recognizer = TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build())
             val textResult = suspendCoroutine { cont ->
@@ -44,9 +71,9 @@ object UpiOcrScanner {
                 userVpa = userVpa
             )
 
-            Log.i("UpiOcrScanner", "UPI receipt parsed: amount=${parsed.amount}, payee=${parsed.payeeName}, dt=${parsed.dateTime}, utr=${parsed.referenceNumber}")
+            Log.i("UpiOcrScanner", "UPI receipt parsed via ML Kit: amount=${parsed.amount}, payee=${parsed.payeeName}, dt=${parsed.dateTime}, utr=${parsed.referenceNumber}")
             Timber.d(
-                "UPI receipt parsed: isExpense=%b, amount=%s, payee=%s, recipient=%s, upiId=%s, utr=%s",
+                "UPI receipt parsed via ML Kit: isExpense=%b, amount=%s, payee=%s, recipient=%s, upiId=%s, utr=%s",
                 parsed.isExpense,
                 parsed.amount,
                 parsed.payeeName,
@@ -56,8 +83,8 @@ object UpiOcrScanner {
             )
             Result.success(parsed)
         } catch (e: Exception) {
-            Log.e("UpiOcrScanner", "Failed to scan UPI receipt", e)
-            Timber.e(e, "Failed to scan UPI receipt")
+            Log.e("UpiOcrScanner", "Failed to scan UPI receipt via ML Kit", e)
+            Timber.e(e, "Failed to scan UPI receipt via ML Kit")
             Result.failure(e)
         }
     }

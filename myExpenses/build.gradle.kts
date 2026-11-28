@@ -270,6 +270,7 @@ dependencies {
     implementation(libs.reorderable)
     implementation(libs.text.recognition.devanagari)
     implementation(libs.pdfbox.android)
+    implementation(libs.rapidocr4j.android)
 
     debugImplementation(libs.androidx.fragment.testing.manifest)
     testImplementation(libs.androidx.fragment.testing)

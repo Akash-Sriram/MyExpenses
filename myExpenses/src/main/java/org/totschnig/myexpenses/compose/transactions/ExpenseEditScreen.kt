@@ -302,7 +302,13 @@ fun ExpenseEditScreen(
         mutableStateOf(initialAmountMajor)
     }
     var amountText by rememberSaveable {
-        mutableStateOf(if (initialAmountMajor > BigDecimal.ZERO) initialAmountMajor.stripTrailingZeros().toPlainString() else "")
+        mutableStateOf(if (initialAmountMajor > BigDecimal.ZERO) {
+            if (initialAmountMajor.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0) {
+                initialAmountMajor.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+            } else {
+                initialAmountMajor.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
+            }
+        } else "")
     }
     var showCalculator by rememberSaveable {
         mutableStateOf(false)
@@ -506,7 +512,11 @@ fun ExpenseEditScreen(
             val newAmt = initialData.amount.amountMajor.abs()
             amount = newAmt
             if (newAmt > BigDecimal.ZERO) {
-                amountText = newAmt.stripTrailingZeros().toPlainString()
+                amountText = if (newAmt.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0) {
+                    newAmt.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                } else {
+                    newAmt.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString()
+                }
             }
             selectedAccountId = initialData.accountId
             transferAccountId = initialData.transferEditData?.transferAccountId ?: accounts.getOrNull(1)?.id ?: 0L

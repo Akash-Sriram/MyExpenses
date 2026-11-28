@@ -69,6 +69,7 @@ snakeyaml = "2.7"
 sqlcipher = "4.12.0"
 tesseract4androidOpenmp = "4.8.0"
 pdfboxAndroid = "2.0.27.0"
+rapidocr4j = "1.0.0"
 mlkitTextRecognition = "16.0.1"
 mlkitTextRecognitionBundledCommon = "17.0.0"
 timberVersion = "5.0.1"
@@ -176,6 +177,7 @@ play-services-auth = { module = "com.google.android.gms:play-services-auth", ver
 play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "playServicesCodeScanner" }
 play-services-mlkit-text-recognition-common = { module = "com.google.android.gms:play-services-mlkit-text-recognition-common", version.ref = "playServicesMlkitTextRecognitionCommon" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfboxAndroid" }
+rapidocr4j-android = { module = "io.github.hzkitty:rapidocr4j-android", version.ref = "rapidocr4j" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectricVersion" }
 saxon-he = { module = "net.sf.saxon:Saxon-HE", version.ref = "saxon" }
 screengrab = { module = "tools.fastlane:screengrab", version.ref = "screengrab" }
