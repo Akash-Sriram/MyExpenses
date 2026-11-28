@@ -351,17 +351,19 @@ object BankStatementParser {
                 }
             } else if (amtMatches.size >= 2) {
                 val txnAmt = amtMatches[amtMatches.size - 2]
-                withdrawal = txnAmt
+                val isCredit = blockText.contains("credit", ignoreCase = true) ||
+                               blockText.contains("deposit", ignoreCase = true) ||
+                               blockText.contains("salary", ignoreCase = true) ||
+                               blockText.contains("neft", ignoreCase = true)
+                if (isCredit) {
+                    deposit = txnAmt
+                } else {
+                    withdrawal = txnAmt
+                }
             }
 
             if (balance > BigDecimal.ZERO) {
-                if (prevBalance == null) {
-                    if (deposit > BigDecimal.ZERO) prevBalance = balance.subtract(deposit)
-                    else if (withdrawal > BigDecimal.ZERO) prevBalance = balance.add(withdrawal)
-                    else prevBalance = balance
-                } else {
-                    prevBalance = balance
-                }
+                prevBalance = balance
             }
 
             val isDeposit = deposit > BigDecimal.ZERO
