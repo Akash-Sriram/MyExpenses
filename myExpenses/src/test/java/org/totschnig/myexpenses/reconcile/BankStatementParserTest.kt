@@ -157,4 +157,109 @@ class BankStatementParserTest {
         assertEquals(0, report.unmatchedCount)
         assertTrue(report.items.first().status is MatchStatus.Matched)
     }
+
+    @Test
+    fun testMergedTransactionsMatchingPairwise() {
+        // Test Sridhar ₹3 + ₹2 = ₹5
+        val stSridhar1 = StatementTransaction(
+            sNo = 1,
+            date = LocalDate.of(2026, 9, 15),
+            payeeOrRemarks = "SRIDHAR R",
+            withdrawal = BigDecimal("3.00"),
+            deposit = BigDecimal.ZERO,
+            amount = BigDecimal("-3.00"),
+            balance = BigDecimal("1000.00"),
+            utr = "505062002586"
+        )
+        val stSridhar2 = StatementTransaction(
+            sNo = 2,
+            date = LocalDate.of(2026, 9, 15),
+            payeeOrRemarks = "SRIDHAR R",
+            withdrawal = BigDecimal("2.00"),
+            deposit = BigDecimal.ZERO,
+            amount = BigDecimal("-2.00"),
+            balance = BigDecimal("998.00"),
+            utr = "505194602586"
+        )
+        val appSridhar = AppTransactionSummary(
+            id = 2235L,
+            date = LocalDate.of(2026, 9, 15),
+            amount = BigDecimal("-5.00"),
+            payee = "Sridhar R"
+        )
+
+        // Test Vigneshwar ₹1200 + ₹500 = ₹1700
+        val stVignesh1 = StatementTransaction(
+            sNo = 3,
+            date = LocalDate.of(2026, 10, 5),
+            payeeOrRemarks = "VIGNESHWAR",
+            withdrawal = BigDecimal("1200.00"),
+            deposit = BigDecimal.ZERO,
+            amount = BigDecimal("-1200.00"),
+            balance = BigDecimal("50000.00"),
+            utr = "628666362786"
+        )
+        val stVignesh2 = StatementTransaction(
+            sNo = 4,
+            date = LocalDate.of(2026, 10, 5),
+            payeeOrRemarks = "VIGNESHWAR",
+            withdrawal = BigDecimal("500.00"),
+            deposit = BigDecimal.ZERO,
+            amount = BigDecimal("-500.00"),
+            balance = BigDecimal("49500.00"),
+            utr = "110840262435"
+        )
+        val appVignesh = AppTransactionSummary(
+            id = 2300L,
+            date = LocalDate.of(2026, 10, 5),
+            amount = BigDecimal("-1700.00"),
+            payee = "VIGNESHWAR B"
+        )
+
+        // Test Nandhini +₹100 + +₹100 = +₹200
+        val stNandhini1 = StatementTransaction(
+            sNo = 5,
+            date = LocalDate.of(2026, 10, 6),
+            payeeOrRemarks = "NANDHINI D",
+            withdrawal = BigDecimal.ZERO,
+            deposit = BigDecimal("100.00"),
+            amount = BigDecimal("100.00"),
+            balance = BigDecimal("49600.00"),
+            utr = "627919581999"
+        )
+        val stNandhini2 = StatementTransaction(
+            sNo = 6,
+            date = LocalDate.of(2026, 10, 6),
+            payeeOrRemarks = "NANDHINI D",
+            withdrawal = BigDecimal.ZERO,
+            deposit = BigDecimal("100.00"),
+            amount = BigDecimal("100.00"),
+            balance = BigDecimal("49700.00"),
+            utr = "627919584253"
+        )
+        val appNandhini = AppTransactionSummary(
+            id = 2318L,
+            date = LocalDate.of(2026, 10, 6),
+            amount = BigDecimal("200.00"),
+            payee = "NANDHINI DEVI M"
+        )
+
+        val statementList = listOf(stSridhar1, stSridhar2, stVignesh1, stVignesh2, stNandhini1, stNandhini2)
+        val appList = listOf(appSridhar, appVignesh, appNandhini)
+
+        val report = StatementReconciler.reconcileSummaries(statementList, appList)
+
+        assertEquals("All 6 statement items should be matched", 6, report.matchedCount)
+        assertEquals("0 statement items should be unmatched", 0, report.unmatchedCount)
+        assertEquals("0 app transactions should be unmatched", 0, report.unmatchedAppTransactions.size)
+
+        for (item in report.items) {
+            val status = item.status
+            assertTrue("Item ${item.statementTx.sNo} should be Matched", status is MatchStatus.Matched)
+            assertTrue(
+                "Match reason should denote Merged in App: ${(status as MatchStatus.Matched).reason}",
+                status.reason.startsWith("Merged in App")
+            )
+        }
+    }
 }

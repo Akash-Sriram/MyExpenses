@@ -1206,8 +1206,9 @@ private fun StatementItemRow(
                 ) {
                     when (status) {
                         is MatchStatus.Matched -> {
+                            val isMerged = status.reason.startsWith("Merged")
                             Text(
-                                text = "✓ Matched (App ID: ${status.appTransactionId})",
+                                text = if (isMerged) "✓ Merged in App (ID: ${status.appTransactionId})" else "✓ Matched (App ID: ${status.appTransactionId})",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color(0xFF2E7D32),
                                 fontWeight = FontWeight.Medium
