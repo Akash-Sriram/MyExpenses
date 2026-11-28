@@ -1656,6 +1656,80 @@ abstract class BaseTransactionDatabase(
         }
     }
 
+    fun SupportSQLiteDatabase.cleanupDuplicatePaymentMethods() {
+        try {
+            for (pm in PreDefinedPaymentMethod.entries) {
+                val candidateIds = mutableListOf<Long>()
+                query(
+                    "SELECT $KEY_ROWID FROM $TABLE_METHODS WHERE $KEY_LABEL = ? OR UPPER(REPLACE($KEY_LABEL, ' ', '')) = ?",
+                    arrayOf(pm.name, pm.name.replace("_", ""))
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        candidateIds.add(cursor.getLong(0))
+                    }
+                }
+                if (candidateIds.size > 1) {
+                    var bestId = candidateIds.first()
+                    var maxTxCount = -1
+                    for (candId in candidateIds) {
+                        val count = query(
+                            "SELECT count(*) FROM $TABLE_TRANSACTIONS WHERE $KEY_METHODID = ?",
+                            arrayOf(candId.toString())
+                        ).use { if (it.moveToFirst()) it.getInt(0) else 0 }
+                        if (count > maxTxCount) {
+                            maxTxCount = count
+                            bestId = candId
+                        }
+                    }
+                    val primaryId = bestId
+                    for (dupId in candidateIds) {
+                        if (dupId == primaryId) continue
+                        execSQL("UPDATE $TABLE_TRANSACTIONS SET $KEY_METHODID = $primaryId WHERE $KEY_METHODID = $dupId")
+                        execSQL("UPDATE $TABLE_TEMPLATES SET $KEY_METHODID = $primaryId WHERE $KEY_METHODID = $dupId")
+                        query(
+                            "SELECT $KEY_TYPE FROM $TABLE_ACCOUNTTYES_METHODS WHERE $KEY_METHODID = ?",
+                            arrayOf(dupId.toString())
+                        ).use { c ->
+                            while (c.moveToNext()) {
+                                val accTypeId = c.getLong(0)
+                                val exists = query(
+                                    "SELECT 1 FROM $TABLE_ACCOUNTTYES_METHODS WHERE $KEY_METHODID = ? AND $KEY_TYPE = ?",
+                                    arrayOf(primaryId.toString(), accTypeId.toString())
+                                ).use { it.moveToFirst() }
+                                if (!exists) {
+                                    insert(
+                                        TABLE_ACCOUNTTYES_METHODS,
+                                        SQLiteDatabase.CONFLICT_NONE,
+                                        ContentValues().apply {
+                                            put(KEY_METHODID, primaryId)
+                                            put(KEY_TYPE, accTypeId)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                        execSQL("DELETE FROM $TABLE_ACCOUNTTYES_METHODS WHERE $KEY_METHODID = $dupId")
+                        execSQL("DELETE FROM $TABLE_METHODS WHERE $KEY_ROWID = $dupId")
+                    }
+                    update(
+                        TABLE_METHODS,
+                        SQLiteDatabase.CONFLICT_NONE,
+                        ContentValues().apply {
+                            put(KEY_LABEL, pm.name)
+                            put(KEY_TYPE, pm.paymentType)
+                            put(KEY_IS_NUMBERED, pm.isNumbered)
+                            put(KEY_ICON, pm.icon)
+                        },
+                        "$KEY_ROWID = ?",
+                        arrayOf(primaryId.toString())
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Error cleaning up duplicate payment methods")
+        }
+    }
+
     fun SupportSQLiteDatabase.ensurePreDefinedPaymentMethods() {
         try {
             var bankTypeId: Long? = null
@@ -1666,7 +1740,10 @@ abstract class BaseTransactionDatabase(
             }
             for (pm in PreDefinedPaymentMethod.entries) {
                 var methodId: Long? = null
-                query("SELECT $KEY_ROWID FROM $TABLE_METHODS WHERE $KEY_LABEL = ?", arrayOf(pm.name)).use { cursor ->
+                query(
+                    "SELECT $KEY_ROWID FROM $TABLE_METHODS WHERE $KEY_LABEL = ? OR UPPER(REPLACE($KEY_LABEL, ' ', '')) = ?",
+                    arrayOf(pm.name, pm.name.replace("_", ""))
+                ).use { cursor ->
                     if (cursor.moveToFirst()) {
                         methodId = cursor.getLong(0)
                     }
@@ -1685,13 +1762,15 @@ abstract class BaseTransactionDatabase(
                     update(
                         TABLE_METHODS, SQLiteDatabase.CONFLICT_NONE,
                         ContentValues().apply {
+                            put(KEY_LABEL, pm.name)
                             put(KEY_TYPE, pm.paymentType)
+                            put(KEY_ICON, pm.icon)
                         },
-                        "$KEY_ROWID = ? AND $KEY_TYPE != ?",
-                        arrayOf(methodId.toString(), pm.paymentType.toString())
+                        "$KEY_ROWID = ?",
+                        arrayOf(methodId.toString())
                     )
                 }
-                if (bankTypeId != null && methodId > 0) {
+                if (bankTypeId != null && methodId > 0 && pm != PreDefinedPaymentMethod.CASH) {
                     val alreadyLinked = query(
                         "SELECT 1 FROM $TABLE_ACCOUNTTYES_METHODS WHERE $KEY_METHODID = ? AND $KEY_TYPE = ?",
                         arrayOf(methodId.toString(), bankTypeId.toString())

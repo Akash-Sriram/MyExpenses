@@ -53,8 +53,9 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Settings
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import android.graphics.Bitmap
@@ -1449,8 +1450,21 @@ fun ExpenseEditScreen(
                     }
 
                     // Payment Method (if methods available and not transfer)
+                    val filteredMethods = remember(availableMethods, selectedAccount, selectedType) {
+                        availableMethods.filter { method ->
+                            val matchesAccount = selectedAccount == null || method.accountTypes.isEmpty() || method.accountTypes.contains(selectedAccount.type.id)
+                            val matchesType = when (selectedType) {
+                                TransactionTypeOption.EXPENSE -> method.type <= 0
+                                TransactionTypeOption.INCOME -> method.type >= 0
+                                TransactionTypeOption.TRANSFER -> true
+                            }
+                            matchesAccount && matchesType
+                        }
+                    }
+
                     if (availableMethods.isNotEmpty() && selectedType != TransactionTypeOption.TRANSFER) {
-                        val methodLabel = availableMethods.find { it.id == selectedMethodId }?.label ?: stringResource(R.string.method)
+                        val currentMethod = availableMethods.find { it.id == selectedMethodId }
+                        val methodLabel = currentMethod?.label ?: stringResource(R.string.method)
                         Box {
                             Row(
                                 modifier = Modifier
@@ -1485,7 +1499,7 @@ fun ExpenseEditScreen(
                                         showMethodMenu = false
                                     }
                                 )
-                                availableMethods.forEach { method ->
+                                filteredMethods.forEach { method ->
                                     DropdownMenuItem(
                                         text = { Text(method.label) },
                                         onClick = {
@@ -1494,6 +1508,36 @@ fun ExpenseEditScreen(
                                         }
                                     )
                                 }
+                                if (currentMethod != null && filteredMethods.none { it.id == currentMethod.id }) {
+                                    DropdownMenuItem(
+                                        text = { Text("${currentMethod.label} (${stringResource(R.string.unmapped)})") },
+                                        onClick = {
+                                            selectedMethodId = currentMethod.id
+                                            showMethodMenu = false
+                                        }
+                                    )
+                                }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Settings,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    text = {
+                                        Text(
+                                            stringResource(R.string.pref_manage_methods_title),
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                                        )
+                                    },
+                                    onClick = {
+                                        showMethodMenu = false
+                                        context.startActivity(Intent(context, org.totschnig.myexpenses.activity.ManageMethods::class.java))
+                                    }
+                                )
                             }
                         }
                     }

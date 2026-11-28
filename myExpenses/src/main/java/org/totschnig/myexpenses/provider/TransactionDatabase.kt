@@ -340,6 +340,7 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       db.execSQL("PRAGMA recursive_triggers = ON;");
       createOrRefreshViews(db);
       db.checkDefaultTransferCategory();
+      db.cleanupDuplicatePaymentMethods();
       db.ensurePreDefinedPaymentMethods();
       runCatching {
         db.execSQL("ALTER TABLE $TABLE_SUBSCRIPTIONS ADD COLUMN cancel_before_renewal INTEGER DEFAULT 0;")

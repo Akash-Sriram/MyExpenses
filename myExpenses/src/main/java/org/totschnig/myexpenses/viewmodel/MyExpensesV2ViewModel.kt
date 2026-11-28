@@ -71,6 +71,7 @@ import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_REFERENCE_NUMBER
 import org.totschnig.myexpenses.provider.KEY_IS_NUMBERED
 import org.totschnig.myexpenses.provider.KEY_METHODID
+import org.totschnig.myexpenses.provider.KEY_ACCOUNT_TYPE_LIST
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.viewmodel.data.PaymentMethod
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
@@ -913,7 +914,7 @@ open class MyExpensesV2ViewModel(
         return try {
             contentResolver.query(
                 TransactionProvider.METHODS_URI,
-                arrayOf(KEY_ROWID, KEY_LABEL, KEY_IS_NUMBERED),
+                arrayOf(KEY_ROWID, KEY_LABEL, KEY_IS_NUMBERED, KEY_TYPE, KEY_ICON, KEY_ACCOUNT_TYPE_LIST),
                 null,
                 null,
                 null
