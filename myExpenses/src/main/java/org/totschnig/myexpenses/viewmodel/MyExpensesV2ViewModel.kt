@@ -68,6 +68,7 @@ import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_PATH
 import org.totschnig.myexpenses.provider.KEY_ICON
+import org.totschnig.myexpenses.provider.KEY_REFERENCE_NUMBER
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
