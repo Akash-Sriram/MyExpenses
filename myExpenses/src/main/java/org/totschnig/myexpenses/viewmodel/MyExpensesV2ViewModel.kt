@@ -1039,7 +1039,7 @@ open class MyExpensesV2ViewModel(
                     val payeeName = receipt.payeeName ?: receipt.recipientName
                     val payeeId = (payeeName ?: "").let { resolvePayeeId(it, receipt.upiId) }
                     val party = payeeId?.let { id ->
-                        val name = getPayeeName(id) ?: payeeName
+                        val name = getPayeeName(id) ?: payeeName ?: ""
                         DisplayParty(id = id, name = name, iban = receipt.upiId)
                     } ?: payeeName?.let { DisplayParty(id = 0L, name = it, iban = receipt.upiId) }
 
