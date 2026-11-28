@@ -66,3 +66,11 @@ data class BalanceVerificationResult(
     val isAligned: Boolean,
     val checkpoint: BalanceCheckpoint?
 )
+
+data class SpatialPdfElement(
+    val x: Float,
+    val y: Float,
+    val text: String,
+    val page: Int
+)
+

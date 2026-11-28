@@ -39,6 +39,181 @@ object BankStatementParser {
         }
     }
 
+    /**
+     * Parses spatial elements extracted from a PDF statement.
+     * Uses table column boundaries, line-level remarks grouping, and running-balance math.
+     */
+    fun parseSpatialElements(elements: List<SpatialPdfElement>): List<StatementTransaction> {
+        if (elements.isEmpty()) return emptyList()
+
+        val results = mutableListOf<StatementTransaction>()
+        val pages = elements.groupBy { it.page }.toSortedMap()
+
+        var expectedSNo = 1
+        var isDownwardDirection = true // Default for PDFBox (Y increases downwards from top of page)
+        var prevBalance: BigDecimal? = null
+
+        for ((_, pageElements) in pages) {
+            // Find candidate transaction S Nos: x < 55, pure digits
+            val candidates = pageElements.filter { e ->
+                e.x < 55f && e.text.all { it.isDigit() } && e.text.toIntOrNull() != null
+            }.sortedBy { it.text.toInt() }
+
+            val validSnos = mutableListOf<SpatialPdfElement>()
+            for (cand in candidates) {
+                val num = cand.text.toInt()
+                if (num == expectedSNo) {
+                    validSnos.add(cand)
+                    expectedSNo++
+                }
+            }
+
+            if (validSnos.isEmpty()) continue
+
+            // Auto-detect coordinate system orientation
+            if (validSnos.size >= 2) {
+                isDownwardDirection = validSnos.first().y < validSnos.last().y
+            }
+
+            for (i in validSnos.indices) {
+                val snoElement = validSnos[i]
+                val sNo = snoElement.text.toInt()
+                val yCurrent = snoElement.y
+
+                val yTop: Float
+                val yBottom: Float
+
+                if (isDownwardDirection) {
+                    yTop = yCurrent - 7.5f
+                    yBottom = if (i + 1 < validSnos.size) validSnos[i + 1].y - 7.5f else yCurrent + 45.0f
+                } else {
+                    yTop = yCurrent + 7.5f
+                    yBottom = if (i + 1 < validSnos.size) validSnos[i + 1].y + 7.5f else yCurrent - 45.0f
+                }
+
+                val txElements = pageElements.filter { e ->
+                    if (isDownwardDirection) e.y >= yTop && e.y < yBottom
+                    else e.y <= yTop && e.y > yBottom
+                }.sortedWith { a, b ->
+                    if (isDownwardDirection) {
+                        val dy = a.y.compareTo(b.y)
+                        if (dy != 0) dy else a.x.compareTo(b.x)
+                    } else {
+                        val dy = b.y.compareTo(a.y)
+                        if (dy != 0) dy else a.x.compareTo(b.x)
+                    }
+                }
+
+                var date: LocalDate? = null
+                val remarksWords = mutableListOf<SpatialPdfElement>()
+                var rawWithdrawal: BigDecimal? = null
+                var rawDeposit: BigDecimal? = null
+                var rawBalance: BigDecimal? = null
+
+                for (e in txElements) {
+                    when {
+                        e.x in 55.0f..114.99f -> {
+                            if (date == null) {
+                                date = parseDate(e.text)
+                            }
+                        }
+                        e.x in 115.0f..389.99f -> {
+                            if (e.text != "-" && e.text != "0") {
+                                remarksWords.add(e)
+                            }
+                        }
+                        e.x in 390.0f..459.99f -> {
+                            val clean = e.text.replace(",", "")
+                            if (Regex("""^\d+(\.\d{2})?$""").matches(clean)) {
+                                rawWithdrawal = clean.toBigDecimalOrNull()
+                            }
+                        }
+                        e.x in 460.0f..529.99f -> {
+                            val clean = e.text.replace(",", "")
+                            if (Regex("""^\d+(\.\d{2})?$""").matches(clean)) {
+                                rawDeposit = clean.toBigDecimalOrNull()
+                            }
+                        }
+                        e.x >= 530.0f -> {
+                            val clean = e.text.replace(",", "")
+                            if (Regex("""^\d+(\.\d{2})?$""").matches(clean)) {
+                                rawBalance = clean.toBigDecimalOrNull()
+                            }
+                        }
+                    }
+                }
+
+                // Group remarks words into lines (same Y within 2.5 points)
+                val remarksLines = mutableListOf<String>()
+                var currentLine = mutableListOf<String>()
+                var lineY: Float? = null
+
+                for (w in remarksWords) {
+                    if (lineY == null || kotlin.math.abs(lineY - w.y) > 2.5f) {
+                        if (currentLine.isNotEmpty()) {
+                            remarksLines.add(currentLine.joinToString(" "))
+                            currentLine = mutableListOf()
+                        }
+                        lineY = w.y
+                    }
+                    currentLine.add(w.text)
+                }
+                if (currentLine.isNotEmpty()) {
+                    remarksLines.add(currentLine.joinToString(" "))
+                }
+
+                val payeeCandidate = remarksLines.firstOrNull() ?: ""
+                val fullRemarks = remarksLines.joinToString(" ")
+
+                var withdrawal = rawWithdrawal ?: BigDecimal.ZERO
+                var deposit = rawDeposit ?: BigDecimal.ZERO
+                val balance = rawBalance ?: BigDecimal.ZERO
+
+                // Running balance verification & computation
+                if (prevBalance != null && balance > BigDecimal.ZERO) {
+                    val diff = balance.subtract(prevBalance)
+                    if (diff > BigDecimal.ZERO) {
+                        deposit = diff
+                        withdrawal = BigDecimal.ZERO
+                    } else if (diff < BigDecimal.ZERO) {
+                        withdrawal = diff.abs()
+                        deposit = BigDecimal.ZERO
+                    }
+                } else if (prevBalance == null && balance > BigDecimal.ZERO) {
+                    if (deposit > BigDecimal.ZERO) {
+                        prevBalance = balance.subtract(deposit)
+                    } else if (withdrawal > BigDecimal.ZERO) {
+                        prevBalance = balance.add(withdrawal)
+                    }
+                }
+
+                if (balance > BigDecimal.ZERO) {
+                    prevBalance = balance
+                }
+
+                val isDeposit = deposit > BigDecimal.ZERO
+                val netAmount = if (isDeposit) deposit else withdrawal.negate()
+
+                results.add(
+                    StatementTransaction(
+                        sNo = sNo,
+                        date = date ?: LocalDate.now(),
+                        payeeOrRemarks = cleanRemarks(if (payeeCandidate.isNotBlank()) payeeCandidate else fullRemarks),
+                        withdrawal = withdrawal,
+                        deposit = deposit,
+                        amount = netAmount,
+                        balance = balance,
+                        utr = extractUtr(fullRemarks),
+                        ref = extractRef(fullRemarks),
+                        rawText = fullRemarks
+                    )
+                )
+            }
+        }
+
+        return results
+    }
+
     private fun parseCsv(lines: List<Line>): List<StatementTransaction> {
         val results = mutableListOf<StatementTransaction>()
         var sNoCounter = 1
@@ -76,7 +251,6 @@ object BankStatementParser {
 
             // Determine if withdrawal or deposit
             val isDeposit = if (parts.size >= 8) {
-                // If deposit column has a non-zero value
                 val depositStr = parts.getOrNull(dateColIdx + 4)?.replace(",", "")?.toDoubleOrNull() ?: 0.0
                 depositStr > 0.0
             } else {
@@ -110,110 +284,106 @@ object BankStatementParser {
 
     private fun parseStructuredText(lines: List<String>): List<StatementTransaction> {
         val results = mutableListOf<StatementTransaction>()
-        val startLinePattern = Pattern.compile("""^\s*(\d+)\s+(\d{2}[./-]\d{2}[./-]\d{4})\s+(.*)$""")
+        val startLinePattern = Pattern.compile("""^\s*(\d+)\s+(\d{2}[./-]\d{2}[./-]\d{4})\s*(.*)$""")
 
-        var currentTxn: MutableStatementTxn? = null
+        val blocks = mutableListOf<MutableList<String>>()
+        var currentBlock: MutableList<String>? = null
 
-        var i = 0
-        while (i < lines.size) {
-            val line = lines[i]
-            val matcher = startLinePattern.matcher(line)
-
-            if (matcher.matches()) {
-                // Save previous
-                currentTxn?.let { results.add(it.toStatementTransaction()) }
-
-                val sNo = matcher.group(1)?.toIntOrNull() ?: (results.size + 1)
-                val dateStr = matcher.group(2) ?: ""
-                val rest = matcher.group(3) ?: ""
-                val date = parseDate(dateStr) ?: LocalDate.now()
-
-                // Check 1-2 lines above for payee header if present
-                val payeeHeader = if (i > 0 && lines[i - 1].trim().isNotEmpty() && !startLinePattern.matcher(lines[i - 1]).matches()) {
-                    lines[i - 1].trim()
-                } else ""
-
-                // Extract decimal amounts
-                val amtMatches = Regex("""(\d+\.\d{2})""").findAll(rest).map { it.value }.toList()
-                var withdrawal = BigDecimal.ZERO
-                var deposit = BigDecimal.ZERO
-                var balance = BigDecimal.ZERO
-
-                if (amtMatches.size >= 2) {
-                    balance = amtMatches.last().toBigDecimalOrNull() ?: BigDecimal.ZERO
-                    val txnAmt = amtMatches[amtMatches.size - 2].toBigDecimalOrNull() ?: BigDecimal.ZERO
-                    
-                    // Column index in line
-                    val amtIdx = line.lastIndexOf(amtMatches[amtMatches.size - 2])
-                    if (amtIdx < 112) {
-                        withdrawal = txnAmt
-                    } else {
-                        deposit = txnAmt
-                    }
-                } else if (amtMatches.size == 1) {
-                    balance = amtMatches[0].toBigDecimalOrNull() ?: BigDecimal.ZERO
-                }
-
-                currentTxn = MutableStatementTxn(
-                    sNo = sNo,
-                    date = date,
-                    payeeHeader = payeeHeader,
-                    withdrawal = withdrawal,
-                    deposit = deposit,
-                    balance = balance,
-                    remarks = mutableListOf()
-                )
-            } else if (currentTxn != null) {
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty() &&
-                    !trimmed.startsWith("Statement of Transactions") &&
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.isEmpty()) continue
+            if (startLinePattern.matcher(trimmed).matches()) {
+                currentBlock?.let { blocks.add(it) }
+                currentBlock = mutableListOf(trimmed)
+            } else if (currentBlock != null) {
+                if (!trimmed.startsWith("Statement of Transactions") &&
                     !trimmed.startsWith("Your Base Branch") &&
                     !trimmed.startsWith("Please call") &&
                     !trimmed.startsWith("Never share") &&
                     !trimmed.startsWith("www.icici") &&
+                    !trimmed.startsWith("Dial your") &&
                     !trimmed.startsWith("S No.")
                 ) {
-                    if (line.length > 30) {
-                        val remarkPart = line.substring(minOf(30, line.length), minOf(95, line.length)).trim()
-                        if (remarkPart.isNotEmpty()) {
-                            currentTxn.remarks.add(remarkPart)
-                        }
-                    }
+                    currentBlock.add(trimmed)
                 }
             }
-            i++
         }
+        currentBlock?.let { blocks.add(it) }
 
-        currentTxn?.let { results.add(it.toStatementTransaction()) }
-        return results
-    }
+        var prevBalance: BigDecimal? = null
 
-    private class MutableStatementTxn(
-        val sNo: Int,
-        val date: LocalDate,
-        val payeeHeader: String,
-        val withdrawal: BigDecimal,
-        val deposit: BigDecimal,
-        val balance: BigDecimal,
-        val remarks: MutableList<String>
-    ) {
-        fun toStatementTransaction(): StatementTransaction {
-            val fullText = (listOf(payeeHeader) + remarks).filter { it.isNotBlank() }.joinToString(" ")
+        for (block in blocks) {
+            val firstLine = block.first()
+            val matcher = startLinePattern.matcher(firstLine)
+            if (!matcher.matches()) continue
+
+            val sNo = matcher.group(1)?.toIntOrNull() ?: (results.size + 1)
+            val dateStr = matcher.group(2) ?: ""
+            val rest = matcher.group(3) ?: ""
+            val date = parseDate(dateStr) ?: LocalDate.now()
+
+            val blockText = block.joinToString(" ")
+            val payeeCandidate = rest.trim()
+
+            // Extract decimal amounts
+            val amtMatches = Regex("""\b(\d+\.\d{2})\b""").findAll(blockText)
+                .map { it.groupValues[1] }
+                .filter { !dateStr.contains(it) }
+                .mapNotNull { it.replace(",", "").toBigDecimalOrNull() }
+                .toList()
+
+            var withdrawal = BigDecimal.ZERO
+            var deposit = BigDecimal.ZERO
+            var balance = BigDecimal.ZERO
+
+            if (amtMatches.isNotEmpty()) {
+                balance = amtMatches.last()
+            }
+
+            if (prevBalance != null && balance > BigDecimal.ZERO) {
+                val diff = balance.subtract(prevBalance)
+                if (diff > BigDecimal.ZERO) {
+                    deposit = diff
+                    withdrawal = BigDecimal.ZERO
+                } else if (diff < BigDecimal.ZERO) {
+                    withdrawal = diff.abs()
+                    deposit = BigDecimal.ZERO
+                }
+            } else if (amtMatches.size >= 2) {
+                val txnAmt = amtMatches[amtMatches.size - 2]
+                withdrawal = txnAmt
+            }
+
+            if (balance > BigDecimal.ZERO) {
+                if (prevBalance == null) {
+                    if (deposit > BigDecimal.ZERO) prevBalance = balance.subtract(deposit)
+                    else if (withdrawal > BigDecimal.ZERO) prevBalance = balance.add(withdrawal)
+                    else prevBalance = balance
+                } else {
+                    prevBalance = balance
+                }
+            }
+
             val isDeposit = deposit > BigDecimal.ZERO
             val netAmount = if (isDeposit) deposit else withdrawal.negate()
-            return StatementTransaction(
-                sNo = sNo,
-                date = date,
-                payeeOrRemarks = cleanRemarks(if (payeeHeader.isNotBlank()) payeeHeader else fullText),
-                withdrawal = withdrawal,
-                deposit = deposit,
-                amount = netAmount,
-                balance = balance,
-                utr = extractUtr(fullText),
-                ref = extractRef(fullText),
-                rawText = fullText
+
+            results.add(
+                StatementTransaction(
+                    sNo = sNo,
+                    date = date,
+                    payeeOrRemarks = cleanRemarks(if (payeeCandidate.isNotBlank()) payeeCandidate else blockText),
+                    withdrawal = withdrawal,
+                    deposit = deposit,
+                    amount = netAmount,
+                    balance = balance,
+                    utr = extractUtr(blockText),
+                    ref = extractRef(blockText),
+                    rawText = blockText
+                )
             )
         }
+
+        return results
     }
 
     private fun parseDate(str: String): LocalDate? {

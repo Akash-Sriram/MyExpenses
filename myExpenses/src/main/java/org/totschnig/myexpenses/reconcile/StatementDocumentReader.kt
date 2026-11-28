@@ -7,6 +7,7 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.tom_roush.pdfbox.text.TextPosition
 import timber.log.Timber
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -106,11 +107,14 @@ object StatementDocumentReader {
                 }
 
                 val pageCount = doc.numberOfPages
-                val stripper = PDFTextStripper()
-                stripper.sortByPosition = true
+                val stripper = SpatialPdfStripper()
                 val fullText = stripper.getText(doc)
 
-                val transactions = BankStatementParser.parse(fullText)
+                var transactions = BankStatementParser.parseSpatialElements(stripper.elements)
+                if (transactions.isEmpty()) {
+                    transactions = BankStatementParser.parse(fullText)
+                }
+
                 if (transactions.isEmpty()) {
                     DocumentReadResult.Error(
                         "Parsed $pageCount pages from $fileName, but could not detect standard bank statement transactions. Please verify the format."
@@ -184,5 +188,29 @@ object StatementDocumentReader {
             }
         } catch (_: Exception) {}
         return name ?: uri.lastPathSegment
+    }
+}
+
+private class SpatialPdfStripper : PDFTextStripper() {
+    val elements = mutableListOf<SpatialPdfElement>()
+
+    init {
+        sortByPosition = true
+    }
+
+    override fun writeString(text: String, textPositions: List<TextPosition>) {
+        super.writeString(text, textPositions)
+        val trimmed = text.trim()
+        if (trimmed.isNotEmpty() && textPositions.isNotEmpty()) {
+            val first = textPositions.first()
+            elements.add(
+                SpatialPdfElement(
+                    x = first.xDirAdj,
+                    y = first.yDirAdj,
+                    text = trimmed,
+                    page = currentPageNo
+                )
+            )
+        }
     }
 }
