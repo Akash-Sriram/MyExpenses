@@ -436,8 +436,8 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
       }
 
       // 3. Clean corporate suffixes and merge into canonical root payees (e.g. ZEPTO MARKETPLACE PRIVATE LIMITED -> Zepto)
+      val rootPayees = mutableListOf<Triple<Long, String, String?>>()
       query("SELECT _id, name, iban FROM $TABLE_PAYEES WHERE $KEY_PARENTID IS NULL ORDER BY _id ASC").use { cursor ->
-        val rootPayees = mutableListOf<Triple<Long, String, String?>>()
         while (cursor.moveToNext()) {
           val id = cursor.getLong(0)
           val name = cursor.getString(1)
