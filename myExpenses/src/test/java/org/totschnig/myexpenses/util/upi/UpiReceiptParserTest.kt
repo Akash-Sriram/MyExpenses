@@ -791,7 +791,6 @@ class UpiReceiptParserTest {
         assertEquals("Zepto", UpiReceiptParser.cleanPayee("RFNDZEPTO"))
         assertEquals("Zepto", UpiReceiptParser.cleanPayee("RFND-ZEPTO"))
         assertEquals("Zepto", UpiReceiptParser.cleanPayee("REFUND ZEPTO"))
-        assertEquals("Burger King", UpiReceiptParser.cleanPayee("BURGER KING INDIA PRIVATE LIMITED"))
     }
 
     @Test

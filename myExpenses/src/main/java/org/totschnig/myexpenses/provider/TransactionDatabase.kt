@@ -443,9 +443,15 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
           val name = cursor.getString(1)
           val iban = if (cursor.isNull(2)) null else cursor.getString(2)
           rootPayees.add(Triple(id, name, iban))
-        }
+        val corporateSuffixRegex = Regex(
+            """(?i)\s+(?:marketplace\s+private\s+limited|marketplace\s+pvt\s+ltd|marketplace|private\s+limited|pvt\s+ltd|pvt\.?\s*ltd\.?|india\s+private\s+limited|india\s+pvt\s+ltd|retail\s+limited|retail\s+private\s+limited|services\s+private\s+limited|technologies\s+private\s+limited|solutions\s+private\s+limited|payments\s+private\s+limited|enterprises|llp|ltd\.?|limited)\s*$"""
+        )
         for ((dirtyId, dirtyName, iban) in rootPayees) {
-          val clean = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(dirtyName)
+          var clean = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(dirtyName)
+          val stripped = clean.replace(corporateSuffixRegex, "").trim()
+          if (stripped.length >= 2) {
+            clean = stripped
+          }
           if (clean.isBlank() || clean.equals(dirtyName, ignoreCase = false)) continue
 
           var canonicalId: Long? = null

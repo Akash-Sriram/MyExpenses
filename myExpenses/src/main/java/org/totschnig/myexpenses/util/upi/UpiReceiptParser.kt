@@ -797,15 +797,6 @@ object UpiReceiptParser {
         // Strip refund prefixes: RFND, REFUND, RFND-, REFUND/
         cleaned = cleaned.replace(Regex("""^(?i)(?:rfnd|refund)[\s/_-]*"""), "").trim()
 
-        // Strip corporate business suffixes (e.g. "MARKETPLACE PRIVATE LIMITED", "PVT LTD")
-        val corporateSuffixRegex = Regex(
-            """(?i)\s+(?:marketplace\s+private\s+limited|marketplace\s+pvt\s+ltd|marketplace|private\s+limited|pvt\s+ltd|pvt\.?\s*ltd\.?|india\s+private\s+limited|india\s+pvt\s+ltd|retail\s+limited|retail\s+private\s+limited|services\s+private\s+limited|technologies\s+private\s+limited|solutions\s+private\s+limited|payments\s+private\s+limited|enterprises|llp|ltd\.?|limited)\s*$"""
-        )
-        val stripped = cleaned.replace(corporateSuffixRegex, "").trim()
-        if (stripped.length >= 2) {
-            cleaned = stripped
-        }
-
         // Match against known prominent merchants
         val knownMerchant = PROMINENT_MERCHANTS.firstOrNull {
             cleaned.equals(it, ignoreCase = true) ||
@@ -816,17 +807,6 @@ object UpiReceiptParser {
         }
         if (knownMerchant != null) {
             return knownMerchant
-        }
-
-        // Normalize all-caps merchant names (e.g. "BURGER KING" -> "Burger King")
-        if (cleaned.isNotEmpty() && cleaned.any { it.isLetter() } && cleaned.all { it.isUpperCase() || !it.isLetter() } && cleaned.length > 3) {
-            val acronyms = setOf("LIC", "TNEB", "HPCL", "BPCL", "HDFC", "ICICI", "SBI", "DMART", "UPI", "NEFT", "IMPS")
-            if (cleaned !in acronyms) {
-                cleaned = cleaned.split(" ").joinToString(" ") { word ->
-                    if (word in acronyms) word
-                    else word.lowercase(Locale.ROOT).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
-                }
-            }
         }
 
         return cleaned
