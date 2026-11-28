@@ -885,7 +885,7 @@ open class MyExpensesV2ViewModel(
             contentResolver.query(
                 TransactionProvider.PAYEES_URI,
                 arrayOf(KEY_ROWID, KEY_PAYEE_NAME, KEY_IBAN),
-                null,
+                "$KEY_PARENTID IS NULL",
                 null,
                 "$KEY_PAYEE_NAME COLLATE LOCALIZED ASC"
             )?.use { cursor ->
@@ -2073,28 +2073,87 @@ open class MyExpensesV2ViewModel(
         } ?: emptyList()
     }
 
+    private fun findRefundCategoryId(): Long? {
+        return try {
+            contentResolver.query(
+                TransactionProvider.CATEGORIES_URI,
+                arrayOf(KEY_ROWID),
+                "$KEY_LABEL = ? COLLATE NOCASE OR $KEY_LABEL = ? COLLATE NOCASE",
+                arrayOf("Refunding", "Refund"),
+                "$KEY_ROWID ASC"
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getLong(0) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun buildStatementTransactionData(statementTx: StatementTransaction, account: FullAccount): TransactionEditData = withContext(Dispatchers.IO) {
+        val isDeposit = statementTx.deposit > BigDecimal.ZERO
+        val amountMajor = if (isDeposit) statementTx.deposit else statementTx.withdrawal
+        val amountMinor = Money.convertBigDecimal(amountMajor, account.currencyUnit.fractionDigits)
+        val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
+        val dateLocalDateTime = statementTx.date.atStartOfDay()
+
+        // 1. Resolve Payee
+        var resolvedPartyId: Long? = null
+        var resolvedPartyName = statementTx.payeeOrRemarks
+
+        // If UTR matches an existing transaction (e.g. earlier purchase that was refunded), inherit its payee
+        if (!statementTx.utr.isNullOrBlank()) {
+            try {
+                contentResolver.query(
+                    TransactionProvider.TRANSACTIONS_URI,
+                    arrayOf(KEY_PAYEEID),
+                    "$KEY_REFERENCE_NUMBER = ? AND $KEY_PAYEEID IS NOT NULL",
+                    arrayOf(statementTx.utr),
+                    "$KEY_ROWID DESC"
+                )?.use { cursor ->
+                    if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                        val originalPayeeId = cursor.getLong(0)
+                        if (originalPayeeId > 0) {
+                            val id = repository.getRootPartyId(originalPayeeId) ?: originalPayeeId
+                            resolvedPartyId = id
+                            resolvedPartyName = getPayeeName(id) ?: resolvedPartyName
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (resolvedPartyId == null) {
+            resolvedPartyId = repository.requireRootParty(resolvedPartyName)
+        }
+        val party = DisplayParty(resolvedPartyId, resolvedPartyName)
+
+        // 2. Resolve Category: If refund, auto-assign Refunding category
+        var categoryId: Long? = null
+        if (statementTx.isRefund || (isDeposit && (statementTx.rawText.contains("RFND", ignoreCase = true) || statementTx.rawText.contains("REFUND", ignoreCase = true)))) {
+            categoryId = findRefundCategoryId()
+        }
+        if (categoryId == null && resolvedPartyId != null) {
+            categoryId = getAutofillForPayee(resolvedPartyId)
+        }
+
+        val comment = statementTx.comment ?: statementTx.payeeOrRemarks
+
+        TransactionEditData(
+            uuid = org.totschnig.myexpenses.model.generateUuid(),
+            accountId = account.id,
+            amount = Money(account.currencyUnit, signedAmountMinor),
+            date = dateLocalDateTime,
+            valueDate = statementTx.date,
+            party = party,
+            catId = categoryId,
+            comment = comment,
+            referenceNumber = statementTx.utr ?: statementTx.ref
+        )
+    }
+
     fun saveStatementTransaction(statementTx: StatementTransaction, account: FullAccount) {
         viewModelScope.launch(coroutineDispatcher) {
-            val isDeposit = statementTx.deposit > BigDecimal.ZERO
-            val amountMajor = if (isDeposit) statementTx.deposit else statementTx.withdrawal
-            val amountMinor = Money.convertBigDecimal(amountMajor, account.currencyUnit.fractionDigits)
-            val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
-
-            val dateLocalDateTime = statementTx.date.atStartOfDay()
-
-            val resolvedPartyId = repository.requireRootParty(statementTx.payeeOrRemarks)
-            val party = DisplayParty(resolvedPartyId, statementTx.payeeOrRemarks)
-
-            val txData = TransactionEditData(
-                uuid = org.totschnig.myexpenses.model.generateUuid(),
-                accountId = account.id,
-                amount = Money(account.currencyUnit, signedAmountMinor),
-                date = dateLocalDateTime,
-                valueDate = statementTx.date,
-                party = party,
-                comment = statementTx.payeeOrRemarks,
-                referenceNumber = statementTx.utr ?: statementTx.ref
-            )
+            val txData = buildStatementTransactionData(statementTx, account)
             saveTransaction(txData)
         }
     }
@@ -2106,26 +2165,7 @@ open class MyExpensesV2ViewModel(
     ) {
         viewModelScope.launch(coroutineDispatcher) {
             statementTxList.forEach { statementTx ->
-                val isDeposit = statementTx.deposit > BigDecimal.ZERO
-                val amountMajor = if (isDeposit) statementTx.deposit else statementTx.withdrawal
-                val amountMinor = Money.convertBigDecimal(amountMajor, account.currencyUnit.fractionDigits)
-                val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
-
-                val dateLocalDateTime = statementTx.date.atStartOfDay()
-
-                val resolvedPartyId = repository.requireRootParty(statementTx.payeeOrRemarks)
-                val party = DisplayParty(resolvedPartyId, statementTx.payeeOrRemarks)
-
-                val txData = TransactionEditData(
-                    uuid = org.totschnig.myexpenses.model.generateUuid(),
-                    accountId = account.id,
-                    amount = Money(account.currencyUnit, signedAmountMinor),
-                    date = dateLocalDateTime,
-                    valueDate = statementTx.date,
-                    party = party,
-                    comment = statementTx.payeeOrRemarks,
-                    referenceNumber = statementTx.utr ?: statementTx.ref
-                )
+                val txData = buildStatementTransactionData(statementTx, account)
                 saveTransaction(txData)
             }
             withContext(Dispatchers.Main) {

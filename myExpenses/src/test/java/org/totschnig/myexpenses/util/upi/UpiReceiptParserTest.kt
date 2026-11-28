@@ -787,6 +787,11 @@ class UpiReceiptParserTest {
         assertEquals("WHISK AND SIP CAFE", UpiReceiptParser.cleanPayee("WHISK AND SIP CAFE [verified]"))
         assertEquals("Hunger Box", UpiReceiptParser.cleanPayee("To: Hunger Box"))
         assertEquals("Amazon", UpiReceiptParser.cleanPayee("To  Amazon"))
+        assertEquals("Zepto", UpiReceiptParser.cleanPayee("ZEPTO MARKETPLACE PRIVATE LIMITED"))
+        assertEquals("Zepto", UpiReceiptParser.cleanPayee("RFNDZEPTO"))
+        assertEquals("Zepto", UpiReceiptParser.cleanPayee("RFND-ZEPTO"))
+        assertEquals("Zepto", UpiReceiptParser.cleanPayee("REFUND ZEPTO"))
+        assertEquals("Burger King", UpiReceiptParser.cleanPayee("BURGER KING INDIA PRIVATE LIMITED"))
     }
 
     @Test
@@ -1592,7 +1597,7 @@ class UpiReceiptParserTest {
 
         assertNotNull(result)
         assertEquals(BigDecimal("160.40"), result.amount)
-        assertEquals("ZEPTO MARKETPLACE PRIVATE LIMITED", result.payeeName)
+        assertEquals("Zepto", result.payeeName)
         assertEquals("ZEPTOMARKETPLACEPRIVAT-12682647.payu@indus", result.upiId)
         assertEquals("070139746741", result.referenceNumber)
         assertNull("NO REMARK should result in null comment", result.comment)

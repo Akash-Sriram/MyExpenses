@@ -13,6 +13,8 @@ data class StatementTransaction(
     val balance: BigDecimal,
     val utr: String? = null,
     val ref: String? = null,
+    val comment: String? = null,
+    val isRefund: Boolean = false,
     val rawText: String = ""
 )
 

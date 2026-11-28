@@ -94,38 +94,54 @@ fun ContentResolver.findParty(party: String, iban: String? = null): Long? {
 }
 
 fun ContentResolver.requireRootParty(name: String): Long? {
-    val trimmed = name.replace(Regex("""[\r\n]+"""), " ").replace(Regex("""\s+"""), " ").trim()
-    if (trimmed.isEmpty()) return null
+    val rawTrimmed = name.replace(Regex("""[\r\n]+"""), " ").replace(Regex("""\s+"""), " ").trim()
+    if (rawTrimmed.isEmpty()) return null
+    val clean = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(rawTrimmed).ifBlank { rawTrimmed }
 
-    // 1. Look for root party (parent_id IS NULL) with this name (case-insensitive)
-    val rootId = query(
-        PAYEES_URI,
-        arrayOf(KEY_ROWID),
-        "$KEY_PAYEE_NAME = ? COLLATE NOCASE AND $KEY_PARENTID IS NULL",
-        arrayOf(trimmed),
-        null
-    )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+    // 1. Look for root party (parent_id IS NULL) with clean name or raw name (case-insensitive)
+    for (candidate in listOf(clean, rawTrimmed).distinct()) {
+        val rootId = query(
+            PAYEES_URI,
+            arrayOf(KEY_ROWID),
+            "$KEY_PAYEE_NAME = ? COLLATE NOCASE AND $KEY_PARENTID IS NULL",
+            arrayOf(candidate),
+            null
+        )?.use { if (it.moveToFirst()) it.getLong(0) else null }
 
-    if (rootId != null) return rootId
+        if (rootId != null) return rootId
 
-    // 2. Space-normalized match for root party (e.g. "Hunger Box" vs "Hungerbox")
-    val noSpaces = trimmed.replace(" ", "")
-    val noSpaceId = query(
-        PAYEES_URI,
-        arrayOf(KEY_ROWID),
-        "REPLACE($KEY_PAYEE_NAME, ' ', '') = ? COLLATE NOCASE AND $KEY_PARENTID IS NULL",
-        arrayOf(noSpaces),
-        null
-    )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+        // Space-normalized match for root party (e.g. "Hunger Box" vs "Hungerbox")
+        val noSpaces = candidate.replace(" ", "")
+        val noSpaceId = query(
+            PAYEES_URI,
+            arrayOf(KEY_ROWID),
+            "REPLACE($KEY_PAYEE_NAME, ' ', '') = ? COLLATE NOCASE AND $KEY_PARENTID IS NULL",
+            arrayOf(noSpaces),
+            null
+        )?.use { if (it.moveToFirst()) it.getLong(0) else null }
 
-    if (noSpaceId != null) return noSpaceId
+        if (noSpaceId != null) return noSpaceId
+    }
+
+    // 2. Prefix / containment match against existing root parties (e.g. "Zepto" matches "ZEPTO MARKETPLACE PRIVATE LIMITED")
+    val prefix = clean.replace(Regex("""(?i)\s+(?:and|&)\s*$"""), "").trim()
+    if (prefix.length >= 3) {
+        val prefixId = query(
+            PAYEES_URI,
+            arrayOf(KEY_ROWID),
+            "($KEY_PAYEE_NAME LIKE ? OR ? LIKE $KEY_PAYEE_NAME || '%') AND $KEY_PARENTID IS NULL",
+            arrayOf("$prefix%", rawTrimmed),
+            "$KEY_ROWID ASC"
+        )?.use { if (it.moveToFirst()) it.getLong(0) else null }
+        if (prefixId != null) return prefixId
+    }
 
     // 3. If no root party, check if any party exists with this name (case-insensitive)
-    val anyId = findParty(trimmed)
+    val anyId = findParty(clean) ?: findParty(rawTrimmed)
     if (anyId != null) return anyId
 
-    // 4. Create a new root party
-    return Party.create(name = trimmed)?.let { createParty(it) }?.id
+    // 4. Create a new root party using the CLEAN name
+    return Party.create(name = clean)?.let { createParty(it) }?.id
 }
 
 fun ContentResolver.requireBranchParty(rootId: Long, name: String, iban: String?): Long {

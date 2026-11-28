@@ -434,6 +434,70 @@ open class TransactionDatabase(context: Context, prefHandler: PrefHandler) :
           execSQL("DELETE FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dupId))
         }
       }
+
+      // 3. Clean corporate suffixes and merge into canonical root payees (e.g. ZEPTO MARKETPLACE PRIVATE LIMITED -> Zepto)
+      query("SELECT _id, name, iban FROM $TABLE_PAYEES WHERE $KEY_PARENTID IS NULL ORDER BY _id ASC").use { cursor ->
+        val rootPayees = mutableListOf<Triple<Long, String, String?>>()
+        while (cursor.moveToNext()) {
+          val id = cursor.getLong(0)
+          val name = cursor.getString(1)
+          val iban = if (cursor.isNull(2)) null else cursor.getString(2)
+          rootPayees.add(Triple(id, name, iban))
+        }
+        for ((dirtyId, dirtyName, iban) in rootPayees) {
+          val clean = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(dirtyName)
+          if (clean.isBlank() || clean.equals(dirtyName, ignoreCase = false)) continue
+
+          var canonicalId: Long? = null
+          query(SimpleSQLiteQuery("SELECT _id FROM $TABLE_PAYEES WHERE name = ? COLLATE NOCASE AND _id != ? AND $KEY_PARENTID IS NULL", arrayOf<Any>(clean, dirtyId))).use { c ->
+            if (c.moveToFirst()) canonicalId = c.getLong(0)
+          }
+          if (canonicalId == null) {
+            val noSpaces = clean.replace(" ", "")
+            query(SimpleSQLiteQuery("SELECT _id FROM $TABLE_PAYEES WHERE REPLACE(name, ' ', '') = ? COLLATE NOCASE AND _id != ? AND $KEY_PARENTID IS NULL", arrayOf<Any>(noSpaces, dirtyId))).use { c ->
+              if (c.moveToFirst()) canonicalId = c.getLong(0)
+            }
+          }
+
+          if (canonicalId != null && canonicalId != dirtyId) {
+            execSQL("UPDATE $TABLE_TRANSACTIONS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            execSQL("UPDATE $TABLE_TEMPLATES SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            execSQL("UPDATE $TABLE_DEBTS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            execSQL("UPDATE $TABLE_PAYEES SET $KEY_PARENTID = ? WHERE $KEY_PARENTID = ?", arrayOf<Any>(canonicalId, dirtyId))
+            if (iban != null) {
+              execSQL("UPDATE $TABLE_PAYEES SET $KEY_IBAN = ? WHERE _id = ? AND ($KEY_IBAN IS NULL OR $KEY_IBAN = '')", arrayOf<Any>(iban, canonicalId))
+            }
+            execSQL("DELETE FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dirtyId))
+          } else {
+            // Rename to clean canonical name
+            execSQL("UPDATE $TABLE_PAYEES SET name = ? WHERE _id = ?", arrayOf<Any>(clean, dirtyId))
+          }
+        }
+      }
+
+      // 4. Deduplicate redundant child branches under the same parent
+      query("SELECT _id, parent_id, iban FROM $TABLE_PAYEES WHERE $KEY_PARENTID IS NOT NULL ORDER BY _id ASC").use { cursor ->
+        val seenBranches = mutableMapOf<Pair<Long, String>, Long>() // (parentId, iban) -> canonical branch ID
+        val duplicateBranches = mutableListOf<Pair<Long, Long>>() // dupBranchId to canonicalBranchId
+        while (cursor.moveToNext()) {
+          val branchId = cursor.getLong(0)
+          val parentId = cursor.getLong(1)
+          val iban = if (cursor.isNull(2)) "" else cursor.getString(2).trim().lowercase(java.util.Locale.ROOT)
+          val key = Pair(parentId, iban)
+          val canonical = seenBranches[key]
+          if (canonical != null) {
+            duplicateBranches.add(Pair(branchId, canonical))
+          } else {
+            seenBranches[key] = branchId
+          }
+        }
+        for ((dupId, canonicalId) in duplicateBranches) {
+          execSQL("UPDATE $TABLE_TRANSACTIONS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dupId))
+          execSQL("UPDATE $TABLE_TEMPLATES SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dupId))
+          execSQL("UPDATE $TABLE_DEBTS SET $KEY_PAYEEID = ? WHERE $KEY_PAYEEID = ?", arrayOf<Any>(canonicalId, dupId))
+          execSQL("DELETE FROM $TABLE_PAYEES WHERE _id = ?", arrayOf<Any>(dupId))
+        }
+      }
     }
   }
 

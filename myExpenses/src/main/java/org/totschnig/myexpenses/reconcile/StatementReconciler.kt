@@ -93,10 +93,11 @@ object StatementReconciler {
             var matchedTx: AppTransactionSummary? = null
             var matchReason = ""
 
-            // Tier 1a: UTR exact match
+            // Tier 1a: UTR exact match (must match direction: debit or credit)
             if (!st.utr.isNullOrBlank()) {
                 matchedTx = appSummaries.firstOrNull { tx ->
                     tx.id !in matchedAppTxIds &&
+                    (if (isWithdrawal) tx.amount <= BigDecimal.ZERO else tx.amount >= BigDecimal.ZERO) &&
                     ((tx.referenceNumber?.contains(st.utr) == true) ||
                      (tx.comment?.contains(st.utr) == true))
                 }
@@ -105,10 +106,11 @@ object StatementReconciler {
                 }
             }
 
-            // Tier 1b: Ref ID match
+            // Tier 1b: Ref ID match (must match direction: debit or credit)
             if (matchedTx == null && !st.ref.isNullOrBlank()) {
                 matchedTx = appSummaries.firstOrNull { tx ->
                     tx.id !in matchedAppTxIds &&
+                    (if (isWithdrawal) tx.amount <= BigDecimal.ZERO else tx.amount >= BigDecimal.ZERO) &&
                     ((tx.referenceNumber?.contains(st.ref) == true) ||
                      (tx.comment?.contains(st.ref) == true))
                 }
@@ -129,12 +131,21 @@ object StatementReconciler {
                 if (candidates.isNotEmpty()) {
                     val best = candidates.minByOrNull { tx ->
                         val dayDiff = abs(ChronoUnit.DAYS.between(st.date, tx.date))
-                        val payeeBonus = if (tx.payee.isNotBlank() && st.payeeOrRemarks.contains(tx.payee, ignoreCase = true)) -5 else 0
-                        dayDiff + payeeBonus
+                        val payeeMatch = tx.payee.isNotBlank() && (
+                            st.payeeOrRemarks.contains(tx.payee, ignoreCase = true) ||
+                            tx.payee.contains(st.payeeOrRemarks, ignoreCase = true) ||
+                            hasPayeeTokenAffinity(st.payeeOrRemarks, tx.payee)
+                        )
+                        val commentMatch = !st.comment.isNullOrBlank() && !tx.comment.isNullOrBlank() && (
+                            st.comment.contains(tx.comment, ignoreCase = true) ||
+                            tx.comment.contains(st.comment, ignoreCase = true)
+                        )
+                        val bonus = (if (payeeMatch) -5 else 0) + (if (commentMatch) -3 else 0)
+                        dayDiff + bonus
                     }
                     if (best != null) {
                         matchedTx = best
-                        matchReason = "Exact Amount ₹$stAmount on ${best.date}"
+                        matchReason = if (st.isRefund) "Refund Match ₹$stAmount on ${best.date}" else "Exact Amount ₹$stAmount on ${best.date}"
                     }
                 }
             }

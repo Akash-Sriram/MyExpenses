@@ -262,4 +262,118 @@ class BankStatementParserTest {
             )
         }
     }
+
+    @Test
+    fun testParseRefundRemarkDetails() {
+        val rawRemark = "RFNDZEPTO/XXpayu@hdfcban/burger/HDFC BANK/805834443326/PPPL320496238642811260639526b0a29e0"
+        val parsed = BankStatementParser.parseRemarkDetails(rawRemark)
+
+        assertEquals("Zepto", parsed.payee)
+        assertEquals("burger refund", parsed.comment)
+        assertEquals("805834443326", parsed.utr)
+        assertTrue(parsed.isRefund)
+    }
+
+    @Test
+    fun testParseSpatialElementsWithRefund() {
+        val elements = listOf(
+            SpatialPdfElement(x = 30.10f, y = 588.98f, text = "1", page = 1),
+            SpatialPdfElement(x = 61.40f, y = 588.98f, text = "28.11.2026", page = 1),
+            SpatialPdfElement(x = 192.00f, y = 594.02f, text = "RFNDZEPTO/XXpayu@hdfcban/burger/HDFC BANK/805834443326/PPPL320496238642811260639526b0a29e0", page = 1),
+            SpatialPdfElement(x = 483.50f, y = 588.98f, text = "160.40", page = 1),
+            SpatialPdfElement(x = 535.50f, y = 588.98f, text = "35000.00", page = 1)
+        )
+
+        val results = BankStatementParser.parseSpatialElements(elements)
+
+        assertEquals(1, results.size)
+        val st = results[0]
+        assertEquals("Zepto", st.payeeOrRemarks)
+        assertEquals("burger refund", st.comment)
+        assertEquals("805834443326", st.utr)
+        assertTrue(st.isRefund)
+        assertEquals(BigDecimal("160.40"), st.deposit)
+        assertEquals(BigDecimal.ZERO, st.withdrawal)
+        assertEquals(BigDecimal("160.40"), st.amount)
+    }
+
+    @Test
+    fun testReconcileOrderReorderAndRefundSharingUtr() {
+        // 1. Cancelled Order at 6:40 AM (Expense -160.40, UTR 805834443326)
+        val stOrder = StatementTransaction(
+            sNo = 1,
+            date = LocalDate.of(2026, 11, 28),
+            payeeOrRemarks = "Zepto",
+            withdrawal = BigDecimal("160.40"),
+            deposit = BigDecimal.ZERO,
+            amount = BigDecimal("-160.40"),
+            balance = BigDecimal("34839.60"),
+            utr = "805834443326"
+        )
+
+        // 2. Successful Re-order at 7:01 AM (Expense -160.40, UTR 070139746741)
+        val stReorder = StatementTransaction(
+            sNo = 2,
+            date = LocalDate.of(2026, 11, 28),
+            payeeOrRemarks = "Zepto",
+            withdrawal = BigDecimal("160.40"),
+            deposit = BigDecimal.ZERO,
+            amount = BigDecimal("-160.40"),
+            balance = BigDecimal("34679.20"),
+            utr = "070139746741"
+        )
+
+        // 3. Auto-refund received at 11:07 AM (Income +160.40, UTR 805834443326, same UTR as original order!)
+        val stRefund = StatementTransaction(
+            sNo = 3,
+            date = LocalDate.of(2026, 11, 28),
+            payeeOrRemarks = "Zepto",
+            withdrawal = BigDecimal.ZERO,
+            deposit = BigDecimal("160.40"),
+            amount = BigDecimal("160.40"),
+            balance = BigDecimal("34839.60"),
+            utr = "805834443326",
+            comment = "burger refund",
+            isRefund = true
+        )
+
+        // App Transactions recorded
+        val appOrder = AppTransactionSummary(
+            id = 1001L,
+            date = LocalDate.of(2026, 11, 28),
+            amount = BigDecimal("-160.40"),
+            payee = "Zepto",
+            referenceNumber = "805834443326"
+        )
+        val appReorder = AppTransactionSummary(
+            id = 1002L,
+            date = LocalDate.of(2026, 11, 28),
+            amount = BigDecimal("-160.40"),
+            payee = "Zepto",
+            referenceNumber = "070139746741"
+        )
+        val appRefund = AppTransactionSummary(
+            id = 1003L,
+            date = LocalDate.of(2026, 11, 28),
+            amount = BigDecimal("160.40"),
+            payee = "ZEPTO MARKETPLACE PRIVATE LIMITED", // Even with legacy corporate payee name!
+            comment = "burger refund"
+        )
+
+        val statementList = listOf(stOrder, stReorder, stRefund)
+        val appList = listOf(appOrder, appReorder, appRefund)
+
+        val report = StatementReconciler.reconcileSummaries(statementList, appList)
+
+        assertEquals("All 3 transactions should be matched", 3, report.matchedCount)
+        assertEquals("0 transactions should be unmatched", 0, report.unmatchedCount)
+
+        val matchOrder = (report.items.first { it.statementTx.sNo == 1 }.status as MatchStatus.Matched)
+        val matchReorder = (report.items.first { it.statementTx.sNo == 2 }.status as MatchStatus.Matched)
+        val matchRefund = (report.items.first { it.statementTx.sNo == 3 }.status as MatchStatus.Matched)
+
+        assertEquals("Order should match appOrder (1001)", 1001L, matchOrder.appTransactionId)
+        assertEquals("Reorder should match appReorder (1002)", 1002L, matchReorder.appTransactionId)
+        assertEquals("Refund should match appRefund (1003)", 1003L, matchRefund.appTransactionId)
+    }
 }

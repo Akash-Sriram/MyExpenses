@@ -194,17 +194,21 @@ object BankStatementParser {
                 val isDeposit = deposit > BigDecimal.ZERO
                 val netAmount = if (isDeposit) deposit else withdrawal.negate()
 
+                val parsedRemark = parseRemarkDetails(fullRemarks, payeeCandidate)
+
                 results.add(
                     StatementTransaction(
                         sNo = sNo,
                         date = date ?: LocalDate.now(),
-                        payeeOrRemarks = cleanRemarks(if (payeeCandidate.isNotBlank()) payeeCandidate else fullRemarks),
+                        payeeOrRemarks = parsedRemark.payee,
                         withdrawal = withdrawal,
                         deposit = deposit,
                         amount = netAmount,
                         balance = balance,
-                        utr = extractUtr(fullRemarks),
-                        ref = extractRef(fullRemarks),
+                        utr = parsedRemark.utr ?: extractUtr(fullRemarks),
+                        ref = parsedRemark.ref ?: extractRef(fullRemarks),
+                        comment = parsedRemark.comment,
+                        isRefund = parsedRemark.isRefund || (isDeposit && fullRemarks.contains("RFND", ignoreCase = true)),
                         rawText = fullRemarks
                     )
                 )
@@ -261,20 +265,21 @@ object BankStatementParser {
             val deposit = if (isDeposit) txnAmt else BigDecimal.ZERO
             val netAmount = if (isDeposit) deposit else withdrawal.negate()
 
-            val utr = extractUtr(remarks)
-            val ref = extractRef(remarks)
+            val parsedRemark = parseRemarkDetails(remarks)
 
             results.add(
                 StatementTransaction(
                     sNo = sNoCounter++,
                     date = date,
-                    payeeOrRemarks = cleanRemarks(remarks),
+                    payeeOrRemarks = parsedRemark.payee,
                     withdrawal = withdrawal,
                     deposit = deposit,
                     amount = netAmount,
                     balance = balance,
-                    utr = utr,
-                    ref = ref,
+                    utr = parsedRemark.utr ?: extractUtr(remarks),
+                    ref = parsedRemark.ref ?: extractRef(remarks),
+                    comment = parsedRemark.comment,
+                    isRefund = parsedRemark.isRefund || (isDeposit && remarks.contains("RFND", ignoreCase = true)),
                     rawText = trimmed
                 )
             )
@@ -369,17 +374,22 @@ object BankStatementParser {
             val isDeposit = deposit > BigDecimal.ZERO
             val netAmount = if (isDeposit) deposit else withdrawal.negate()
 
+            val textForParsing = if (payeeCandidate.isNotBlank()) "$payeeCandidate $blockText" else blockText
+            val parsedRemark = parseRemarkDetails(textForParsing, payeeCandidate)
+
             results.add(
                 StatementTransaction(
                     sNo = sNo,
                     date = date,
-                    payeeOrRemarks = cleanRemarks(if (payeeCandidate.isNotBlank()) payeeCandidate else blockText),
+                    payeeOrRemarks = parsedRemark.payee,
                     withdrawal = withdrawal,
                     deposit = deposit,
                     amount = netAmount,
                     balance = balance,
-                    utr = extractUtr(blockText),
-                    ref = extractRef(blockText),
+                    utr = parsedRemark.utr ?: extractUtr(blockText),
+                    ref = parsedRemark.ref ?: extractRef(blockText),
+                    comment = parsedRemark.comment,
+                    isRefund = parsedRemark.isRefund || (isDeposit && blockText.contains("RFND", ignoreCase = true)),
                     rawText = blockText
                 )
             )
@@ -435,8 +445,110 @@ object BankStatementParser {
         return null
     }
 
+    data class ParsedRemark(
+        val payee: String,
+        val comment: String? = null,
+        val utr: String? = null,
+        val ref: String? = null,
+        val isRefund: Boolean = false
+    )
+
+    fun parseRemarkDetails(text: String, candidatePayee: String? = null): ParsedRemark {
+        val trimmed = text.trim()
+        val isRefund = trimmed.startsWith("RFND", ignoreCase = true) ||
+                       trimmed.contains("/RFND", ignoreCase = true) ||
+                       trimmed.startsWith("REFUND", ignoreCase = true) ||
+                       trimmed.contains("/REFUND", ignoreCase = true)
+
+        val utr = extractUtr(trimmed)
+        val ref = extractRef(trimmed)
+
+        // 1. Check for RFND format: RFNDZEPTO/XXpayu@hdfcban/burger/HDFC BANK/805834443326/PPPL...
+        if (isRefund) {
+            val tokens = trimmed.split("/").map { it.trim() }.filter { it.isNotEmpty() }
+            if (tokens.isNotEmpty()) {
+                val firstToken = tokens.first()
+                val rawMerchant = firstToken.replace(Regex("""^(?i)(?:rfnd|refund)[\s/_-]*"""), "").trim()
+                val cleanMerchant = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(rawMerchant).ifBlank {
+                    candidatePayee?.takeIf { it.isNotBlank() } ?: rawMerchant
+                }
+
+                // Look for item / note token: not bank name, not VPA (no @), not pure digits, not long hex/hash
+                var note: String? = null
+                for (token in tokens.drop(1)) {
+                    if (token.contains("@")) continue
+                    if (token.contains("BANK", ignoreCase = true)) continue
+                    if (token.all { it.isDigit() }) continue
+                    if (token.length > 20 && token.any { it.isDigit() } && token.any { it.isLetter() }) continue // hash/gateway id
+                    if (token.length in 2..30) {
+                        note = token
+                        break
+                    }
+                }
+
+                val comment = if (!note.isNullOrBlank()) {
+                    if (note.contains("refund", ignoreCase = true)) note else "$note refund"
+                } else {
+                    "Refund"
+                }
+
+                return ParsedRemark(
+                    payee = cleanMerchant,
+                    comment = comment,
+                    utr = utr,
+                    ref = ref,
+                    isRefund = true
+                )
+            }
+        }
+
+        // 2. Check for standard UPI slash-separated remarks: UPI/<UTR>/<NAME>/<VPA>/... or UPI/<NAME>/<VPA>/...
+        if (trimmed.startsWith("UPI/", ignoreCase = true) || trimmed.contains("/UPI/", ignoreCase = true)) {
+            val tokens = trimmed.split("/").map { it.trim() }.filter { it.isNotEmpty() }
+            val rest = tokens.filter { !it.equals("UPI", ignoreCase = true) }
+            var extractedPayee: String? = null
+            var comment: String? = null
+            for (token in rest) {
+                if (token.all { it.isDigit() }) continue
+                if (token.contains("@")) continue
+                if (token.contains("BANK", ignoreCase = true)) continue
+                if (token.equals("DR", ignoreCase = true) || token.equals("CR", ignoreCase = true)) continue
+                if (extractedPayee == null && token.length >= 2) {
+                    extractedPayee = org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(token)
+                } else if (comment == null && token.length >= 2) {
+                    comment = token
+                }
+            }
+            if (!extractedPayee.isNullOrBlank()) {
+                return ParsedRemark(
+                    payee = extractedPayee,
+                    comment = comment,
+                    utr = utr,
+                    ref = ref,
+                    isRefund = false
+                )
+            }
+        }
+
+        // 3. Fallback
+        val fallbackPayee = if (!candidatePayee.isNullOrBlank()) {
+            org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(cleanRemarks(candidatePayee))
+        } else {
+            org.totschnig.myexpenses.util.upi.UpiReceiptParser.cleanPayee(cleanRemarks(trimmed))
+        }
+
+        return ParsedRemark(
+            payee = fallbackPayee.ifBlank { cleanRemarks(trimmed) },
+            comment = null,
+            utr = utr,
+            ref = ref,
+            isRefund = false
+        )
+    }
+
     private fun cleanRemarks(text: String): String {
         return text
+            .replace(Regex("""(?i)^RFND[A-Za-z0-9_-]+/?|RFND/|REFUND/"""), "")
             .replace(Regex("""UPI/[^/]+/"""), "")
             .replace(Regex("""BIL/INFT/[^/]+/"""), "")
             .replace(Regex("""NEFT-[^/]+-"""), "")

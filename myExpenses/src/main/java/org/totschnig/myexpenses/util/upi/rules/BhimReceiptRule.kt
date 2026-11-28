@@ -47,8 +47,10 @@ object BhimReceiptRule : ReceiptParserRule {
             }
             payee = parts.joinToString(" ").replace(Regex("""\s+"""), " ").trim().takeIf { it.length >= 2 }
         }
-        if (payee == null) {
-            payee = UpiReceiptParser.extractPayee(lines, null, fullText)
+        payee = if (payee == null) {
+            UpiReceiptParser.extractPayee(lines, null, fullText)
+        } else {
+            UpiReceiptParser.cleanPayee(payee)
         }
 
         // 2. UPI ID: Multi-line wrapped text under "To UPI ID"
