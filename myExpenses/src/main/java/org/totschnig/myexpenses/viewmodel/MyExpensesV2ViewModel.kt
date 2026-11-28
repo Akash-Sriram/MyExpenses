@@ -2146,7 +2146,7 @@ open class MyExpensesV2ViewModel(
             date = dateLocalDateTime,
             valueDate = statementTx.date,
             party = party,
-            catId = categoryId,
+            categoryId = categoryId,
             comment = comment,
             referenceNumber = statementTx.utr ?: statementTx.ref
         )
