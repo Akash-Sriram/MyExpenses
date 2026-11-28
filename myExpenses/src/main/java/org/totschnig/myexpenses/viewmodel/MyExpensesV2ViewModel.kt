@@ -9,7 +9,6 @@ import org.totschnig.myexpenses.db2.addAttachments
 import org.totschnig.myexpenses.db2.deleteAttachments
 import org.totschnig.myexpenses.db2.loadAttachments
 import org.totschnig.myexpenses.db2.getCategoryPath
-import org.totschnig.myexpenses.db2.requireRootParty
 import org.totschnig.myexpenses.provider.BaseTransactionProvider
 import org.totschnig.myexpenses.provider.KEY_DESCRIPTION
 import org.totschnig.myexpenses.provider.KEY_IBAN
@@ -67,12 +66,10 @@ import org.totschnig.myexpenses.provider.KEY_EXCLUDE_FROM_TOTALS
 import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_PATH
-import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_REFERENCE_NUMBER
 import org.totschnig.myexpenses.provider.KEY_IS_NUMBERED
 import org.totschnig.myexpenses.provider.KEY_METHODID
 import org.totschnig.myexpenses.provider.KEY_ACCOUNT_TYPE_LIST
-import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.viewmodel.data.PaymentMethod
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.TABLE_CATEGORIES

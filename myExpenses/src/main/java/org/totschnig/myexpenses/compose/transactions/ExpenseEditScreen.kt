@@ -55,7 +55,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import android.graphics.Bitmap
@@ -63,7 +62,6 @@ import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.os.Build
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.ui.graphics.asImageBitmap
@@ -109,7 +107,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
