@@ -532,7 +532,12 @@ abstract class BaseMyExpenses<T : MyExpensesViewModel> : LaunchActivity(),
                             )
                         }).show(supportFragmentManager, "BALANCE_ACCOUNT")
                     } else {
-                        showSnackBar(R.string.dialog_command_disabled_balance)
+                        val v2ViewModel = viewModel as? org.totschnig.myexpenses.viewmodel.MyExpensesV2ViewModel
+                        if (v2ViewModel != null) {
+                            v2ViewModel.startReconcile(it)
+                        } else {
+                            showSnackBar(R.string.dialog_command_disabled_balance)
+                        }
                     }
                 }
             }

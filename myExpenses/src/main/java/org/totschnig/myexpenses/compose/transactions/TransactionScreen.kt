@@ -498,7 +498,7 @@ fun TransactionScreen(
                                         onLoadPeriodSummary = { acc, period -> viewModel.getPeriodSummary(acc, period) },
                                         hideBalances = hideBalances,
                                         viewModel = viewModel,
-                                        onOpenReconcile = { (currentAccount as? FullAccount)?.let { viewModel.startReconcile(it) } }
+                                        onOpenReconcile = { account -> viewModel.startReconcile(account) }
                                     )
                                 },
                                 actions = {
@@ -793,7 +793,7 @@ private fun BalanceHeader(
     onLoadPeriodSummary: (suspend (BaseAccount, BalancePeriod) -> PeriodBalanceSummary)? = null,
     hideBalances: Boolean = false,
     viewModel: MyExpensesV2ViewModel? = null,
-    onOpenReconcile: (() -> Unit)? = null
+    onOpenReconcile: ((FullAccount) -> Unit)? = null
 ) {
     var isSummaryPopupVisible by rememberSaveable { mutableStateOf(false) }
     var selectedPeriod by rememberSaveable { mutableStateOf(BalancePeriod.SALARY_CYCLE) }
@@ -911,7 +911,6 @@ private fun BalanceHeader(
 
                                 if (currentAccount is FullAccount) {
                                     val isCcard = currentAccount.type.name == PREDEFINED_NAME_CCARD
-                                    val isBank = currentAccount.type.name == PREDEFINED_NAME_BANK
 
                                     if (isCcard && viewModel != null) {
                                         val ccDetail by viewModel.getCreditCardDetail(currentAccount.id)
@@ -923,12 +922,14 @@ private fun BalanceHeader(
                                             currencyUnit = currentAccount.currencyUnit,
                                             detail = ccDetail
                                         )
-                                    } else if (isBank && onOpenReconcile != null) {
+                                    }
+
+                                    if (!currentAccount.isPortfolio && onOpenReconcile != null) {
                                         Spacer(Modifier.height(12.dp))
                                         OutlinedButton(
                                             onClick = {
                                                 isSummaryPopupVisible = false
-                                                onOpenReconcile()
+                                                onOpenReconcile(currentAccount)
                                             },
                                             modifier = Modifier.fillMaxWidth(),
                                             shape = RoundedCornerShape(8.dp)

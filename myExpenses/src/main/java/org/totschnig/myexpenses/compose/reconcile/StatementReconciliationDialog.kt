@@ -19,10 +19,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.res.booleanResource
+import org.totschnig.myexpenses.compose.conditional
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -307,13 +311,31 @@ fun StatementReconciliationDialog(
 
     BackHandler(onBack = onDismiss)
 
-    Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding(),
-        color = MaterialTheme.colorScheme.background
+    val isLarge = booleanResource(R.bool.isLarge)
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = isLarge,
+            decorFitsSystemWindows = false
+        )
     ) {
-        Scaffold(
+        Surface(
+            modifier = Modifier
+                .conditional(
+                    isLarge,
+                    ifTrue = {
+                        widthIn(max = 680.dp)
+                            .heightIn(max = 900.dp)
+                            .fillMaxHeight(0.95f)
+                    },
+                    ifFalse = { fillMaxSize() }
+                )
+                .imePadding(),
+            shape = if (isLarge) MaterialTheme.shapes.extraLarge else androidx.compose.ui.graphics.RectangleShape,
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = {
                 TopAppBar(
@@ -420,6 +442,7 @@ fun StatementReconciliationDialog(
                 }
             }
         }
+    }
     }
 }
 
