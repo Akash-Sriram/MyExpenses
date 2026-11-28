@@ -56,14 +56,15 @@ object BhimReceiptRule : ReceiptParserRule {
         var upiId: String? = null
         if (upiIdx >= 0) {
             val sb = StringBuilder()
-            sb.append(lines[upiIdx].replace(Regex("""(?i).*to\s+upi\s+id"""), ""))
+            sb.append(lines[upiIdx].replace(Regex("""(?i).*to\s+upi\s+id"""), "")).append(" ")
             for (i in (upiIdx + 1) until minOf(lines.size, upiIdx + 7)) {
                 val l = lines[i]
                 if (Regex("""(?i)debited\s+account|process\s+details|icici|hdfc|sbi\b|axis""").containsMatchIn(l) && !l.contains("@")) break
-                sb.append(l)
+                sb.append(l).append(" ")
                 if (l.contains("@")) break
             }
-            val stitched = rightColumnNoise.replace(sb.toString(), "").replace(Regex("""\s+"""), "")
+            val withoutNoise = rightColumnNoise.replace(sb.toString(), " ")
+            val stitched = withoutNoise.replace(Regex("""\s+"""), "")
             upiId = Regex("""[A-Za-z0-9][A-Za-z0-9._\-]*@[A-Za-z]{2,}""").find(stitched)?.value
         }
         if (upiId == null) {
