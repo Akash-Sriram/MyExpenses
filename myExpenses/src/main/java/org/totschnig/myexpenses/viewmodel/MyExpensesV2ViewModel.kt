@@ -66,6 +66,8 @@ import org.totschnig.myexpenses.provider.KEY_CR_STATUS
 import org.totschnig.myexpenses.provider.KEY_EXCLUDE_FROM_TOTALS
 import org.totschnig.myexpenses.provider.KEY_PAYEEID
 import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
+import org.totschnig.myexpenses.provider.KEY_PATH
+import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_TYPE
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
@@ -903,23 +905,55 @@ open class MyExpensesV2ViewModel(
         }
     }
 
-    fun getAutofillForPayee(payeeId: Long): Long? {
+    data class AutofillCategoryInfo(
+        val catId: Long,
+        val path: String?,
+        val icon: String?
+    )
+
+    fun getAutofillCategoryForPayee(payeeId: Long): AutofillCategoryInfo? {
         return try {
             contentResolver.query(
                 android.content.ContentUris.withAppendedId(TransactionProvider.AUTOFILL_URI, payeeId),
-                arrayOf(KEY_CATID),
+                arrayOf(KEY_CATID, KEY_PATH, KEY_ICON),
                 null,
                 null,
                 null
             )?.use { cursor ->
-                if (cursor.moveToFirst() && !cursor.isNull(0)) {
-                    val catId = cursor.getLong(0)
-                    if (catId != 0L) catId else null
+                if (cursor.moveToFirst()) {
+                    val catIdIdx = cursor.getColumnIndex(KEY_CATID)
+                    val pathIdx = cursor.getColumnIndex(KEY_PATH)
+                    val iconIdx = cursor.getColumnIndex(KEY_ICON)
+                    val catId = if (catIdIdx != -1 && !cursor.isNull(catIdIdx)) cursor.getLong(catIdIdx) else 0L
+                    if (catId != 0L) {
+                        var path = if (pathIdx != -1 && !cursor.isNull(pathIdx)) cursor.getString(pathIdx) else null
+                        var icon = if (iconIdx != -1 && !cursor.isNull(iconIdx)) cursor.getString(iconIdx) else null
+                        if (path.isNullOrBlank()) {
+                            contentResolver.query(
+                                android.content.ContentUris.withAppendedId(TransactionProvider.CATEGORIES_URI, catId),
+                                arrayOf(org.totschnig.myexpenses.provider.KEY_LABEL, KEY_ICON),
+                                null, null, null
+                            )?.use { catCursor ->
+                                if (catCursor.moveToFirst()) {
+                                    val lIdx = catCursor.getColumnIndex(org.totschnig.myexpenses.provider.KEY_LABEL)
+                                    val iIdx = catCursor.getColumnIndex(KEY_ICON)
+                                    if (lIdx != -1 && !catCursor.isNull(lIdx)) path = catCursor.getString(lIdx)
+                                    if (iIdx != -1 && !catCursor.isNull(iIdx) && icon.isNullOrBlank()) icon = catCursor.getString(iIdx)
+                                }
+                            }
+                        }
+                        AutofillCategoryInfo(catId, path, icon)
+                    } else null
                 } else null
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            timber.log.Timber.e(e, "Error loading autofill category for payee %d", payeeId)
             null
         }
+    }
+
+    fun getAutofillForPayee(payeeId: Long): Long? {
+        return getAutofillCategoryForPayee(payeeId)?.catId
     }
 
 
@@ -1003,11 +1037,13 @@ open class MyExpensesV2ViewModel(
 
                 if (receipt != null && receipt.isValid) {
                     val payeeName = receipt.payeeName ?: receipt.recipientName
-                    val payeeId = payeeName?.let { resolvePayeeId(it, receipt.upiId) }
+                    val payeeId = (payeeName ?: "").let { resolvePayeeId(it, receipt.upiId) }
                     val party = payeeId?.let { id ->
                         val name = getPayeeName(id) ?: payeeName
                         DisplayParty(id = id, name = name, iban = receipt.upiId)
                     } ?: payeeName?.let { DisplayParty(id = 0L, name = it, iban = receipt.upiId) }
+
+                    val autoFillCategory = payeeId?.let { getAutofillCategoryForPayee(it) }
 
                     val methodId = findMethodIdForLabel("UPI") ?: findMethodIdForLabel("Electronic payment")
                     val methodLabel = if (methodId != null) "UPI" else null
@@ -1029,6 +1065,9 @@ open class MyExpensesV2ViewModel(
                         date = date,
                         valueDate = valueDate,
                         party = party,
+                        categoryId = autoFillCategory?.catId,
+                        categoryPath = autoFillCategory?.path,
+                        categoryIcon = autoFillCategory?.icon,
                         methodId = methodId,
                         methodLabel = methodLabel,
                         comment = receipt.comment,
