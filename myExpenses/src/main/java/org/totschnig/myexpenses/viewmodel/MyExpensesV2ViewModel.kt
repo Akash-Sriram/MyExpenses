@@ -2098,4 +2098,39 @@ open class MyExpensesV2ViewModel(
             saveTransaction(txData)
         }
     }
+
+    fun saveStatementTransactions(
+        statementTxList: List<StatementTransaction>,
+        account: FullAccount,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch(coroutineDispatcher) {
+            statementTxList.forEach { statementTx ->
+                val isDeposit = statementTx.deposit > BigDecimal.ZERO
+                val amountMajor = if (isDeposit) statementTx.deposit else statementTx.withdrawal
+                val amountMinor = Money.convertBigDecimal(amountMajor, account.currencyUnit.fractionDigits)
+                val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
+
+                val dateLocalDateTime = statementTx.date.atStartOfDay()
+
+                val resolvedPartyId = repository.requireRootParty(statementTx.payeeOrRemarks)
+                val party = DisplayParty(resolvedPartyId, statementTx.payeeOrRemarks)
+
+                val txData = TransactionEditData(
+                    uuid = org.totschnig.myexpenses.model.generateUuid(),
+                    accountId = account.id,
+                    amount = Money(account.currencyUnit, signedAmountMinor),
+                    date = dateLocalDateTime,
+                    valueDate = statementTx.date,
+                    party = party,
+                    comment = statementTx.payeeOrRemarks,
+                    referenceNumber = statementTx.utr ?: statementTx.ref
+                )
+                saveTransaction(txData)
+            }
+            withContext(Dispatchers.Main) {
+                onComplete()
+            }
+        }
+    }
 }

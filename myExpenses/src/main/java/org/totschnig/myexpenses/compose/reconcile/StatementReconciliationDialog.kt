@@ -3,6 +3,7 @@ package org.totschnig.myexpenses.compose.reconcile
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -52,6 +53,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -129,7 +131,8 @@ fun StatementReconciliationDialog(
     currencyUnit: CurrencyUnit,
     appTransactions: List<Transaction2>,
     onDismiss: () -> Unit,
-    onAddMissingTransaction: (StatementTransaction) -> Unit
+    onAddMissingTransaction: (StatementTransaction) -> Unit,
+    onAddAllMissingTransactions: ((List<StatementTransaction>) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -196,7 +199,10 @@ fun StatementReconciliationDialog(
     var importedPageCount by remember { mutableStateOf<Int?>(null) }
     var isProcessingDoc by remember { mutableStateOf(false) }
     var docErrorMessage by remember { mutableStateOf<String?>(null) }
-    var reconciliationReport by remember { mutableStateOf<ReconciliationReport?>(null) }
+    var parsedTransactions by remember { mutableStateOf<List<StatementTransaction>?>(null) }
+    val reconciliationReport = remember(parsedTransactions, appTransactions) {
+        parsedTransactions?.let { StatementReconciler.reconcile(it, appTransactions) }
+    }
     var itemFilter by rememberSaveable { mutableStateOf(ItemFilter.UNMATCHED_ONLY) }
 
     // Password Prompt Dialog State for encrypted PDFs
@@ -219,7 +225,7 @@ fun StatementReconciliationDialog(
                         isPasswordDialogOpen = false
                         passwordInput = ""
                         passwordError = null
-                        reconciliationReport = StatementReconciler.reconcile(result.transactions, appTransactions)
+                        parsedTransactions = result.transactions
                     }
                     is DocumentReadResult.PasswordRequired -> {
                         pendingPasswordDocUri = result.uri
@@ -293,14 +299,16 @@ fun StatementReconciliationDialog(
         )
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    BackHandler(onBack = onDismiss)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
+        color = MaterialTheme.colorScheme.background
     ) {
         Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding(),
+            modifier = Modifier.fillMaxSize(),
             topBar = {
                 TopAppBar(
                     title = {
@@ -392,7 +400,8 @@ fun StatementReconciliationDialog(
                             itemFilter = itemFilter,
                             onFilterChange = { itemFilter = it },
                             currencyUnit = currencyUnit,
-                            onAddMissing = onAddMissingTransaction
+                            onAddMissing = onAddMissingTransaction,
+                            onAddAllMissing = onAddAllMissingTransactions
                         )
                     }
                 }
@@ -767,16 +776,17 @@ private fun StatementDocumentImportContent(
     itemFilter: ItemFilter,
     onFilterChange: (ItemFilter) -> Unit,
     currencyUnit: CurrencyUnit,
-    onAddMissing: (StatementTransaction) -> Unit
+    onAddMissing: (StatementTransaction) -> Unit,
+    onAddAllMissing: ((List<StatementTransaction>) -> Unit)? = null
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        if (report == null) {
-            // Document Import Prompt Card
+    if (report == null) {
+        // Document Import Prompt Card
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -854,117 +864,139 @@ private fun StatementDocumentImportContent(
                     }
                 }
             }
-        } else {
-            // Reconciled Statement Document Header Card
-            Card(
+        }
+    } else {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Sleek, compact summary bar (~56dp)
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Row 1: File pill + Match Rate badge + Change File action
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f, fill = false),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Icon(Icons.Default.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Icon(
+                                Icons.Default.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                             Text(
                                 text = fileName ?: "Statement Document",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             pageCount?.let { pages ->
-                                Surface(
-                                    shape = RoundedCornerShape(4.dp),
-                                    color = MaterialTheme.colorScheme.primaryContainer
-                                ) {
-                                    Text(
-                                        text = "$pages pages",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
+                                Text(
+                                    text = "(${pages}p)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
 
-                        OutlinedButton(
-                            onClick = onPickDocument,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                            modifier = Modifier.height(28.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("Change File", style = MaterialTheme.typography.labelSmall)
+                            val matchPercent = if (report.totalStatementCount > 0) {
+                                (report.matchedCount.toDouble() / report.totalStatementCount.toDouble()) * 100.0
+                            } else 0.0
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (report.unmatchedCount == 0) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.primaryContainer
+                            ) {
+                                Text(
+                                    text = "${String.format(java.util.Locale.US, "%.1f", matchPercent)}% (${report.matchedCount}/${report.totalStatementCount})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (report.unmatchedCount == 0) Color(0xFF2E7D32) else MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            Text(
+                                text = "Change",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .clickable(onClick = onPickDocument)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
                     }
 
-                    val matchPercent = if (report.totalStatementCount > 0) {
-                        (report.matchedCount.toDouble() / report.totalStatementCount.toDouble()) * 100.0
-                    } else 0.0
-
+                    // Row 2: Filter chips + Add All (N) button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Matching Accuracy: ${String.format(java.util.Locale.US, "%.1f", matchPercent)}%",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (report.unmatchedCount == 0) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
-                        ) {
-                            Text(
-                                text = "${report.matchedCount}/${report.totalStatementCount} Matched",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = if (report.unmatchedCount == 0) Color(0xFF2E7D32) else Color(0xFFC62828),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            FilterChip(
+                                selected = itemFilter == ItemFilter.UNMATCHED_ONLY,
+                                onClick = { onFilterChange(ItemFilter.UNMATCHED_ONLY) },
+                                label = { Text("Missing (${report.unmatchedCount})", style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.height(28.dp)
+                            )
+                            FilterChip(
+                                selected = itemFilter == ItemFilter.MATCHED_ONLY,
+                                onClick = { onFilterChange(ItemFilter.MATCHED_ONLY) },
+                                label = { Text("Matched (${report.matchedCount})", style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.height(28.dp)
+                            )
+                            FilterChip(
+                                selected = itemFilter == ItemFilter.ALL,
+                                onClick = { onFilterChange(ItemFilter.ALL) },
+                                label = { Text("All (${report.totalStatementCount})", style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.height(28.dp)
                             )
                         }
-                    }
 
-                    if (report.unmatchedCount > 0) {
-                        Text(
-                            text = "Found ${report.unmatchedCount} statement transactions missing from MyExpenses. Tap '+ Add to App' to record them immediately.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    } else {
-                        Text(
-                            text = "All statement transactions accounted for in MyExpenses!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF2E7D32)
-                        )
+                        if (report.unmatchedCount > 0 && onAddAllMissing != null) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val missing = report.items
+                                        .filter { it.status is MatchStatus.UnmatchedInApp }
+                                        .map { it.statementTx }
+                                    onAddAllMissing(missing)
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(28.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(2.dp))
+                                Text(
+                                    text = "Add All (${report.unmatchedCount})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            // Filter Chips
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = itemFilter == ItemFilter.UNMATCHED_ONLY,
-                    onClick = { onFilterChange(ItemFilter.UNMATCHED_ONLY) },
-                    label = { Text("Missing (${report.unmatchedCount})") }
-                )
-                FilterChip(
-                    selected = itemFilter == ItemFilter.MATCHED_ONLY,
-                    onClick = { onFilterChange(ItemFilter.MATCHED_ONLY) },
-                    label = { Text("Matched (${report.matchedCount})") }
-                )
-                FilterChip(
-                    selected = itemFilter == ItemFilter.ALL,
-                    onClick = { onFilterChange(ItemFilter.ALL) },
-                    label = { Text("All (${report.totalStatementCount})") }
-                )
-            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
 
             val displayedItems = remember(report, itemFilter) {
                 when (itemFilter) {
@@ -977,11 +1009,10 @@ private fun StatementDocumentImportContent(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .weight(1f)
             ) {
                 items(displayedItems, key = { it.statementTx.sNo }) { item ->
-                    StatementItemCard(
+                    StatementItemRow(
                         item = item,
                         currencyUnit = currencyUnit,
                         onAdd = { onAddMissing(item.statementTx) }
@@ -993,7 +1024,7 @@ private fun StatementDocumentImportContent(
 }
 
 @Composable
-private fun StatementItemCard(
+private fun StatementItemRow(
     item: ReconcileResult,
     currencyUnit: CurrencyUnit,
     onAdd: () -> Unit
@@ -1001,49 +1032,68 @@ private fun StatementItemCard(
     val tx = item.statementTx
     val isWithdrawal = tx.withdrawal > BigDecimal.ZERO || tx.amount < BigDecimal.ZERO
     val status = item.status
+    val isUnmatched = status is MatchStatus.UnmatchedInApp
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (status is MatchStatus.UnmatchedInApp) {
-                Color(0xFFFFF8E1) // Soft amber for missing
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
-        )
+    val initial = tx.payeeOrRemarks.trimStart().firstOrNull()?.uppercaseChar()?.toString() ?: if (isWithdrawal) "W" else "D"
+    val avatarBg = if (isWithdrawal) {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    } else {
+        Color(0xFFE8F5E9)
+    }
+    val avatarTextColor = if (isWithdrawal) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else {
+        Color(0xFF2E7D32)
+    }
+
+    val formattedDate = remember(tx.date) {
+        try {
+            tx.date.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy"))
+        } catch (_: Exception) {
+            tx.date.toString()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (isUnmatched) {
+                    Modifier.background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.06f))
+                } else {
+                    Modifier
+                }
+            )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+            // 40dp Avatar
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = avatarBg
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = tx.date.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = initial,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = avatarTextColor
                     )
-                    if (tx.utr != null) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
-                        ) {
-                            Text(
-                                text = "UTR: ${tx.utr}",
-                                style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
                 }
+            }
 
+            Spacer(Modifier.width(12.dp))
+
+            // Info Column
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = tx.payeeOrRemarks,
                     style = MaterialTheme.typography.bodyMedium,
@@ -1052,27 +1102,58 @@ private fun StatementItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = formattedDate,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (tx.utr != null) {
+                        Text(
+                            text = "• UTR: ${tx.utr}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
                 when (status) {
                     is MatchStatus.Matched -> {
                         Text(
-                            text = "✓ ${status.reason} (App ID: ${status.appTransactionId})",
+                            text = "✓ Matched (App ID: ${status.appTransactionId})",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF2E7D32)
                         )
                     }
-
                     is MatchStatus.UnmatchedInApp -> {
-                        Text(
-                            text = "Missing from MyExpenses",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                        ) {
+                            Text(
+                                text = "Missing from App",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
                     }
                 }
             }
 
-            Column(horizontalAlignment = Alignment.End) {
+            Spacer(Modifier.width(8.dp))
+
+            // Amount and Action Button
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 val amt = if (isWithdrawal) tx.withdrawal else tx.deposit
                 Text(
                     text = "${if (isWithdrawal) "-" else "+"} ${currencyUnit.symbol} ${amt.setScale(2, RoundingMode.HALF_UP).toPlainString()}",
@@ -1081,19 +1162,23 @@ private fun StatementItemCard(
                     color = if (isWithdrawal) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
                 )
 
-                if (status is MatchStatus.UnmatchedInApp) {
-                    Spacer(Modifier.height(4.dp))
-                    OutlinedButton(
+                if (isUnmatched) {
+                    FilledTonalButton(
                         onClick = onAdd,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                         modifier = Modifier.height(28.dp)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("+ Add to App", style = MaterialTheme.typography.labelSmall)
+                        Spacer(Modifier.width(2.dp))
+                        Text("Add", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
         }
+
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 68.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
     }
 }

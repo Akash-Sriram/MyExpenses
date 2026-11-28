@@ -749,6 +749,13 @@ fun TransactionScreen(
                 coroutineScope.launch {
                     reconcileTxList = viewModel.loadTransactionsForReconcile(fullAcc.id)
                 }
+            },
+            onAddAllMissingTransactions = { missingList ->
+                viewModel.saveStatementTransactions(missingList, fullAcc) {
+                    coroutineScope.launch {
+                        reconcileTxList = viewModel.loadTransactionsForReconcile(fullAcc.id)
+                    }
+                }
             }
         )
     }
