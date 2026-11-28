@@ -16,29 +16,6 @@ import kotlin.coroutines.suspendCoroutine
 object UpiOcrScanner {
 
     suspend fun scanReceipt(context: Context, uri: Uri): Result<UpiReceiptData> = withContext(Dispatchers.IO) {
-        // 1. Primary: RapidOCR (PaddleOCR PP-OCRv4 ONNX Runtime with 2D Key-Value Pairing)
-        val rapidResult = try {
-            RapidOcrScanner.scan(context, uri)
-        } catch (e: Throwable) {
-            Timber.w(e, "RapidOCR attempt failed, falling back to ML Kit")
-            Result.failure(e)
-        }
-
-        if (rapidResult.isSuccess) {
-            val data = rapidResult.getOrNull()
-            if (data != null && data.isValid) {
-                Timber.i(
-                    "RapidOCR successfully scanned receipt: amount=%s, payee=%s, comment=%s, utr=%s",
-                    data.amount,
-                    data.payeeName,
-                    data.comment,
-                    data.referenceNumber
-                )
-                return@withContext rapidResult
-            }
-        }
-
-        // 2. Graceful Fallback: Google ML Kit
         scanWithMlKit(context, uri)
     }
 

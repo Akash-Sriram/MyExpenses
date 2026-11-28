@@ -1,5 +1,8 @@
 package org.totschnig.myexpenses.util.upi
 
+import org.totschnig.myexpenses.util.upi.rules.BhimReceiptRule
+import org.totschnig.myexpenses.util.upi.rules.IMobileReceiptRule
+import org.totschnig.myexpenses.util.upi.rules.SamsungWalletReceiptRule
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -9,6 +12,12 @@ import java.util.Locale
 import java.util.regex.Pattern
 
 object UpiReceiptParser {
+
+    private val RULES: List<ReceiptParserRule> = listOf(
+        SamsungWalletReceiptRule,
+        BhimReceiptRule,
+        IMobileReceiptRule
+    )
 
     private val RUPEE_AMOUNT_PATTERN = Pattern.compile(
         """(?<![a-zA-Z0-9#])(?:[₹\u20B9\u09B9\u0969\u0930\u0939?zZrR#*FEeTtXx~=]|Rs\.?|INR|Re\.?|रु|R(?=[\s\d|:JỊ]))[\s|:JỊ\-]*([0-9]{1,3}(?:,[0-9]{2,3})*(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)(?!\d)""",
@@ -170,20 +179,52 @@ object UpiReceiptParser {
             add("8680878355")
         }.distinct()
 
+        for (rule in RULES) {
+            if (rule.matches(joined, normalizedLines)) {
+                val ruleData = rule.parse(normalizedLines, joined, effectiveUserNames, effectiveUserPhones)
+                if (ruleData != null && ruleData.isValid) {
+                    val rawPayee = ruleData.payeeName
+                    val isRecipientMe = isUserRecipient(rawPayee, ruleData.upiId, effectiveUserNames, effectiveUserPhones)
+                    val isIncome = containsRefundOrIncome(joined) || isRecipientMe
+                    val isExpense = !isIncome
+                    val isCardTransfer = joined.contains("BIL*INFT*", ignoreCase = true) ||
+                                         joined.contains("BIL/INFT", ignoreCase = true) ||
+                                         joined.contains("5007") ||
+                                         (joined.contains("credit card", ignoreCase = true) && (joined.contains("bill", ignoreCase = true) || joined.contains("payment", ignoreCase = true)))
+                    val targetAccountHint = when {
+                        joined.contains("5007") || (isCardTransfer && !joined.contains("Amazon", ignoreCase = true)) -> "Coral Credit Card"
+                        joined.contains("Amazon Paylater", ignoreCase = true) || joined.contains("Paylater", ignoreCase = true) -> "Amazon Paylater"
+                        joined.contains("Amazon Pay", ignoreCase = true) && isCardTransfer -> "Amazon Pay CC"
+                        else -> ruleData.targetAccountHint
+                    }
+                    val suggestedTags = if (isCardTransfer) listOf("credit card") else ruleData.suggestedTags
+                    val payeeName = if (isRecipientMe) {
+                        extractSender(normalizedLines, joined)?.takeIf { !isUserRecipient(it, null, effectiveUserNames, effectiveUserPhones) }
+                    } else {
+                        rawPayee
+                    }
+                    val recipientName = if (isRecipientMe) rawPayee else ruleData.recipientName
+
+                    return ruleData.copy(
+                        payeeName = payeeName,
+                        recipientName = recipientName,
+                        isExpense = isExpense,
+                        isTransfer = isCardTransfer,
+                        targetAccountHint = targetAccountHint,
+                        suggestedTags = suggestedTags
+                    )
+                }
+            }
+        }
+
         val amount = extractAmount(normalizedLines, joined)
-        val bhim = extractBhimLayout(normalizedLines, joined)
-        val upiId = bhim?.upiId ?: extractUpiId(normalizedLines, effectiveUserPhones, joined)
-        val rawPayee = bhim?.payee ?: extractPayee(normalizedLines, upiId, joined)
+        val upiId = extractUpiId(normalizedLines, effectiveUserPhones, joined)
+        val rawPayee = extractPayee(normalizedLines, upiId, joined)
         val dateTime = extractDateTime(normalizedLines, joined)
         val utr = extractUtr(normalizedLines, joined)
         val bankHint = extractBankHint(normalizedLines, joined)
         val paymentMethod = detectPaymentMethod(joined)
-        val comment = if (bhim != null) {
-            if (bhim.noRemark) null else extractComment(normalizedLines, rawPayee, joined)?.takeIf { c ->
-                val compact = c.lowercase(Locale.ROOT).replace(Regex("""\s+"""), "")
-                upiId == null || !upiId.lowercase(Locale.ROOT).contains(compact)
-            }
-        } else extractComment(normalizedLines, rawPayee, joined)
+        val comment = extractComment(normalizedLines, rawPayee, joined)
 
         val isRecipientMe = isUserRecipient(rawPayee, upiId, effectiveUserNames, effectiveUserPhones)
         val isIncome = containsRefundOrIncome(joined) || isRecipientMe
@@ -258,7 +299,7 @@ object UpiReceiptParser {
                lower.contains("insurance")
     }
 
-    private fun cleanAmountCandidate(line: String): String {
+    internal fun cleanAmountCandidate(line: String): String {
         // Strip leading OCR symbol misreads when followed by space or digits (e.g. "₹30.00" -> "30.00", "7 618.00" -> "618.00", "? 1,250.00" -> "1,250.00", "३ 201.72" -> "201.72", "R600.00" -> "600.00")
         var cleaned = line.trim().replace(Regex("""^(?:[₹\u20B9\u0969\u09B9\u0930\u0939?zZrR#*FEeTtXx~=]|रु|\u0930\u0941)\s*(?=\d)"""), "")
         cleaned = cleaned.replace(Regex("""^(?:Rs\.?|INR|Re\.?|R(?=[\d|:JỊ]))[\s|JỊ:\-]*"""), "")
@@ -288,7 +329,7 @@ object UpiReceiptParser {
         return result
     }
 
-    private fun extractAmount(lines: List<String>, fullText: String): BigDecimal? {
+    internal fun extractAmount(lines: List<String>, fullText: String): BigDecimal? {
         // Priority 0a: Status keyword on the SAME line as the amount (e.g. "₹441.00 Sent", "441.00 Sent", "3411.00 Sent")
         for (line in lines) {
             if (isReferenceOrAccountLine(line)) continue
@@ -472,7 +513,7 @@ object UpiReceiptParser {
         return amount > BigDecimal.ZERO
     }
 
-    private fun extractUpiId(lines: List<String>, userPhones: List<String> = emptyList(), fullText: String? = null): String? {
+    internal fun extractUpiId(lines: List<String>, userPhones: List<String> = emptyList(), fullText: String? = null): String? {
         val isSamsung = fullText?.contains("Samsung Wallet", ignoreCase = true) == true ||
                 fullText?.contains("Samsung Walet", ignoreCase = true) == true ||
                 lines.any { it.contains("Samsung Wallet", ignoreCase = true) || it.contains("Samsung Walet", ignoreCase = true) }
@@ -542,7 +583,7 @@ object UpiReceiptParser {
                lower.matches(Regex(""".*\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b.*"""))
     }
 
-    private fun extractPayee(lines: List<String>, foundUpiId: String?, fullText: String? = null): String? {
+    internal fun extractPayee(lines: List<String>, foundUpiId: String?, fullText: String? = null): String? {
         val isSamsung = fullText?.contains("Samsung Wallet", ignoreCase = true) == true ||
                 fullText?.contains("Samsung Walet", ignoreCase = true) == true ||
                 fullText?.contains("Paid from Samsung Wallet", ignoreCase = true) == true
@@ -768,7 +809,7 @@ object UpiReceiptParser {
         return cleaned
     }
 
-    private fun isValidPayee(candidate: String): Boolean {
+    internal fun isValidPayee(candidate: String): Boolean {
         if (candidate.length < 2) return false
         val lower = candidate.lowercase(Locale.ROOT).trim()
         if (IGNORE_PAYEE_WORDS.any { lower == it || lower.startsWith("$it ") || lower.endsWith(" $it") }) {
@@ -801,7 +842,7 @@ object UpiReceiptParser {
         return true
     }
 
-    private fun extractDateTime(lines: List<String>, fullText: String): LocalDateTime? {
+    internal fun extractDateTime(lines: List<String>, fullText: String): LocalDateTime? {
         val currentYear = LocalDate.now().year
 
         val SEP = """[,•|.\-\s\u00a0\u202f\n]+"""
@@ -1000,7 +1041,7 @@ object UpiReceiptParser {
         }.coerceIn(0, 23)
     }
 
-    private fun extractUtr(lines: List<String>, fullText: String): String? {
+    internal fun extractUtr(lines: List<String>, fullText: String): String? {
         // Priority 1: line-by-line sequential scan: check each line for inline explicit label or multi-line label followed by reference number
         for (i in lines.indices) {
             val line = lines[i].trim()
@@ -1056,7 +1097,7 @@ object UpiReceiptParser {
         return null
     }
 
-    private fun extractBankHint(lines: List<String>, fullText: String): String? {
+    internal fun extractBankHint(lines: List<String>, fullText: String): String? {
         for (p in BANK_HINT_PATTERNS) {
             val m = p.matcher(fullText)
             if (m.find()) {
@@ -1188,57 +1229,9 @@ object UpiReceiptParser {
                 return "$userPart@$domain"
             }
         }
-        return candidate
     }
 
-    private data class BhimLayout(val payee: String?, val upiId: String?, val noRemark: Boolean)
-
-    private fun extractBhimLayout(lines: List<String>, fullText: String): BhimLayout? {
-        val lower = fullText.lowercase(Locale.ROOT)
-        if (!lower.contains("banking name") || !lower.contains("to upi id")) return null
-        val noRemark = Regex("""(?i)\bno\s+remarks?\b""").containsMatchIn(fullText)
-        val rightColumnNoise = Regex("""(?i)\b(?:no\s+remarks?|remarks?|date\s*&\s*time|date\s+and\s+time|transaction\s+id)\b""")
-        val stopLabel = Regex("""(?i)(transaction\s+id|date\s*&\s*time|to\s+upi\s+id|debited\s+account|process\s+details|remarks?)""")
-
-        // Payee: lines after "Banking Name" until next label
-        val bnIdx = lines.indexOfFirst { it.contains("banking name", ignoreCase = true) }
-        var payee: String? = null
-        if (bnIdx >= 0) {
-            val parts = mutableListOf<String>()
-            val sameLine = lines[bnIdx].replace(Regex("""(?i).*banking\s+name\s*[:\-]?"""), "").trim()
-            if (sameLine.isNotEmpty()) parts += sameLine
-            for (i in (bnIdx + 1) until minOf(lines.size, bnIdx + 4)) {
-                val l = lines[i]
-                val m = stopLabel.find(l)
-                if (m != null) {
-                    val before = l.substring(0, m.range.first).trim()
-                    if (before.isNotEmpty()) parts += before
-                    break
-                }
-                parts += l.trim()
-            }
-            payee = parts.joinToString(" ").replace(Regex("""\s+"""), " ").trim().takeIf { it.length >= 2 }
-        }
-
-        // UPI ID: wrapped lines after "To UPI ID" until "Debited account", stitched without spaces
-        val upiIdx = lines.indexOfFirst { it.contains("to upi id", ignoreCase = true) }
-        var upiId: String? = null
-        if (upiIdx >= 0) {
-            val sb = StringBuilder()
-            sb.append(lines[upiIdx].replace(Regex("""(?i).*to\s+upi\s+id"""), ""))
-            for (i in (upiIdx + 1) until minOf(lines.size, upiIdx + 7)) {
-                val l = lines[i]
-                if (Regex("""(?i)debited\s+account|process\s+details|icici|hdfc|sbi\b|axis""").containsMatchIn(l) && !l.contains("@")) break
-                sb.append(l)
-                if (l.contains("@")) break
-            }
-            val stitched = rightColumnNoise.replace(sb.toString(), "").replace(Regex("""\s+"""), "")
-            upiId = Regex("""[A-Za-z0-9.\-_]{2,}@[A-Za-z]{2,}""").find(stitched)?.value
-        }
-        return BhimLayout(payee, upiId, noRemark)
-    }
-
-    private fun extractComment(lines: List<String>, payeeName: String?, fullText: String): String? {
+    internal fun extractComment(lines: List<String>, payeeName: String?, fullText: String): String? {
         // 1. Explicit labeled comments across fullText or line-by-line: "Notes: ...", "Remarks: ...", "Message: ..."
         val explicitInFullText = Regex("""(?i)\b(?:notes?|remarks?|message|comments?|purpose)\s*[:\-]?\s*[\n\r\s]*\s*([a-zA-Z0-9\s.,'#\-]{2,50})""").find(fullText)
         if (explicitInFullText != null) {
@@ -1312,7 +1305,7 @@ object UpiReceiptParser {
         return systemWords.any { lower == it || lower.startsWith("$it ") || lower.contains(it) }
     }
 
-    private fun isValidUserComment(candidate: String, payeeName: String?): Boolean {
+    internal fun isValidUserComment(candidate: String, payeeName: String?): Boolean {
         if (candidate.length < 2) return false
         val lower = candidate.lowercase(Locale.ROOT).trim()
 

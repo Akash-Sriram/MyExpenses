@@ -1527,6 +1527,77 @@ class UpiReceiptParserTest {
         assertEquals(BigDecimal("411.00"), result.amount)
         assertEquals("COFFEE DAY", result.payeeName)
     }
+
+    @Test
+    fun testParseSamsungWalletZeptoBurgerReceipt() {
+        val rawText = """
+            Paid from
+            Samsung Wallet
+            
+            ZEPTO
+            zeptogrocery.payu@hdfcbank
+            HDFC BANK
+            28 NOV 2026, 06:40 AM
+            
+            ₹160.40
+            Sent
+            
+            Sender: asg98@pingpay
+            Sent from: ICICI Bank
+            Transaction ID: 805834443326
+            Notes: burger
+            
+            Powered by AXIS BANK | UPI
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("160.40"), result.amount)
+        assertEquals("Zepto", result.payeeName)
+        assertEquals("zeptogrocery.payu@hdfcbank", result.upiId)
+        assertEquals("805834443326", result.referenceNumber)
+        assertEquals("burger", result.comment)
+        assertEquals(LocalDateTime.of(2026, 11, 28, 6, 40), result.dateTime)
+    }
+
+    @Test
+    fun testParseBhimZeptoNoRemarkReceipt() {
+        val rawText = """
+            BHIM - Bharat's Own Payments App
+            Paid
+            ₹160.40
+            
+            Banking Name
+            ZEPTO MARKETPLACE PRIVATE LIMITED
+            
+            Transaction ID Date & Time
+            070139746741 28th Nov 26, 07:01 am
+            
+            To UPI ID Remarks
+            ZEPTOMARKET NO REMARK
+            PLACEPRIVAT
+            -12682647
+            .payu@indus
+            
+            Debited account
+            ICICI Bank XXXXXX07
+            
+            Process details
+            Payment initiated by G AKASH SRIRAM
+            Payment transferred from G AKASH SRIRAM
+        """.trimIndent()
+
+        val result = UpiReceiptParser.parse(rawText)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("160.40"), result.amount)
+        assertEquals("ZEPTO MARKETPLACE PRIVATE LIMITED", result.payeeName)
+        assertEquals("ZEPTOMARKETPLACEPRIVAT-12682647.payu@indus", result.upiId)
+        assertEquals("070139746741", result.referenceNumber)
+        assertNull("NO REMARK should result in null comment", result.comment)
+        assertEquals(LocalDateTime.of(2026, 11, 28, 7, 1), result.dateTime)
+    }
 }
 
 
