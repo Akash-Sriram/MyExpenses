@@ -110,6 +110,7 @@ open class ExpenseEdit : ProtectedFragmentActivity() {
                         allCategories = viewModel.getAllCategories(),
                         allTags = viewModel.getAllTags(),
                         allPayees = viewModel.getAllPayees(),
+                        availableMethods = viewModel.getAllPaymentMethods(),
                         onSave = { savedData ->
                             viewModel.saveTransaction(savedData)
                             finish()

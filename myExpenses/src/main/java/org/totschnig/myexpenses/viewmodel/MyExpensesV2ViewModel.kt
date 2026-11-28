@@ -69,7 +69,10 @@ import org.totschnig.myexpenses.provider.KEY_PAYEE_NAME
 import org.totschnig.myexpenses.provider.KEY_PATH
 import org.totschnig.myexpenses.provider.KEY_ICON
 import org.totschnig.myexpenses.provider.KEY_REFERENCE_NUMBER
+import org.totschnig.myexpenses.provider.KEY_IS_NUMBERED
+import org.totschnig.myexpenses.provider.KEY_METHODID
 import org.totschnig.myexpenses.provider.KEY_TYPE
+import org.totschnig.myexpenses.viewmodel.data.PaymentMethod
 import org.totschnig.myexpenses.provider.TABLE_ACCOUNTS
 import org.totschnig.myexpenses.provider.TABLE_CATEGORIES
 import org.totschnig.myexpenses.provider.TABLE_PAYEES
@@ -898,6 +901,26 @@ open class MyExpensesV2ViewModel(
                     if (!name.isNullOrBlank()) {
                         list.add(DisplayParty(id, name, iban = iban))
                     }
+                }
+                list
+            } ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun getAllPaymentMethods(): List<PaymentMethod> {
+        return try {
+            contentResolver.query(
+                TransactionProvider.METHODS_URI,
+                arrayOf(KEY_ROWID, KEY_LABEL, KEY_IS_NUMBERED),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val list = mutableListOf<PaymentMethod>()
+                while (cursor.moveToNext()) {
+                    list.add(PaymentMethod.from(cursor))
                 }
                 list
             } ?: emptyList()
@@ -2097,26 +2120,38 @@ open class MyExpensesV2ViewModel(
         val signedAmountMinor = if (isDeposit) amountMinor else -amountMinor
         val dateLocalDateTime = statementTx.date.atStartOfDay()
 
-        // 1. Resolve Payee
+        // 1. Resolve Payee, Category, Method from existing transaction matching UTR if available
         var resolvedPartyId: Long? = null
         var resolvedPartyName = statementTx.payeeOrRemarks
+        var matchedCategoryId: Long? = null
+        var matchedMethodId: Long? = null
 
-        // If UTR matches an existing transaction (e.g. earlier purchase that was refunded), inherit its payee
+        // If UTR matches an existing transaction (e.g. earlier purchase that was refunded), inherit its payee, category, and method
         if (!statementTx.utr.isNullOrBlank()) {
             try {
                 contentResolver.query(
                     TransactionProvider.TRANSACTIONS_URI,
-                    arrayOf(KEY_PAYEEID),
+                    arrayOf(KEY_PAYEEID, KEY_CATID, KEY_METHODID),
                     "$KEY_REFERENCE_NUMBER = ? AND $KEY_PAYEEID IS NOT NULL",
                     arrayOf(statementTx.utr),
                     "$KEY_ROWID DESC"
                 )?.use { cursor ->
-                    if (cursor.moveToFirst() && !cursor.isNull(0)) {
-                        val originalPayeeId = cursor.getLong(0)
-                        if (originalPayeeId > 0) {
-                            val id = repository.getRootPartyId(originalPayeeId) ?: originalPayeeId
-                            resolvedPartyId = id
-                            resolvedPartyName = getPayeeName(id) ?: resolvedPartyName
+                    if (cursor.moveToFirst()) {
+                        if (!cursor.isNull(0)) {
+                            val originalPayeeId = cursor.getLong(0)
+                            if (originalPayeeId > 0) {
+                                val id = repository.getRootPartyId(originalPayeeId) ?: originalPayeeId
+                                resolvedPartyId = id
+                                resolvedPartyName = getPayeeName(id) ?: resolvedPartyName
+                            }
+                        }
+                        if (!cursor.isNull(1)) {
+                            val catId = cursor.getLong(1)
+                            if (catId > 0) matchedCategoryId = catId
+                        }
+                        if (!cursor.isNull(2)) {
+                            val mId = cursor.getLong(2)
+                            if (mId > 0) matchedMethodId = mId
                         }
                     }
                 }
@@ -2128,13 +2163,19 @@ open class MyExpensesV2ViewModel(
         }
         val party = DisplayParty(resolvedPartyId, resolvedPartyName)
 
-        // 2. Resolve Category: If refund, auto-assign Refunding category
+        // 2. Resolve Category: If refund, prefer original order's category (to offset expense). If none, fallback to Refunding category.
         var categoryId: Long? = null
         if (statementTx.isRefund || (isDeposit && (statementTx.rawText.contains("RFND", ignoreCase = true) || statementTx.rawText.contains("REFUND", ignoreCase = true)))) {
-            categoryId = findRefundCategoryId()
+            categoryId = matchedCategoryId ?: findRefundCategoryId()
         }
         if (categoryId == null) {
             resolvedPartyId?.let { categoryId = getAutofillForPayee(it) }
+        }
+
+        // 3. Resolve Payment Method: Inherit from matching original order, or default to UPI if statement has UTR/UPI/RFND
+        var methodId: Long? = matchedMethodId
+        if (methodId == null && (statementTx.utr != null || statementTx.rawText.contains("UPI", ignoreCase = true) || statementTx.isRefund)) {
+            methodId = findMethodIdForLabel("UPI")
         }
 
         val comment = statementTx.comment ?: statementTx.payeeOrRemarks
@@ -2148,7 +2189,8 @@ open class MyExpensesV2ViewModel(
             party = party,
             categoryId = categoryId,
             comment = comment,
-            referenceNumber = statementTx.utr ?: statementTx.ref
+            referenceNumber = statementTx.utr ?: statementTx.ref,
+            methodId = methodId
         )
     }
 

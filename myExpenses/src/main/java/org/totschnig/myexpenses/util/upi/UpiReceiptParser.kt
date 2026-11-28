@@ -2,6 +2,7 @@ package org.totschnig.myexpenses.util.upi
 
 import org.totschnig.myexpenses.util.upi.rules.BhimReceiptRule
 import org.totschnig.myexpenses.util.upi.rules.IMobileReceiptRule
+import org.totschnig.myexpenses.util.upi.rules.MerchantRefundRule
 import org.totschnig.myexpenses.util.upi.rules.SamsungWalletReceiptRule
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -16,7 +17,8 @@ object UpiReceiptParser {
     private val RULES: List<ReceiptParserRule> = listOf(
         SamsungWalletReceiptRule,
         BhimReceiptRule,
-        IMobileReceiptRule
+        IMobileReceiptRule,
+        MerchantRefundRule
     )
 
     private val RUPEE_AMOUNT_PATTERN = Pattern.compile(

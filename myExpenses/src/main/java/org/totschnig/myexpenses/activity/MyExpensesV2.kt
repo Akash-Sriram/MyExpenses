@@ -292,6 +292,7 @@ open class MyExpensesV2 : BaseMyExpenses<MyExpensesV2ViewModel>(),
                                 allCategories = viewModel.getAllCategories(),
                                 allTags = viewModel.getAllTags(),
                                 allPayees = viewModel.getAllPayees(),
+                                availableMethods = viewModel.getAllPaymentMethods(),
                                 onSave = { savedData ->
                                     viewModel.saveTransaction(savedData)
                                     viewModel.clearTransactionToEdit()

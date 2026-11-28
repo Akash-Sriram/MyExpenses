@@ -1602,6 +1602,21 @@ class UpiReceiptParserTest {
         assertNull("NO REMARK should result in null comment", result.comment)
         assertEquals(LocalDateTime.of(2026, 11, 28, 7, 1), result.dateTime)
     }
+
+    @Test
+    fun testParseZeptoMerchantRefundSms() {
+        val sms = "Dear user, Refund of Rs 160.40 has been processed for your Zepto order OIUVJCSRB78772. Refund Ref. num. 104562090814. You can check details on Refunds page in the app."
+
+        val result = UpiReceiptParser.parse(sms)
+
+        assertNotNull(result)
+        assertEquals(BigDecimal("160.40"), result.amount)
+        assertEquals("Zepto", result.payeeName)
+        assertEquals("Refund for order OIUVJCSRB78772 (Ref: 104562090814)", result.comment)
+        assertEquals("104562090814", result.referenceNumber)
+        assertFalse(result.isExpense)
+        assertTrue(result.suggestedTags.contains("refund"))
+    }
 }
 
 
